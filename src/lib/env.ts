@@ -18,9 +18,24 @@ export const ENV = {
   get TRANSIT_API_KEY(): string {
     return process.env.TRANSIT_API_KEY ?? "";
   },
+  get SUBWAY_API_KEY(): string {
+    return process.env.SUBWAY_API_KEY ?? "";
+  },
+  get JEJU_API_KEY(): string {
+    return process.env.JEJU_API_KEY ?? "";
+  },
+  get KAKAO_REST_API_KEY(): string {
+    return process.env.KAKAO_REST_API_KEY ?? "";
+  },
 };
 
-export type ApiKeyName = "BUS_API_KEY" | "TOUR_API_KEY" | "TRANSIT_API_KEY";
+export type ApiKeyName =
+  | "BUS_API_KEY"
+  | "TOUR_API_KEY"
+  | "TRANSIT_API_KEY"
+  | "SUBWAY_API_KEY"
+  | "JEJU_API_KEY"
+  | "KAKAO_REST_API_KEY";
 
 export function hasKey(name: ApiKeyName): boolean {
   return ENV[name].trim().length > 0;

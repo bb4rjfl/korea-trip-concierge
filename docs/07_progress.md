@@ -18,8 +18,8 @@
 - [x] **대화 예시 3개** 작성 (docs/09)
 - [x] **API 키 발급 상세 가이드** 작성 완료 (docs/08, 별도 세션)
 - [x] **public GitHub repo 생성+푸시**: https://github.com/bb4rjfl/korea-trip-concierge (main, .gitattributes LF 정규화, 시크릿 미포함)
-- [ ] **데이터 소스·API 키 발급** (사용자) — docs/08 따라 BUS/TOUR/TRANSIT 키 발급 → `.env`
-- [ ] 키 발급 후 실응답으로 각 소스 파서 필드 검증(`verify-live`/`NOTE(verify-live)` 주석 지점)
+- [x] **데이터 소스·API 키 발급** (사용자) — BUS/TOUR(동일 data.go.kr 키)/TRANSIT(ODsay) 발급 → `.env` 저장 완료
+- [~] 키 발급 후 실응답으로 각 소스 파서 필드 검증(`scripts/verify-live.ts`) — **TourAPI ✅완료**, **TAGO ✅(비서울 전국 실데이터 동작, 도착필드만 낮시간 재확인)**, **ODsay ❌(ApiKeyAuthFailed)**, **서울 버스 ⏳(활용신청 대기)**
 - [x] **점검/하드닝**: `.env` 로더 추가(`loadEnv.ts`, server 최초 import) + env를 live getter로 — 키 인식 end-to-end 검증. 잘못된 JSON 에러 핸들러. repo 위생(루트 중복문서 01~07 제거, settings.local.json untrack). 지식툴 데이터 보강(지역+4/메뉴+6/결제+2).
 - [x] **카카오 규칙 자가점검(docs/01 §8)** 통과 — 위반 0 (Inspector 정식만 배포 후 대기)
 - [ ] MCP Inspector 정식 통과 확인 (로컬 curl은 통과)
@@ -35,7 +35,18 @@
 3. **KC 1차 배포**: PlayMCP in KC → Git 소스 빌드 → repo=`bb4rjfl/korea-trip-concierge`, branch=main, Dockerfile=루트 → Active → Endpoint URL 확보 → PlayMCP 임시등록 → 도구함 테스트(지식툴 3종만으로도 데모 가능).
 
 ## 블로커 / 확인 필요
-- **API 키 발급(사용자 액션 필요)**: data.go.kr 공공데이터포털 회원가입+활용신청, ODsay 가입. → 발급되면 알려주면 실데이터 연동 진행.
+- ~~ODsay 키 인증 실패~~ ✅ **해결**: 키 끝자리 `l`(소문자L)→`I`(대문자i) 오타였음. 정정 후 실호출 25개 경로 정상(지하철+버스+도보, 요금/시간 파싱 일치). getTransitRoute 실동작 확인.
+- **스코프 확장 — 신규 소스 추가(사용자 결정: 전부 탑재, 툴 20개 이내)**. 키 보관 위치 .env:
+  - ① 서울 버스 4종(data.go.kr, `BUS_API_KEY` 재사용) → trackBusArrival 서울 분기 채우기(seoul.ts) — **TODO**(새벽이라 라이브 데이터 0, 낮 검증)
+  - ② 기상청 날씨 + ③ 에어코리아 대기오염(data.go.kr, `BUS_API_KEY` 동일 키) → **신규 툴 getWeatherAndAir 완성·실데이터 검증 ✅**(KMA 단기예보 nx/ny 격자+도시테이블, 에어코리아 시도별 PM10/PM2.5 평균·등급·마스크 권고)
+  - ④ 서울 지하철 실시간(열린데이터광장, `SUBWAY_API_KEY`) → 신규 툴 — **키 검증 OK**(새벽 데이터 0, 낮 재확인 후 구현)
+  - ⑤ VisitJeju 제주관광(`JEJU_API_KEY`) → **신규 툴 getJejuInfo 완성·실데이터 검증 ✅**(HTTPS 필수, locale=en 영어, category c1~c6)
+  - ⑥ 카카오 Local 키워드/카테고리 장소검색(`KAKAO_REST_API_KEY`, 일 10만 무료) → 신규 툴(이름에 kakao 금지→`recommendPlaces` 등) — **사용자 액션 대기**: 콘솔에서 [카카오맵]>[사용 설정] ON 필요(현재 403 OPEN_MAP_AND_LOCAL disabled). Admin/Native/JS 키는 미사용·미저장.
+  - 진행: **10개 툴**(getJejuInfo, getWeatherAndAir 추가), build/70 tests green.
+- **서울 버스 활용신청(사용자 액션)**: 결정 D=「전국 TAGO + 서울 별도」. TAGO에 서울 없으므로 data.go.kr에서 **서울 버스도착정보(+정류소정보)** 추가 활용신청 필요(같은 BUS_API_KEY 재사용). 활성화되면 `src/lib/sources/seoul.ts` 구현·연결 예정. 현재 trackBusArrival은 서울 입력 시 "경로 안내 사용" 안내로 폴백.
+- **TAGO getSttnNoList 지연(주의)**: 정류소명 검색이 라이브 3.8~5.8s(새벽 측정) — 기본 2.5s 초과. 디렉터리성 호출(도시/정류소)만 타임아웃 6s로 상향(캐시 1h/1d라 콜드캐시에서만 느림), 실시간 도착 호출은 2.5s 유지. **낮 시간대 재측정 권장** + p99<3s 충돌 여부 모니터.
+- **TAGO 도착필드 미확인**: 새벽 측정이라 도착 0건 → routeno/arrtime/arrprevstationcnt/vehicletp 라이브 확인은 낮 시간대 1회 필요(문서 스펙과는 일치).
+- **검증 완료(참고)**: TAGO 엔드포인트 철자 `BusSttnInfoInqireService`/`ArvlInfoInqireService`(Inqire), 정류소검색 `cityCode`+`nodeNm`(응답에 citycode 없음→주입), city명(영/한)→코드 매핑(getCtyCodeList+별칭). TourAPI `listYN` 제거로 정상(필드 전수 일치). 모두 코드 반영 + 테스트 57개 green.
 - 루트의 `01~07_*.md` 가 `docs/`와 100% 중복 → 드리프트 방지 위해 루트 사본 삭제 권장(사용자 확인 대기).
 - 카카오맵 직접연동 가능 여부(선택, 필수 아님)
 - 본선 Kakao Tools의 Widget/elicitation/푸시 지원 범위 (본선 단계 확인)
@@ -57,3 +68,4 @@ Dockerfile               linux/amd64, 루트
 - 2026-06-25 (4): 남은 API 툴 3종 실연동 선작성 — tago.ts(TAGO 실시간 버스)+odsay.ts(경로) 소스 구현, trackBusArrival/getTransitRoute/getNowInfo 연결. 파서 픽스처/mock 테스트 추가(56개 통과). git 저장소 초기화 + .gitattributes(LF) + 첫 커밋 → public GitHub repo(bb4rjfl/korea-trip-concierge) 생성·푸시. docs/08 키 발급 가이드 완료 확인.
 - 2026-06-25 (5): 전반 점검 후 하드닝 — (버그) `.env` 미로딩 발견·수정(loadEnv + live getter, end-to-end 검증), 잘못된 JSON 에러 핸들러. repo 위생(루트 중복문서 제거, 로컬설정 untrack). 지식툴 데이터 보강. 카카오 §8 자가점검 통과. build/56 tests green.
 - 2026-06-25 (6): 서비스 오버뷰 문서 작성(`docs/00_service_overview.md`) — 총정리 + MCP 작동원리 심화(전송/생애주기/도구선택/stateless) + 8개 도구 상세 흐름 + 여정 그래프. README 문서맵·CLAUDE.md 필독순서에 00/08/09 반영.
+- 2026-06-25 (7): **API 키 3종 발급·저장 + 실연동 검증**. `.env`에 BUS/TOUR(동일 data.go.kr 키)/TRANSIT(ODsay) 저장. `scripts/verify-live.ts`로 실호출 검증 → 발견·수정: (1) TourAPI EngService2 GW가 `listYN` 거부 → 제거(필드 전수 일치, 3개 툴 실동작 확인). (2) TAGO 서비스 철자 오타 `Inqire`(BusSttnInfoInqireService/ArvlInfoInqireService)로 정정. 미해결: TAGO 정류소조회 cityCode 필수+서울 미포함 재설계, ODsay ApiKeyAuthFailed(키 재확인 대기). 테스트 56개 green 유지.

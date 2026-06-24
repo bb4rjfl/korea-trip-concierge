@@ -17,8 +17,16 @@ import { ENV } from "../env.js";
 import { fetchJson } from "../http.js";
 import { TtlCache } from "../cache.js";
 
-const STOP_BASE = "http://apis.data.go.kr/1613000/BusSttnInfoInquireService";
-const ARVL_BASE = "http://apis.data.go.kr/1613000/ArvlInfoInquireService";
+// NOTE: data.go.kr's real TAGO service names contain the "Inqire" typo (no 'u')
+// — verified live; the corrected-spelling URLs return HTTP 500.
+const STOP_BASE = "http://apis.data.go.kr/1613000/BusSttnInfoInqireService";
+const ARVL_BASE = "http://apis.data.go.kr/1613000/ArvlInfoInqireService";
+
+// TAGO's stop-name search (getSttnNoList) measures ~4–6s live, well over the
+// default 2.5s guard. These are DIRECTORY lookups that we cache (1h/1d), so the
+// slow path is cold-cache only; allow them more time. The real-time arrivals
+// call keeps the strict default so the live portion stays fast (p99 budget).
+const DIRECTORY_TIMEOUT_MS = 6000;
 
 export interface BusStop {
   nodeId: string;
@@ -55,8 +63,40 @@ function itemsOf<T>(json: unknown): T[] {
 interface RawStop {
   nodeid?: string;
   nodenm?: string;
-  citycode?: string | number;
+  gpslati?: number;
+  gpslong?: number;
 }
+
+interface RawCity {
+  citycode?: string | number;
+  cityname?: string;
+}
+
+/**
+ * English→Korean city aliases so foreign users can pass "Busan" etc. Matched
+ * against the live getCtyCodeList names (which are Korean). Seoul is excluded on
+ * purpose — TAGO has no Seoul; the tool routes Seoul to a separate source.
+ */
+const CITY_ALIAS: Record<string, string> = {
+  busan: "부산",
+  daegu: "대구",
+  incheon: "인천",
+  gwangju: "광주",
+  daejeon: "대전",
+  ulsan: "울산",
+  sejong: "세종",
+  jeju: "제주",
+  suwon: "수원",
+  seongnam: "성남",
+  goyang: "고양",
+  yongin: "용인",
+  bucheon: "부천",
+  ansan: "안산",
+  cheongju: "청주",
+  jeonju: "전주",
+  gangneung: "강릉",
+  gyeongju: "경주",
+};
 
 interface RawArrival {
   routeno?: string | number;
@@ -67,14 +107,41 @@ interface RawArrival {
 
 const stopCache = new TtlCache<BusStop[]>(60 * 60_000); // stop directory is stable
 const arrivalCache = new TtlCache<BusArrival[]>(10_000); // real-time: short TTL
+const cityCache = new TtlCache<RawCity[]>(24 * 60 * 60_000); // city codes ~ never change
 
-/** Resolve a stop name to candidate stops (best match first). */
-export async function resolveStop(name: string): Promise<BusStop[]> {
-  return stopCache.getOrLoad(`stop:${name}`, async () => {
-    const json = await fetchJson(url(STOP_BASE, "getSttnNoList", { stSrch: name }));
+/** Live city-code directory (getCtyCodeList). Cached for a day. */
+async function cityList(): Promise<RawCity[]> {
+  return cityCache.getOrLoad("cities", async () => {
+    const json = await fetchJson(url(STOP_BASE, "getCtyCodeList", {}), {}, DIRECTORY_TIMEOUT_MS);
+    return itemsOf<RawCity>(json);
+  });
+}
+
+/**
+ * Resolve a city name (English or Korean) to a TAGO cityCode. Returns undefined
+ * for unknown cities and for Seoul (not in TAGO — handled by the tool layer).
+ */
+export async function resolveCityCode(cityName: string): Promise<string | undefined> {
+  const raw = cityName.trim().toLowerCase();
+  if (!raw) return undefined;
+  const ko = CITY_ALIAS[raw] ?? cityName.trim();
+  const cities = await cityList();
+  const hit =
+    cities.find((c) => String(c.cityname ?? "").includes(ko)) ??
+    cities.find((c) => ko.includes(String(c.cityname ?? "").replace(/(특별시|광역시|특별자치시|특별자치도|도|시)$/u, "")));
+  return hit?.citycode != null ? String(hit.citycode) : undefined;
+}
+
+/**
+ * Resolve a stop name within a city to candidate stops. TAGO requires cityCode
+ * and does NOT echo it back in the response, so we inject the queried code.
+ */
+export async function resolveStop(name: string, cityCode: string): Promise<BusStop[]> {
+  return stopCache.getOrLoad(`stop:${cityCode}:${name}`, async () => {
+    const json = await fetchJson(url(STOP_BASE, "getSttnNoList", { cityCode, nodeNm: name }), {}, DIRECTORY_TIMEOUT_MS);
     return itemsOf<RawStop>(json)
-      .filter((s) => s.nodeid && s.citycode != null)
-      .map((s) => ({ nodeId: String(s.nodeid), nodeName: String(s.nodenm ?? name), cityCode: String(s.citycode) }));
+      .filter((s) => s.nodeid)
+      .map((s) => ({ nodeId: String(s.nodeid), nodeName: String(s.nodenm ?? name), cityCode }));
   });
 }
 
@@ -94,14 +161,16 @@ export async function getArrivals(cityCode: string, nodeId: string): Promise<Bus
 }
 
 /**
- * High-level: track a specific bus toward a drop-off stop. Returns the matching
+ * High-level: track a specific bus toward a drop-off stop in a given city.
+ * `cityCode` must be resolved first (resolveCityCode). Returns the matching
  * arrival (stops remaining = stops until the bus reaches that stop) or null.
  */
 export async function trackBus(
   busNumber: string,
   dropOffStop: string,
+  cityCode: string,
 ): Promise<{ stop: BusStop; arrival: BusArrival } | null> {
-  const stops = await resolveStop(dropOffStop);
+  const stops = await resolveStop(dropOffStop, cityCode);
   if (stops.length === 0) return null;
   const stop = stops[0];
   const arrivals = await getArrivals(stop.cityCode, stop.nodeId);

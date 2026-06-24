@@ -43,11 +43,13 @@ describe("handlers return guarded text content", () => {
     searchPlaceForeigner: { query: "quiet cafe in Hongdae" },
     findForeignerFriendlyStore: { area: "Seongsu" },
     getTransitRoute: { from: "Seoul Station", to: "Myeongdong" },
-    trackBusArrival: { busNumber: "143", dropOffStop: "Myeongdong Cathedral" },
+    trackBusArrival: { busNumber: "143", dropOffStop: "Seomyeon", city: "Busan" },
     explainPayment: { situation: "paying for the subway" },
     getAreaGuide: { area: "Myeongdong" },
     translateMenuContext: { menuText: "tteokbokki" },
     getNowInfo: { place: "Gyeongbokgung Palace" },
+    getJejuInfo: { category: "attraction" },
+    getWeatherAndAir: { city: "Seoul" },
   };
 
   for (const tool of ALL_TOOLS) {

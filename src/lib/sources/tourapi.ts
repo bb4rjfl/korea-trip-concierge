@@ -101,8 +101,7 @@ function buildUrl(operation: string, params: Record<string, string>): string {
     _type: "json",
     numOfRows: "8",
     pageNo: "1",
-    listYN: "Y",
-    arrange: "O", // by title
+    arrange: "O", // by title (EngService2 GW rejects listYN — verified live)
     ...params,
   });
   return `${BASE}/${operation}?${sp.toString()}`;

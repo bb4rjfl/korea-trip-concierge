@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { parsePlaces, searchPlaces } from "../src/lib/sources/tourapi.js";
-import { trackBus } from "../src/lib/sources/tago.js";
+import { trackBus, resolveCityCode } from "../src/lib/sources/tago.js";
 import { parseRoutes } from "../src/lib/sources/odsay.js";
+import { parseJeju } from "../src/lib/sources/jeju.js";
+import { parseWeather, parseAir, resolveCity } from "../src/lib/sources/weatherair.js";
 
 /** A representative EngService2 response with two items. */
 const TWO_ITEMS = {
@@ -98,15 +100,18 @@ describe("searchPlaces — request + limit (mocked fetch)", () => {
 describe("TAGO trackBus (mocked fetch)", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("resolves a stop then finds the matching route's arrival", async () => {
+  it("resolves a stop (injecting cityCode) then finds the matching route's arrival", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string) => {
         if (url.includes("getSttnNoList")) {
+          expect(url).toContain("cityCode=21");
+          expect(url).toContain("nodeNm=");
+          // Real TAGO stop responses carry no citycode — only nodeid/nodenm/gps.
           return {
             ok: true,
             json: async () => ({
-              response: { body: { items: { item: [{ nodeid: "N1", nodenm: "Myeongdong Stn unique-stop", citycode: 25 }] } } },
+              response: { body: { items: { item: [{ nodeid: "N1", nodenm: "Seomyeon unique-stop", gpslati: 35.1, gpslong: 129.0 }] } } },
             }),
           } as unknown as Response;
         }
@@ -129,12 +134,12 @@ describe("TAGO trackBus (mocked fetch)", () => {
       }),
     );
 
-    const res = await trackBus("143", "Myeongdong Stn unique-stop");
+    const res = await trackBus("143", "Seomyeon unique-stop", "21");
     expect(res).not.toBeNull();
     expect(res!.arrival.routeNo).toBe("143");
     expect(res!.arrival.stopsRemaining).toBe(3);
     expect(res!.arrival.etaMinutes).toBe(6); // 360s -> 6 min
-    expect(res!.stop.cityCode).toBe("25");
+    expect(res!.stop.cityCode).toBe("21"); // injected from the query, not the response
   });
 
   it("returns null when no stop matches", async () => {
@@ -142,7 +147,34 @@ describe("TAGO trackBus (mocked fetch)", () => {
       "fetch",
       vi.fn(async () => ({ ok: true, json: async () => ({ response: { body: { items: "" } } }) }) as unknown as Response),
     );
-    expect(await trackBus("9", "nowhere unique-stop-2")).toBeNull();
+    expect(await trackBus("9", "nowhere unique-stop-2", "21")).toBeNull();
+  });
+
+  it("resolveCityCode maps an English alias to a TAGO city code", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        expect(url).toContain("getCtyCodeList");
+        return {
+          ok: true,
+          json: async () => ({
+            response: {
+              body: {
+                items: {
+                  item: [
+                    { citycode: 21, cityname: "부산광역시" },
+                    { citycode: 25, cityname: "대전광역시/계룡시" },
+                  ],
+                },
+              },
+            },
+          }),
+        } as unknown as Response;
+      }),
+    );
+    expect(await resolveCityCode("Busan")).toBe("21");
+    expect(await resolveCityCode("대전")).toBe("25");
+    expect(await resolveCityCode("Atlantis")).toBeUndefined();
   });
 });
 
@@ -174,5 +206,73 @@ describe("ODsay parseRoutes", () => {
   it("returns [] when no path", () => {
     expect(parseRoutes({})).toEqual([]);
     expect(parseRoutes({ error: { msg: "x" } })).toEqual([]);
+  });
+});
+
+describe("VisitJeju parseJeju", () => {
+  it("normalizes items, prefers road address, strips '*' phone, picks thumbnail", () => {
+    const places = parseJeju({
+      result: "200",
+      items: [
+        {
+          title: "Seongsan Ilchulbong",
+          contentscd: { label: "Tourist Destination" },
+          address: "Old address",
+          roadaddress: "284-12 Ilchul-ro, Seogwipo",
+          introduction: "A UNESCO sunrise peak.",
+          phoneno: "*",
+          latitude: 33.46,
+          longitude: 126.93,
+          repPhoto: { photoid: { thumbnailpath: "https://img/thumb.gif", imgpath: "https://img/full.gif" } },
+        },
+      ],
+    });
+    expect(places).toHaveLength(1);
+    expect(places[0].title).toBe("Seongsan Ilchulbong");
+    expect(places[0].category).toBe("Tourist Destination");
+    expect(places[0].address).toBe("284-12 Ilchul-ro, Seogwipo"); // road preferred
+    expect(places[0].tel).toBeUndefined(); // "*" -> empty
+    expect(places[0].image).toBe("https://img/thumb.gif");
+    expect(places[0].lat).toBeCloseTo(33.46);
+  });
+
+  it("handles missing items", () => {
+    expect(parseJeju({})).toEqual([]);
+  });
+});
+
+describe("weather/air parsing", () => {
+  it("parseWeather picks the earliest forecast slot and decodes codes", () => {
+    const items = [
+      { category: "TMP", fcstDate: "20260625", fcstTime: "0900", fcstValue: "24" },
+      { category: "SKY", fcstDate: "20260625", fcstTime: "0900", fcstValue: "1" },
+      { category: "PTY", fcstDate: "20260625", fcstTime: "0900", fcstValue: "0" },
+      { category: "POP", fcstDate: "20260625", fcstTime: "0900", fcstValue: "20" },
+      { category: "TMP", fcstDate: "20260625", fcstTime: "1200", fcstValue: "27" }, // later slot ignored
+    ];
+    const w = parseWeather(items);
+    expect(w.tempC).toBe(24);
+    expect(w.sky).toBe("Clear");
+    expect(w.precip).toBeUndefined(); // PTY 0 -> none
+    expect(w.rainProb).toBe(20);
+  });
+
+  it("parseAir averages valid stations, ignores '-', grades by worst PM", () => {
+    const air = parseAir([
+      { pm10Value: "14", pm25Value: "4", dataTime: "2026-06-25 02:00" },
+      { pm10Value: "16", pm25Value: "-", dataTime: "2026-06-25 02:00" }, // pm25 sensor down
+      { pm10Value: "-", pm25Value: "6", dataTime: "2026-06-25 02:00" },
+    ]);
+    expect(air.pm10).toBe(15); // (14+16)/2
+    expect(air.pm25).toBe(5); // (4+6)/2
+    expect(air.grade).toBe("Good"); // both low
+    expect(air.stations).toBe(2);
+  });
+
+  it("resolveCity maps aliases and defaults to Seoul", () => {
+    expect(resolveCity("Busan").sido).toBe("부산");
+    expect(resolveCity("제주").label).toBe("Jeju");
+    expect(resolveCity(undefined).label).toBe("Seoul");
+    expect(resolveCity("Atlantis").label).toBe("Seoul");
   });
 });

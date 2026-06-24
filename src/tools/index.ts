@@ -7,8 +7,10 @@ import { explainPayment } from "./explainPayment.js";
 import { getAreaGuide } from "./getAreaGuide.js";
 import { translateMenuContext } from "./translateMenuContext.js";
 import { getNowInfo } from "./getNowInfo.js";
+import { getJejuInfo } from "./getJejuInfo.js";
+import { getWeatherAndAir } from "./getWeatherAndAir.js";
 
-/** All registered tools (8 — within the recommended 3–10 range). */
+/** All registered tools (max 20 per Kakao policy). */
 export const ALL_TOOLS: ToolDef[] = [
   searchPlaceForeigner,
   findForeignerFriendlyStore,
@@ -18,6 +20,8 @@ export const ALL_TOOLS: ToolDef[] = [
   getAreaGuide,
   translateMenuContext,
   getNowInfo,
+  getJejuInfo,
+  getWeatherAndAir,
 ];
 
 export const TOOL_NAMES = ALL_TOOLS.map((t) => t.name);
