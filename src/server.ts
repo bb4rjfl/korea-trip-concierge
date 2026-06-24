@@ -1,4 +1,5 @@
-import express, { type Request, type Response } from "express";
+import "./lib/loadEnv.js"; // MUST be first: populate process.env from .env before anything reads keys
+import express, { type NextFunction, type Request, type Response } from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { SERVER_NAME, SERVER_VERSION } from "./lib/constants.js";
@@ -67,6 +68,16 @@ const methodNotAllowed = (_req: Request, res: Response) =>
   });
 app.get("/mcp", methodNotAllowed);
 app.delete("/mcp", methodNotAllowed);
+
+// Malformed JSON (from express.json) and any unhandled error → clean JSON-RPC error.
+app.use((err: Error, _req: Request, res: Response, next: NextFunction) => {
+  if (res.headersSent) return next(err);
+  res.status(400).json({
+    jsonrpc: "2.0",
+    error: { code: -32700, message: "Parse error: invalid JSON body." },
+    id: null,
+  });
+});
 
 const port = Number(ENV.PORT);
 app.listen(port, () => {

@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "PowerShell($names = @\\('01_kakao_playmcp_rules','02_product_spec','03_tool_contracts','04_ux_interaction','05_working_agreement','06_decision_log','07_progress'\\); foreach \\($n in $names\\) { $root = \"C:\\\\Users\\\\user\\\\Claude\\\\Projects\\\\kakaomcp1-kpass\\\\$n.md\"; $doc = \"C:\\\\Users\\\\user\\\\Claude\\\\Projects\\\\kakaomcp1-kpass\\\\docs\\\\$n.md\"; $a = Get-FileHash $root -Algorithm MD5; $b = Get-FileHash $doc -Algorithm MD5; $same = if \\($a.Hash -eq $b.Hash\\) { 'IDENTICAL' } else { 'DIFFERENT' }; Write-Output \"$n : $same\" })"
-    ]
-  }
-}

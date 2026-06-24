@@ -20,6 +20,8 @@
 - [x] **public GitHub repo 생성+푸시**: https://github.com/bb4rjfl/korea-trip-concierge (main, .gitattributes LF 정규화, 시크릿 미포함)
 - [ ] **데이터 소스·API 키 발급** (사용자) — docs/08 따라 BUS/TOUR/TRANSIT 키 발급 → `.env`
 - [ ] 키 발급 후 실응답으로 각 소스 파서 필드 검증(`verify-live`/`NOTE(verify-live)` 주석 지점)
+- [x] **점검/하드닝**: `.env` 로더 추가(`loadEnv.ts`, server 최초 import) + env를 live getter로 — 키 인식 end-to-end 검증. 잘못된 JSON 에러 핸들러. repo 위생(루트 중복문서 01~07 제거, settings.local.json untrack). 지식툴 데이터 보강(지역+4/메뉴+6/결제+2).
+- [x] **카카오 규칙 자가점검(docs/01 §8)** 통과 — 위반 0 (Inspector 정식만 배포 후 대기)
 - [ ] MCP Inspector 정식 통과 확인 (로컬 curl은 통과)
 - [ ] KC Git 소스 빌드(이 repo, 루트 Dockerfile) → Active → Endpoint URL
 - [ ] public Git repo 푸시
@@ -53,3 +55,4 @@ Dockerfile               linux/amd64, 루트
 - 2026-06-24 (2): 런타임 TS 확정(D-004), 데이터 전략 실연동 확정(D-005). TS MCP 서버 스캐폴드 전체 구축 — 8툴 계약 등록, 지식툴 3종 실동작, 공통 인프라(24k가드·칩푸터·네이밍린트·timeout/cache), Dockerfile. build/lint/46 tests/서버 end-to-end 검증 완료.
 - 2026-06-24 (3): TourAPI(영문) 실연동 클라이언트 구현 + searchPlaceForeigner/findForeignerFriendlyStore 연결(키 가드/에러처리), 픽스처+mock 테스트(52개 통과). 대화예시 3개(docs/09) 작성. API 키 발급 상세 가이드는 별도 세션으로 분기(docs/08 작성 예정).
 - 2026-06-25 (4): 남은 API 툴 3종 실연동 선작성 — tago.ts(TAGO 실시간 버스)+odsay.ts(경로) 소스 구현, trackBusArrival/getTransitRoute/getNowInfo 연결. 파서 픽스처/mock 테스트 추가(56개 통과). git 저장소 초기화 + .gitattributes(LF) + 첫 커밋 → public GitHub repo(bb4rjfl/korea-trip-concierge) 생성·푸시. docs/08 키 발급 가이드 완료 확인.
+- 2026-06-25 (5): 전반 점검 후 하드닝 — (버그) `.env` 미로딩 발견·수정(loadEnv + live getter, end-to-end 검증), 잘못된 JSON 에러 핸들러. repo 위생(루트 중복문서 제거, 로컬설정 untrack). 지식툴 데이터 보강. 카카오 §8 자가점검 통과. build/56 tests green.

@@ -65,6 +65,33 @@ const AREAS: Area[] = [
     getThere: "Seongsu Stn (Line 2) or Seoul Forest Stn (Bundang Line).",
     interests: { food: "Specialty coffee and walk-in brunch spots.", shopping: "Concept stores and pop-ups." },
   },
+  {
+    keys: /(itaewon|이태원)/i,
+    name: "Itaewon (이태원)",
+    blurb:
+      "Seoul's most international quarter — global restaurants, English everywhere, halal options, and a buzzing nightlife. The easiest area for non-Korean speakers.",
+    spots: ["world-cuisine restaurants", "Itaewon antique furniture street", "Leeum Museum of Art", "Gyeongridan-gil cafés"],
+    getThere: "Itaewon Stn (Line 6).",
+    interests: { food: "Halal, Western, and global cuisines with English menus.", nightlife: "Bars and clubs, busiest Fri–Sat." },
+  },
+  {
+    keys: /(bukchon|북촌)/i,
+    name: "Bukchon Hanok Village (북촌한옥마을)",
+    blurb:
+      "A preserved hillside of traditional hanok houses between two palaces — postcard alleys and city views. A residential area, so visit quietly and by day.",
+    spots: ["Bukchon 8 Views photo spots", "hanok alleys", "Gyeongbokgung & Changdeokgung (both adjacent)", "craft workshops"],
+    getThere: "Anguk Stn (Line 3) Exit 2.",
+    interests: { history: "Pair with Gyeongbokgung, Insadong, and Samcheongdong on foot." },
+  },
+  {
+    keys: /(dongdaemun|동대문|ddp)/i,
+    name: "Dongdaemun (동대문)",
+    blurb:
+      "24-hour fashion-and-shopping district anchored by the spaceship-like DDP. Wholesale malls, late-night shopping, and street food that never sleeps.",
+    spots: ["Dongdaemun Design Plaza (DDP)", "all-night fashion malls", "Gwangjang Market (nearby)", "Heunginjimun Gate"],
+    getThere: "Dongdaemun History & Culture Park Stn (Lines 2/4/5).",
+    interests: { shopping: "Wholesale & retail fashion malls, many open past midnight.", food: "Late-night street food and Gwangjang Market." },
+  },
 ];
 
 function render(areaQuery: string, interest?: string): string {

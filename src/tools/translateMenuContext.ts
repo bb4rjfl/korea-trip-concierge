@@ -29,6 +29,11 @@ const DISHES: Dish[] = [
   { match: /냉면|naengmyeon/i, en: "Cold buckwheat noodles", desc: "Chilled noodles in icy broth (mul) or spicy sauce (bibim).", spice: 1, allergens: ["gluten", "egg", "soy"] },
   { match: /김밥|kimbap|gimbap/i, en: "Kimbap", desc: "Seaweed rice rolls with vegetables, egg, and often ham or tuna.", spice: 0, allergens: ["egg", "sesame", "fish", "soy"] },
   { match: /제육|jeyuk/i, en: "Spicy stir-fried pork", desc: "Pork stir-fried in a spicy gochujang marinade.", spice: 2, allergens: ["soy", "pork", "sesame"] },
+  { match: /삼계탕|samgyetang/i, en: "Ginseng chicken soup", desc: "Whole young chicken stuffed with rice, ginseng, and garlic in a mild broth — a summer health dish.", spice: 0, allergens: [] },
+  { match: /잡채|japchae/i, en: "Glass noodle stir-fry", desc: "Sweet-savory sweet-potato glass noodles with vegetables and beef.", spice: 0, allergens: ["soy", "sesame", "egg"] },
+  { match: /해장국|haejangguk/i, en: "Hangover soup", desc: "Hearty soup (often with ox-blood, pork spine, or cabbage) eaten to recover from drinking.", spice: 1, allergens: ["soy"] },
+  { match: /순대|sundae/i, en: "Korean blood sausage", desc: "Steamed pig-intestine sausage filled with noodles and barley — savory, often with offal.", spice: 0, allergens: ["pork", "soy"] },
+  { match: /파전|pajeon|jeon/i, en: "Savory pancake", desc: "Pan-fried scallion (and often seafood) pancake; crispy edges, soft center.", spice: 0, allergens: ["gluten", "egg", "shellfish", "soy"] },
 ];
 
 const SPICE_LABEL = ["🌶️ none", "🌶️ mild", "🌶️🌶️ medium", "🌶️🌶️🌶️ hot"];

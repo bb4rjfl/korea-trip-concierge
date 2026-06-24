@@ -52,6 +52,26 @@ const GUIDES: PaymentGuide[] = [
     tip: "Carry small-denomination cash (₩1,000–₩10,000). ATMs marked 'Global' dispense cash from foreign cards.",
   },
   {
+    match: /(convenience|cu|gs25|7.?eleven|emart24|편의점)/i,
+    label: "Convenience store",
+    works: [
+      "**Foreign credit/debit cards** (tap or insert) — widely accepted at CU, GS25, 7-Eleven, Emart24.",
+      "**Cash**.",
+    ],
+    avoid: ["Domestic-only QR pay apps (KakaoPay/Naver Pay) unless you have a Korean account."],
+    tip: "Convenience stores are the most reliable place to use a foreign card for small purchases — and to buy/charge a T-money card.",
+  },
+  {
+    match: /(department|duty.?free|mall|백화점|면세)/i,
+    label: "Department store / duty-free",
+    works: [
+      "**Foreign cards** (all major brands) and **mobile pay** registered abroad.",
+      "**Tax-free / immediate tax refund** for tourists — show your passport at the counter.",
+    ],
+    avoid: ["Forgetting your passport — it's required for tax-free purchases."],
+    tip: "Ask for 'tax refund / 택스 리펀드' and keep receipts; refunds are processed at the airport or instantly in-store.",
+  },
+  {
     match: /(kiosk|self.?order|unmanned|키오스크|무인)/i,
     label: "Self-order kiosk",
     works: [
