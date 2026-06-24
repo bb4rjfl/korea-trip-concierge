@@ -33,10 +33,11 @@
 ## 4. `trackBusArrival`  (K-Bus Companion, 조회형)
 - **title**: "Track Bus Arrival"
 - **description(영문)**: "Looks up the real-time position of a specific Korean city bus and how many stops remain until the user's drop-off stop, with an English heads-up message. Korea Trip Concierge(코리아 트립 컨시어지)."
-- **inputSchema**: `{ busNumber: string (required), dropOffStop: string (required), currentStop?: string }`
-- **output**: 남은 정거장·예상시간·하차 안내 문구(영문). **푸시 아님 — 조회**. 끝에 **[🔄 Refresh] [🚏 Check when near]** 선택지.
+- **inputSchema**: `{ busNumber: string (required), dropOffStop: string (required), city: string (required), currentStop?: string }`
+- **데이터**: 국토부 **TAGO 전국 버스도착정보**(`BUS_API_KEY`). 정류소명→cityCode+nodeId 해석 후 도착조회. ⚠️ **TAGO에 서울 미포함** → `city`로 도시 특정 필수. 서울 입력 시 별도 소스(seoul.ts, 활용신청 대기) 연결 전까지 "경로 안내 사용" 폴백.
+- **output**: 남은 정거장·예상시간·하차 안내 문구(영문). **푸시 아님 — 조회**. 끝에 **[🔄 Refresh] [🚏 Am I close?]** 선택지.
 - annotations: readOnly true / idempotent false (실시간 변동) / openWorld true
-- ⚠️ 외부 API 타임아웃(예 2.5s)·캐싱으로 p99 3s 사수. 24k 가드.
+- ⚠️ 외부 API 타임아웃(예 2.5s)·캐싱으로 p99 3s 사수. 단 TAGO 정류소검색(디렉터리)은 6s 허용+장기캐시. 24k 가드.
 
 ## 5. `explainPayment`
 - **title**: "Explain Payment Options for Foreigners"
@@ -63,8 +64,24 @@
 - **title**: "Is It Good to Go Now?"
 - **description(영문)**: "Tells a foreign visitor whether a place is worth visiting right now using opening hours, crowd level, and weather. Korea Trip Concierge(코리아 트립 컨시어지)."
 - **inputSchema**: `{ place: string (required) }`
-- **output**: 지금 상태(영업/혼잡/날씨) + 추천 여부. 끝에 선택지(대안 시간/대안 장소).
+- **output**: 지금 상태(영업시간 + 현재 KST 시각) + 추천 여부. 끝에 선택지(대안 시간/대안 장소). (혼잡/날씨는 향후 보강 — 현재 시간 기반.)
 - annotations: readOnly true / idempotent false / openWorld true
+
+## 9. `getJejuInfo`  (제주 특화)
+- **title**: "Jeju Island Info"
+- **description(영문)**: "Gives a foreign visitor English travel info for Jeju Island — attractions, restaurants, festivals, shopping, or accommodations — from the official VisitJeju data, with names, addresses, and short intros. Part of Korea Trip Concierge(코리아 트립 컨시어지)."
+- **inputSchema**: `{ category?: enum(attraction, restaurant, festival, shopping, accommodation, theme), limit?: number(1~10, 기본 6) }`
+- **데이터**: **VisitJeju Open API**(`JEJU_API_KEY`). ⚠️ HTTPS 필수, `locale=en`(영어), category c1관광지/c2쇼핑/c3숙박/c4음식점/c5축제/c6테마. 전국 TourAPI에 제주가 빈약해 별도 소스로 보강.
+- **output**: 제주 항목 목록(이름·분류·주소·소개·전화). 끝에 선택지(관광지/맛집/축제/이동).
+- annotations: readOnly true / idempotent true / openWorld true
+
+## 10. `getWeatherAndAir`  (현지 생활정보)
+- **title**: "Weather & Air Quality"
+- **description(영문)**: "Gives a foreign visitor the current weather forecast and fine-dust (PM10/PM2.5) air quality for a Korean city, with a plain-English advisory (e.g. whether to wear a mask). Part of Korea Trip Concierge(코리아 트립 컨시어지)."
+- **inputSchema**: `{ city?: string (기본 Seoul) }`
+- **데이터**: **기상청 단기예보(KMA)** + **에어코리아 대기오염**(둘 다 `BUS_API_KEY` 동일 data.go.kr 키). ⚠️ KMA는 위경도 아닌 nx/ny 격자(도시 테이블), AirKorea 값 `-`(통신장애)는 무시.
+- **output**: 기온·하늘·강수확률 + PM10/PM2.5 등급 + 마스크 권고(영문). 끝에 선택지(옷차림/실내장소/경로).
+- annotations: readOnly true / idempotent false (시간 변동) / openWorld true
 
 ---
 

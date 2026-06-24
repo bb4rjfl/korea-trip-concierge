@@ -8,7 +8,7 @@
 ```bash
 npm install
 npm run build      # 네이밍 린트(kakao 금지) + tsc
-npm test           # vitest (56)
+npm test           # vitest (70)
 npm run dev        # tsx watch (로컬 서버, POST /mcp)
 npm start          # node dist/server.js
 ```
@@ -25,7 +25,7 @@ API 키는 `.env.example`를 복사해 `.env`에 설정 (발급법: `docs/08_api
 | 파일 | 내용 |
 |---|---|
 | `CLAUDE.md` | 프로젝트 헌법·규칙 요약·필독 순서 |
-| `docs/00_service_overview.md` | 🟢 서비스 총정리 + MCP 작동원리 + 8개 도구 흐름 (전체 그림 진입) |
+| `docs/00_service_overview.md` | 🟢 서비스 총정리 + MCP 작동원리 + 10개 도구 흐름 (전체 그림 진입) |
 | `docs/01_kakao_playmcp_rules.md` | ⭐ 카카오 PlayMCP 개발가이드+심사정책+일정 (절대 규칙) |
 | `docs/02_product_spec.md` | 제품 정의·통합 결정·툴 목록·푸시 제약 |
 | `docs/03_tool_contracts.md` | 8개 툴 입출력 계약(JSON) |

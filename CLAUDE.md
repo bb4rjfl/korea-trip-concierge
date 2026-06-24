@@ -17,7 +17,7 @@
 ## 1. 작업 시작 전 필독 순서 (매 세션)
 
 1. **이 파일(CLAUDE.md)** — 전체 맥락·규칙 진입점
-2. `docs/00_service_overview.md` — 🟢 서비스 총정리 + MCP 작동원리 + 8개 도구 흐름 (전체 그림이 필요할 때)
+2. `docs/00_service_overview.md` — 🟢 서비스 총정리 + MCP 작동원리 + 10개 도구 흐름 (전체 그림이 필요할 때)
 3. `docs/01_kakao_playmcp_rules.md` — ⭐ 카카오 PlayMCP 개발가이드 + 심사정책 (반려 방지, 절대 규칙)
 4. `docs/02_product_spec.md` — 제품 정의 + 통합 툴 스펙 (무엇을 만드나)
 5. `docs/03_tool_contracts.md` — 각 툴의 입출력 계약 (JSON, 구현 기준)
@@ -83,12 +83,12 @@
 
 - [x] 공모전 규칙·심사정책 정독 및 문서화
 - [x] 아이디어 통합 확정 (Concierge + K-Pass Finder + K-Bus Companion → 단일 서버)
-- [x] 런타임/데이터전략 확정 (D-004/D-005) + **TS MCP 서버 구축** (8툴 계약 등록, 지식툴 3종 실동작, **API툴 5종 연동 코드 완성**, build/56 tests/서버 end-to-end 통과)
+- [x] 런타임/데이터전략 확정 (D-004/D-005) + **TS MCP 서버 구축** — **10툴**(D-006), 지식툴 3종 즉시동작 + **API툴 7종 실데이터 검증**, build/**70 tests**/서버 end-to-end 통과
 - [x] **public GitHub repo**: https://github.com/bb4rjfl/korea-trip-concierge
-- [x] 대화 예시 3개(docs/09) + API 키 발급 가이드(docs/08) 작성
-- [ ] 데이터 소스 확정 (**API 키 발급** — 사용자 액션 필요, docs/08 참조)
-- [ ] 키 발급 후 실응답 파서 검증(`verify-live`) + MCP Inspector 정식 통과
-- [ ] KC 배포(이 repo Git 소스 빌드) → PlayMCP 임시등록 → 도구함 테스트
+- [x] 대화 예시 3개(docs/09) + API 키 발급 가이드(docs/08) + 핸드오프(docs/10) 작성
+- [x] **API 키 발급·저장**(.env) + 실연동 검증 — TourAPI/TAGO(비서울)/ODsay/VisitJeju/날씨·미세먼지 ✅
+- [ ] 낮 시간 라이브 확인: TAGO 도착필드 / 서울 지하철·버스 / 카카오 Local(콘솔 ON)
+- [ ] MCP Inspector 정식 통과 → KC 배포(ODsay IP를 KC IP로 갱신) → PlayMCP 임시등록 → 도구함 테스트
 - [ ] 심사요청(≤7/7) → 전체공개 → 비즈폼 응모(≤7/14)
 
 > 상세 진행은 `docs/07_progress.md` 가 단일 진실 소스(SSOT).

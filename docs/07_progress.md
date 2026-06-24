@@ -53,11 +53,13 @@
 
 ## 프로젝트 구조 (현재)
 ```
-src/server.ts            Streamable HTTP stateless 진입점 (+ 시작 시 네이밍 린트)
-src/lib/                 constants, env, naming, markdown(24k), footer(칩), http(timeout), cache(TTL), responses
-src/tools/               8개 툴 (types, index, *.ts) — explainPayment/translateMenuContext/getAreaGuide 실동작
+src/server.ts            Streamable HTTP stateless 진입점 (loadEnv 최초 import + 네이밍 린트)
+src/lib/                 constants, env, loadEnv(.env), naming, markdown(24k), footer(칩), http(timeout), cache(TTL), responses
+src/lib/sources/         TourAPI, TAGO(버스), ODsay(경로), VisitJeju, 기상청+에어코리아(weatherair)
+src/tools/               10개 툴 (types, index, *.ts) — 지식툴3 즉시동작 + API툴7 실연동
 scripts/lint-naming.ts   빌드 게이트 (kakao 토큰/charset/중복/개수)
-test/                    vitest 46개 (헬퍼 + 전체 툴 계약 + 핸들러 스모크)
+scripts/verify-live.ts   실 API 호출 점검 (키 필요)
+test/                    vitest 70개 (헬퍼 + 전체 툴 계약 + 핸들러 스모크 + 소스 파서)
 Dockerfile               linux/amd64, 루트
 ```
 
@@ -69,3 +71,5 @@ Dockerfile               linux/amd64, 루트
 - 2026-06-25 (5): 전반 점검 후 하드닝 — (버그) `.env` 미로딩 발견·수정(loadEnv + live getter, end-to-end 검증), 잘못된 JSON 에러 핸들러. repo 위생(루트 중복문서 제거, 로컬설정 untrack). 지식툴 데이터 보강. 카카오 §8 자가점검 통과. build/56 tests green.
 - 2026-06-25 (6): 서비스 오버뷰 문서 작성(`docs/00_service_overview.md`) — 총정리 + MCP 작동원리 심화(전송/생애주기/도구선택/stateless) + 8개 도구 상세 흐름 + 여정 그래프. README 문서맵·CLAUDE.md 필독순서에 00/08/09 반영.
 - 2026-06-25 (7): **API 키 3종 발급·저장 + 실연동 검증**. `.env`에 BUS/TOUR(동일 data.go.kr 키)/TRANSIT(ODsay) 저장. `scripts/verify-live.ts`로 실호출 검증 → 발견·수정: (1) TourAPI EngService2 GW가 `listYN` 거부 → 제거(필드 전수 일치, 3개 툴 실동작 확인). (2) TAGO 서비스 철자 오타 `Inqire`(BusSttnInfoInqireService/ArvlInfoInqireService)로 정정. 미해결: TAGO 정류소조회 cityCode 필수+서울 미포함 재설계, ODsay ApiKeyAuthFailed(키 재확인 대기). 테스트 56개 green 유지.
+- 2026-06-25 (8, 별도 세션): 스코프 확장 — VisitJeju(getJejuInfo)+기상청·에어코리아(getWeatherAndAir) 신규 툴, ODsay 키 오타 수정, TAGO 전국+서울 분기(city 필수) 재설계. 10툴/70 tests green. (D-006/D-007)
+- 2026-06-25 (9, 메인 세션): 핸드오프 수신·동기화(origin 동일, 70 green 확인). **R-DOC 문서 정합화** — 코드(10툴)와 어긋난 문서 일괄 갱신: docs/03(getJejuInfo·getWeatherAndAir 계약 추가 + trackBusArrival city), docs/02(툴표 10·데이터소스 확정), docs/00(8→10 전면), docs/06(D-006/D-007), docs/07 구조 스냅샷, CLAUDE.md 현재상태, README. **다음**: 낮 시간 라이브 확인(TAGO 도착필드·서울 지하철/버스·카카오 Local) → KC 배포.
