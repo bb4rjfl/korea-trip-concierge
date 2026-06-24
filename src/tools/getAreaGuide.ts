@@ -126,7 +126,8 @@ function render(areaQuery: string, interest?: string): string {
 const CHOICES: Choice[] = [
   { emoji: "🍜", cmdEn: "Find foreigner-friendly restaurants here", cmdKo: "근처 맛집", descEn: "stores that take foreign cards" },
   { emoji: "🚇", cmdEn: "How do I get here?", cmdKo: "가는 길", descEn: "public-transit route" },
-  { emoji: "🕒", cmdEn: "Is it good to go now?", descEn: "live hours, crowds, weather" },
+  { emoji: "🕒", cmdEn: "Is it good to go now?", descEn: "live hours + weather" },
+  { emoji: "🌤️", cmdEn: "Weather & fine dust today", descEn: "forecast + air quality" },
 ];
 
 export const getAreaGuide: ToolDef = {

@@ -72,6 +72,21 @@ interface TourApiResponse {
 }
 
 /**
+ * Clean a TourAPI English title for Markdown output. EngService titles often
+ * carry a trailing Korean name in parentheses and bracketed tags, e.g.
+ * "...Flagship Store [Tax Refund Shop](앤더슨벨 …)" — the `[x](y)` shape renders
+ * as a broken link and the Hangul is unreadable for our users. Strip any
+ * parenthetical containing Hangul so what remains is clean English.
+ */
+export function cleanTitle(t?: string): string {
+  return (t ?? "")
+    .replace(/\s*[(（][^()（）]*[가-힣][^()（）]*[)）]/g, "") // Korean parenthetical
+    .replace(/\s*\[[^\]]*\]/g, "") // bracketed tags e.g. "[Tax Refund Shop]"
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/**
  * Normalize a TourAPI body into Place[]. data.go.kr quirks handled:
  * - `items` is "" (empty string) when there are no results
  * - `items.item` is a single object (not an array) when exactly one result
@@ -82,7 +97,7 @@ export function parsePlaces(json: TourApiResponse): Place[] {
   if (!items || !items.item) return [];
   const arr = Array.isArray(items.item) ? items.item : [items.item];
   return arr.map((it) => ({
-    title: (it.title ?? "").trim(),
+    title: cleanTitle(it.title),
     address: [it.addr1, it.addr2].filter(Boolean).join(" ").trim(),
     tel: it.tel?.trim() || undefined,
     image: it.firstimage?.trim() || it.firstimage2?.trim() || undefined,
@@ -125,6 +140,26 @@ export async function searchPlaces(opts: SearchOptions): Promise<Place[]> {
     return parsePlaces(json);
   });
   return typeof opts.limit === "number" ? places.slice(0, opts.limit) : places;
+}
+
+/**
+ * Try several keyword candidates in order, returning the first non-empty result.
+ * searchKeyword2 matches the keyword against the TITLE, so a combined phrase like
+ * "cafe Hongdae" often misses — falling back to "Hongdae" then "cafe" recovers
+ * useful results instead of showing "no places found".
+ */
+export async function searchPlacesAny(
+  keywords: string[],
+  opts: { category?: string; limit?: number } = {},
+): Promise<Place[]> {
+  const seen = new Set<string>();
+  for (const kw of keywords.map((k) => k.trim()).filter(Boolean)) {
+    if (seen.has(kw)) continue;
+    seen.add(kw);
+    const places = await searchPlaces({ keyword: kw, category: opts.category, limit: opts.limit });
+    if (places.length) return places;
+  }
+  return [];
 }
 
 /** Best-match single place for a free-text name (for hours/route lookups). */

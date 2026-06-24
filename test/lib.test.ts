@@ -3,6 +3,12 @@ import { buildChoiceFooter } from "../src/lib/footer.js";
 import { renderMarkdown } from "../src/lib/markdown.js";
 import { assertNamingOk, checkToolName } from "../src/lib/naming.js";
 import { MAX_RESPONSE_CHARS } from "../src/lib/constants.js";
+import {
+  resolveStationKo,
+  romanizeStation,
+  romanizeText,
+  formatSubwayDirection,
+} from "../src/lib/romanize.js";
 
 describe("buildChoiceFooter", () => {
   it("renders 2–4 chips with command + description", () => {
@@ -39,6 +45,31 @@ describe("renderMarkdown 24k guard", () => {
   it("leaves short bodies intact", () => {
     const out = renderMarkdown("hello", "world");
     expect(out).toBe("hello\n\nworld");
+  });
+});
+
+describe("romanize (U1)", () => {
+  it("resolves EN/alias/KO input to Korean station, undefined for unknown", () => {
+    expect(resolveStationKo("Gangnam")).toBe("강남");
+    expect(resolveStationKo("hongdae")).toBe("홍대입구");
+    expect(resolveStationKo("강남역")).toBe("강남");
+    expect(resolveStationKo("Atlantis")).toBeUndefined();
+  });
+
+  it("romanizes a Korean station, falls back to Korean for unknown", () => {
+    expect(romanizeStation("성수")).toBe("Seongsu");
+    expect(romanizeStation("강남역")).toBe("Gangnam");
+    expect(romanizeStation("없는역")).toBe("없는역");
+  });
+
+  it("romanizes known stations inside free text (longest match wins)", () => {
+    expect(romanizeText("을지로3가 근처")).toContain("Euljiro 3-ga");
+    expect(romanizeText("을지로입구")).toBe("Euljiro 1-ga");
+  });
+
+  it("formats a subway direction string into English", () => {
+    expect(formatSubwayDirection("성수행 - 신설동방면")).toBe("to Seongsu (via Sinseol-dong)");
+    expect(formatSubwayDirection("중앙보훈병원행")).toBe("to Junggang Veterans Hospital");
   });
 });
 

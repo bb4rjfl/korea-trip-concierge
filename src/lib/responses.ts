@@ -14,13 +14,26 @@ export function fail(title: string, detail: string, choices: Choice[]): ToolResu
 }
 
 /**
- * Shown when a tool needs an external API key that isn't configured yet. Keeps
- * the tool listable/testable in Inspector without shipping fake data.
+ * Shown when a tool's live data source is temporarily unavailable (e.g. its key
+ * isn't configured in this environment). Neutral wording that reads fine both in
+ * local/Inspector and in production — never ships fake data (S2).
  */
 export function notConnected(toolTitle: string, sourceNote: string, choices: Choice[]): ToolResult {
   const body =
-    `🔌 **${toolTitle} — live data source not connected yet**\n\n` +
+    `🔌 **${toolTitle} — live data temporarily unavailable**\n\n` +
     `${sourceNote}\n\n` +
-    `_This tool is wired and validated; it returns live results once the API key is configured._`;
+    `_This usually clears up shortly. Please try again in a moment._`;
   return textResult(renderMarkdown(body, buildChoiceFooter(choices)));
+}
+
+/**
+ * Standard "upstream didn't respond in time" failure — shared so every tool's
+ * timeout/network path reads consistently (S3).
+ */
+export function timeoutFail(serviceLabel: string, choices: Choice[]): ToolResult {
+  return fail(
+    `Couldn't reach the ${serviceLabel} service`,
+    "It didn't respond in time. Please try again in a moment.",
+    choices,
+  );
 }

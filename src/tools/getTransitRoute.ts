@@ -15,6 +15,7 @@ import type { ToolDef } from "./types.js";
 
 const CHOICES: Choice[] = [
   { emoji: "🔄", cmdEn: "Refresh for leaving now", cmdKo: "지금 출발 새로고침", descEn: "recompute" },
+  { emoji: "🚇", cmdEn: "Next subway train at a station", descEn: "real-time Seoul subway" },
   { emoji: "💳", cmdEn: "How do I pay for this?", descEn: "transit payment guide" },
   { emoji: "🗺️", cmdEn: "Tell me about the destination area", descEn: "neighborhood guide" },
 ];
@@ -46,8 +47,11 @@ export const getTransitRoute: ToolDef = {
     "explained in English for foreign visitors. " +
     `Part of ${SERVICE_NAME}.`,
   inputSchema: {
-    from: z.string().describe("Origin: place name, station, or address."),
     to: z.string().describe("Destination: place name, station, or address."),
+    from: z
+      .string()
+      .optional()
+      .describe("Origin: place name, station, or address. If the user hasn't said where they are, ask first."),
     departAt: z.string().optional().describe("Optional departure time (ISO 8601); defaults to now."),
   },
   annotations: {
@@ -58,8 +62,18 @@ export const getTransitRoute: ToolDef = {
     openWorldHint: true,
   },
   handler: async (args) => {
-    const from = String(args.from ?? "");
-    const to = String(args.to ?? "");
+    const from = String(args.from ?? "").trim();
+    const to = String(args.to ?? "").trim();
+
+    // U3: a transit route needs a starting point. If the user only gave a
+    // destination (common from chips), ask for the origin instead of failing.
+    if (!from) {
+      return fail(
+        "Where are you starting from?",
+        `I can route you to **${to || "your destination"}** — just tell me your starting point (a station, landmark, or address).`,
+        CHOICES,
+      );
+    }
 
     if (!hasKey("TRANSIT_API_KEY") || !hasKey("TOUR_API_KEY")) {
       return notConnected(

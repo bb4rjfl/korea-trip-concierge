@@ -3,6 +3,7 @@ import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
 import { getStationArrivals, resolveStationName, type SubwayArrival } from "../lib/sources/seoulSubway.js";
+import { formatSubwayDirection, romanizeStation } from "../lib/romanize.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -34,11 +35,12 @@ function render(station: string, arrivals: SubwayArrival[]): string {
   }
 
   const lines = [`🚇 **${station} — next trains**`, ""];
-  for (const [dir, arr] of byDir) {
-    lines.push(`**→ ${dir}**`);
+  for (const [, arr] of byDir) {
+    // Romanize the Korean direction string for English-first readers (U1).
+    lines.push(`**→ ${formatSubwayDirection(arr[0].towards || arr[0].destination)}**`);
     for (const a of arr) {
       const eta = a.etaMinutes != null ? `**${a.etaMinutes} min**` : `_${a.status}_`;
-      const loc = a.currentLocation ? ` · near ${a.currentLocation}` : "";
+      const loc = a.currentLocation ? ` · near ${romanizeStation(a.currentLocation)}` : "";
       lines.push(`- ${a.line}: ${eta}${loc}`);
     }
     lines.push("");

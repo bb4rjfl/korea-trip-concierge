@@ -4,7 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { SERVER_NAME, SERVER_VERSION } from "./lib/constants.js";
 import { assertNamingOk } from "./lib/naming.js";
-import { ENV } from "./lib/env.js";
+import { ENV, hasKey } from "./lib/env.js";
 import { ALL_TOOLS, TOOL_NAMES } from "./tools/index.js";
 
 // Fail fast at startup if any name breaks Kakao rules (kakao token, charset,
@@ -22,7 +22,15 @@ function buildServer(): McpServer {
         inputSchema: tool.inputSchema,
         annotations: tool.annotations,
       },
-      async (args: Record<string, unknown>) => tool.handler(args),
+      async (args: Record<string, unknown>) => {
+        // S1: lightweight per-tool timing to diagnose p99 in production logs.
+        const start = Date.now();
+        try {
+          return await tool.handler(args);
+        } finally {
+          console.log(`[tool] ${tool.name} ${Date.now() - start}ms`);
+        }
+      },
     );
   }
   return server;
@@ -31,9 +39,22 @@ function buildServer(): McpServer {
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 
-// Health check (KC / load balancers).
+// Health check (KC / load balancers). Includes which data-source keys are
+// configured (booleans only — never the secret values) to debug KC env (S5).
 app.get("/", (_req: Request, res: Response) => {
-  res.json({ name: SERVER_NAME, version: SERVER_VERSION, tools: TOOL_NAMES.length, status: "ok" });
+  res.json({
+    name: SERVER_NAME,
+    version: SERVER_VERSION,
+    tools: TOOL_NAMES.length,
+    status: "ok",
+    sources: {
+      tour: hasKey("TOUR_API_KEY"),
+      bus: hasKey("BUS_API_KEY"),
+      transit: hasKey("TRANSIT_API_KEY"),
+      subway: hasKey("SUBWAY_API_KEY"),
+      jeju: hasKey("JEJU_API_KEY"),
+    },
+  });
 });
 
 // Streamable HTTP, stateless: new server + transport per request, no sessions.

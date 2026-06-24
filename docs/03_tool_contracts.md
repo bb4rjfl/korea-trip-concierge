@@ -26,8 +26,8 @@
 ## 3. `getTransitRoute`
 - **title**: "Get Public Transit Route"
 - **description(영문)**: "Returns public-transit routes (subway/bus) between two points in Korea with fares, transfers, and time, explained in English for foreign visitors. Korea Trip Concierge(코리아 트립 컨시어지)."
-- **inputSchema**: `{ from: string (required), to: string (required), departAt?: string }`
-- **output**: 1~3개 경로, 각 경로 단계·요금·소요·환승. 끝에 선택지(다른 경로/지금 출발 새로고침).
+- **inputSchema**: `{ to: string (required), from?: string, departAt?: string }` — `from` 미지정(칩에서 목적지만 온 경우)이면 "출발지 알려달라" 정중 안내로 폴백(U3).
+- **output**: 1~3개 경로, 각 경로 단계·요금·소요·환승. 끝에 선택지(지하철 실시간/결제/도착지 동네).
 - annotations: readOnly true / idempotent false / openWorld true
 
 ## 4. `trackBusArrival`  (K-Bus Companion, 조회형)

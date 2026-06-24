@@ -17,8 +17,12 @@
 import { ENV } from "../env.js";
 import { fetchJson } from "../http.js";
 import { TtlCache } from "../cache.js";
+import { resolveStationKo } from "../romanize.js";
 
 const BASE = "http://swopenapi.seoul.go.kr/api/subway";
+
+/** Resolve a user-supplied station name to the Korean name the API expects. */
+export const resolveStationName = resolveStationKo;
 
 /** subwayId → human line label (common lines + tourist-relevant metro). */
 const LINE_LABEL: Record<string, string> = {
@@ -50,64 +54,6 @@ const ARVL_STATUS: Record<string, string> = {
   "5": "arrived previous stop",
   "99": "en route",
 };
-
-/**
- * EN→KO station map for the most tourist/traffic-relevant stops. Korean input
- * passes through (we strip a trailing 역). Extendable.
- */
-const STATION_KO: Record<string, string> = {
-  gangnam: "강남",
-  "hongdae": "홍대입구",
-  "hongik": "홍대입구",
-  "hongik university": "홍대입구",
-  myeongdong: "명동",
-  "seoul station": "서울",
-  seoul: "서울",
-  itaewon: "이태원",
-  dongdaemun: "동대문",
-  "dongdaemun history culture park": "동대문역사문화공원",
-  jamsil: "잠실",
-  gwanghwamun: "광화문",
-  "euljiro 1-ga": "을지로입구",
-  euljiro: "을지로입구",
-  sinchon: "신촌",
-  ewha: "이대",
-  gyeongbokgung: "경복궁",
-  anguk: "안국",
-  insadong: "안국",
-  "seoul forest": "서울숲",
-  yeouido: "여의도",
-  apgujeong: "압구정",
-  sinsa: "신사",
-  garosugil: "신사",
-  samseong: "삼성",
-  coex: "삼성",
-  "express bus terminal": "고속터미널",
-  hapjeong: "합정",
-  "gimpo airport": "김포공항",
-  yongsan: "용산",
-  wangsimni: "왕십리",
-  "konkuk university": "건대입구",
-  konkuk: "건대입구",
-  seongsu: "성수",
-  ttukseom: "뚝섬",
-  "city hall": "시청",
-  jonggak: "종각",
-  "jongno 3-ga": "종로3가",
-  "dongguk university": "동대입구",
-  noksapyeong: "녹사평",
-  "cheongnyangni": "청량리",
-  "dmc": "디지털미디어시티",
-  "digital media city": "디지털미디어시티",
-};
-
-/** Resolve a user-supplied station name to the Korean name the API expects. */
-export function resolveStationName(input: string): string | undefined {
-  const raw = input.trim();
-  if (!raw) return undefined;
-  if (/[가-힣]/.test(raw)) return raw.replace(/역$/, ""); // already Korean
-  return STATION_KO[raw.toLowerCase()];
-}
 
 export interface SubwayArrival {
   line: string;

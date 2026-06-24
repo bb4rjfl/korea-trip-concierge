@@ -83,7 +83,7 @@
 
 - [x] 공모전 규칙·심사정책 정독 및 문서화
 - [x] 아이디어 통합 확정 (Concierge + K-Pass Finder + K-Bus Companion → 단일 서버)
-- [x] 런타임/데이터전략 확정 (D-004/D-005) + **TS MCP 서버 구축** — **11툴**(D-006, 권장10 초과→통폐합 검토), 지식툴 3종 즉시동작 + **API툴 8종 실데이터 검증**, build/**77 tests**/서버 end-to-end 통과
+- [x] 런타임/데이터전략 확정 (D-004/D-005) + **TS MCP 서버 구축** — **11툴**(D-006, 권장10 초과→유지 결정), 지식툴 3종 즉시동작 + **API툴 8종 실데이터 검증**, UI/UX·구조 하드닝(로마자화·날씨통합·타이틀정제 등), build/**83 tests**/서버 end-to-end 통과
 - [x] **public GitHub repo**: https://github.com/bb4rjfl/korea-trip-concierge
 - [x] 대화 예시 3개(docs/09) + API 키 발급 가이드(docs/08) + 핸드오프(docs/10) 작성
 - [x] **API 키 발급·저장**(.env) + 실연동 검증 — TourAPI/TAGO(비서울)/ODsay/VisitJeju/날씨·미세먼지 ✅

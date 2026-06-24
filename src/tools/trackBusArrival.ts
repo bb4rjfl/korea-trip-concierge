@@ -100,8 +100,10 @@ export const trackBusArrival: ToolDef = {
       }
       const { arrival } = result;
       const stopsWord = arrival.stopsRemaining === 1 ? "stop" : "stops";
+      // Show the user's own stop wording (their language) rather than the API's
+      // Korean stop name — English-first UX (U1).
       const body = [
-        `🚌 **Bus ${arrival.routeNo} → ${result.stop.nodeName}**`,
+        `🚌 **Bus ${arrival.routeNo} → ${stop}**`,
         "",
         `Currently **${arrival.stopsRemaining} ${stopsWord} away**, about **${arrival.etaMinutes} min**.`,
         arrival.stopsRemaining <= 1

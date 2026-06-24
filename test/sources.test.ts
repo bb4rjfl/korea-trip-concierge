@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { parsePlaces, searchPlaces } from "../src/lib/sources/tourapi.js";
+import { parsePlaces, searchPlaces, cleanTitle } from "../src/lib/sources/tourapi.js";
 import { trackBus, resolveCityCode } from "../src/lib/sources/tago.js";
 import { parseRoutes } from "../src/lib/sources/odsay.js";
 import { parseJeju } from "../src/lib/sources/jeju.js";
@@ -37,6 +37,18 @@ const TWO_ITEMS = {
     },
   },
 };
+
+describe("cleanTitle (TourAPI title sanitization)", () => {
+  it("strips a trailing Korean parenthetical that breaks Markdown", () => {
+    expect(cleanTitle("Gyeongbokgung Palace(경복궁)")).toBe("Gyeongbokgung Palace");
+    expect(cleanTitle("Andersson Bell Flagship Store [Tax Refund Shop](앤더슨벨 스토어)")).toBe(
+      "Andersson Bell Flagship Store",
+    );
+  });
+  it("leaves clean English titles untouched", () => {
+    expect(cleanTitle("Gwangjang Market")).toBe("Gwangjang Market");
+  });
+});
 
 describe("parsePlaces — data.go.kr response quirks", () => {
   it("parses an array of items", () => {

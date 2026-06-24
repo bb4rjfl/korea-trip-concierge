@@ -2,7 +2,7 @@ import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
-import { searchPlaces, type Place } from "../lib/sources/tourapi.js";
+import { searchPlacesAny, type Place } from "../lib/sources/tourapi.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -23,12 +23,25 @@ const RETRY: Choice[] = [
   { emoji: "🗺️", cmdEn: "Guide me around this area", descEn: "neighborhood overview instead" },
 ];
 
+/** Infer a TourAPI category from the natural-language query when not given. */
+function inferCategory(query: string, explicit?: string): string | undefined {
+  if (explicit) return explicit;
+  const q = query.toLowerCase();
+  if (/cafe|coffee|restaurant|brunch|dining|eat|food|맛집|카페|레스토랑/.test(q)) return "food";
+  if (/shop|shopping|mall|store|market|boutique|쇼핑|상점/.test(q)) return "shopping";
+  if (/museum|palace|temple|park|attraction|sight|landmark|tour|관광|명소/.test(q)) return "attraction";
+  if (/hotel|stay|guesthouse|hostel|accommodation|숙소|호텔/.test(q)) return "accommodation";
+  return undefined;
+}
+
 function renderPlaces(query: string, places: Place[]): string {
   if (places.length === 0) {
     return `🔎 **No places found for** _"${query}"_.\n\nTry a broader term or a nearby landmark.`;
   }
   const lines = places.map((p, i) => {
-    const img = p.image ? ` ![photo](${p.image})` : "";
+    // Only the top 2 results get a thumbnail — keeps the response scannable and
+    // well under the 24k budget (U8).
+    const img = p.image && i < 2 ? ` ![photo](${p.image})` : "";
     const tel = p.tel ? ` · ☎ ${p.tel}` : "";
     return `**${i + 1}. ${p.title}**${img}\n   📍 ${p.address}${tel}`;
   });
@@ -70,9 +83,13 @@ export const searchPlaceForeigner: ToolDef = {
       );
     }
 
-    const keyword = [query, area].filter(Boolean).join(" ").trim();
+    // Try the combined phrase first, then fall back to area-only / query-only so
+    // a literal "cafe Hongdae" miss still surfaces useful results. Infer the
+    // category from the query (e.g. "cafe" → food) so the type filter applies.
+    const candidates = [[query, area].filter(Boolean).join(" "), area, query];
+    const cat = inferCategory(query, category);
     try {
-      const places = await searchPlaces({ keyword, category, limit: 5 });
+      const places = await searchPlacesAny(candidates, { category: cat, limit: 5 });
       return ok(renderPlaces(query, places), CHOICES);
     } catch {
       return fail(
