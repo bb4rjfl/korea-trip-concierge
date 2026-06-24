@@ -17,7 +17,7 @@
 ## 1. 작업 시작 전 필독 순서 (매 세션)
 
 1. **이 파일(CLAUDE.md)** — 전체 맥락·규칙 진입점
-2. `docs/00_service_overview.md` — 🟢 서비스 총정리 + MCP 작동원리 + 10개 도구 흐름 (전체 그림이 필요할 때)
+2. `docs/00_service_overview.md` — 🟢 서비스 총정리 + MCP 작동원리 + 11개 도구 흐름 (전체 그림이 필요할 때)
 3. `docs/01_kakao_playmcp_rules.md` — ⭐ 카카오 PlayMCP 개발가이드 + 심사정책 (반려 방지, 절대 규칙)
 4. `docs/02_product_spec.md` — 제품 정의 + 통합 툴 스펙 (무엇을 만드나)
 5. `docs/03_tool_contracts.md` — 각 툴의 입출력 계약 (JSON, 구현 기준)
@@ -83,7 +83,7 @@
 
 - [x] 공모전 규칙·심사정책 정독 및 문서화
 - [x] 아이디어 통합 확정 (Concierge + K-Pass Finder + K-Bus Companion → 단일 서버)
-- [x] 런타임/데이터전략 확정 (D-004/D-005) + **TS MCP 서버 구축** — **10툴**(D-006), 지식툴 3종 즉시동작 + **API툴 7종 실데이터 검증**, build/**70 tests**/서버 end-to-end 통과
+- [x] 런타임/데이터전략 확정 (D-004/D-005) + **TS MCP 서버 구축** — **11툴**(D-006, 권장10 초과→통폐합 검토), 지식툴 3종 즉시동작 + **API툴 8종 실데이터 검증**, build/**77 tests**/서버 end-to-end 통과
 - [x] **public GitHub repo**: https://github.com/bb4rjfl/korea-trip-concierge
 - [x] 대화 예시 3개(docs/09) + API 키 발급 가이드(docs/08) + 핸드오프(docs/10) 작성
 - [x] **API 키 발급·저장**(.env) + 실연동 검증 — TourAPI/TAGO(비서울)/ODsay/VisitJeju/날씨·미세먼지 ✅

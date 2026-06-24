@@ -9,6 +9,7 @@ import { translateMenuContext } from "./translateMenuContext.js";
 import { getNowInfo } from "./getNowInfo.js";
 import { getJejuInfo } from "./getJejuInfo.js";
 import { getWeatherAndAir } from "./getWeatherAndAir.js";
+import { trackSubwayArrival } from "./trackSubwayArrival.js";
 
 /** All registered tools (max 20 per Kakao policy). */
 export const ALL_TOOLS: ToolDef[] = [
@@ -16,6 +17,7 @@ export const ALL_TOOLS: ToolDef[] = [
   findForeignerFriendlyStore,
   getTransitRoute,
   trackBusArrival,
+  trackSubwayArrival,
   explainPayment,
   getAreaGuide,
   translateMenuContext,

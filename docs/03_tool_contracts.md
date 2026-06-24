@@ -83,6 +83,15 @@
 - **output**: 기온·하늘·강수확률 + PM10/PM2.5 등급 + 마스크 권고(영문). 끝에 선택지(옷차림/실내장소/경로).
 - annotations: readOnly true / idempotent false (시간 변동) / openWorld true
 
+## 11. `trackSubwayArrival`  (서울 지하철 실시간, 조회형)
+- **title**: "Track Subway Arrival"
+- **description(영문)**: "Looks up real-time next-train arrivals at a Seoul subway station — line, direction, destination, and minutes away — explained in English for foreign visitors. Query-based (refresh to update). Part of Korea Trip Concierge(코리아 트립 컨시어지)."
+- **inputSchema**: `{ station: string (required, 영문/한글) }`
+- **데이터**: **서울 TOPIS swopenAPI `realtimeStationArrival`**(`SUBWAY_API_KEY`, 키는 path 세그먼트). 영문 역명→한글 매핑(주요/관광역) 후 조회. ⚠️ 지하철 운행 05:30~01:00, 운행外/데이터없음은 top-level `{status,code:"INFO-200",...}` → 빈 목록 처리. (위치정보 `realtimePosition` OA-12601은 향후 옵션.)
+- **output**: 방면별 다음 열차(노선·N분·현재위치)·상태. **푸시 아님 — 조회**. 끝에 **[🔄 Refresh] [🗺️ Route] [🏙️ Around]** 선택지.
+- annotations: readOnly true / idempotent false (실시간) / openWorld true
+- ⚠️ verify-live: 성공 응답의 도착 필드(subwayId/trainLineNm/bstatnNm/barvlDt/arvlMsg3/arvlCd)는 낮 시간 1회 확인. 키·URL·봉투는 검증 완료.
+
 ---
 
 ## 공통 에러 처리

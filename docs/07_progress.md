@@ -37,17 +37,18 @@
 ## 블로커 / 확인 필요
 - ~~ODsay 키 인증 실패~~ ✅ **해결**: 키 끝자리 `l`(소문자L)→`I`(대문자i) 오타였음. 정정 후 실호출 25개 경로 정상(지하철+버스+도보, 요금/시간 파싱 일치). getTransitRoute 실동작 확인.
 - **스코프 확장 — 신규 소스 추가(사용자 결정: 전부 탑재, 툴 20개 이내)**. 키 보관 위치 .env:
-  - ① 서울 버스 4종(data.go.kr, `BUS_API_KEY` 재사용) → trackBusArrival 서울 분기 채우기(seoul.ts) — **TODO**(새벽이라 라이브 데이터 0, 낮 검증)
+  - ① 서울 버스 4종(data.go.kr, `BUS_API_KEY` 재사용) → trackBusArrival 서울 분기 채우기(seoul.ts) — **활용신청 승인됨 ✅**, 구현 대기(낮 라이브 검증)
   - ② 기상청 날씨 + ③ 에어코리아 대기오염(data.go.kr, `BUS_API_KEY` 동일 키) → **신규 툴 getWeatherAndAir 완성·실데이터 검증 ✅**(KMA 단기예보 nx/ny 격자+도시테이블, 에어코리아 시도별 PM10/PM2.5 평균·등급·마스크 권고)
-  - ④ 서울 지하철 실시간(열린데이터광장, `SUBWAY_API_KEY`) → 신규 툴 — **키 검증 OK**(새벽 데이터 0, 낮 재확인 후 구현)
+  - ④ 서울 지하철 실시간(TOPIS swopenAPI, `SUBWAY_API_KEY`) → **신규 툴 trackSubwayArrival 완성 ✅**(realtimeStationArrival, 영문역명 매핑, 키·URL·봉투 라이브 검증 — 운행外 `{code:INFO-200}` 빈목록 처리). 성공 도착필드만 낮 1회 확인. (위치 realtimePosition OA-12601은 옵션)
   - ⑤ VisitJeju 제주관광(`JEJU_API_KEY`) → **신규 툴 getJejuInfo 완성·실데이터 검증 ✅**(HTTPS 필수, locale=en 영어, category c1~c6)
-  - ⑥ 카카오 Local 키워드/카테고리 장소검색(`KAKAO_REST_API_KEY`, 일 10만 무료) → 신규 툴(이름에 kakao 금지→`recommendPlaces` 등) — **사용자 액션 대기**: 콘솔에서 [카카오맵]>[사용 설정] ON 필요(현재 403 OPEN_MAP_AND_LOCAL disabled). Admin/Native/JS 키는 미사용·미저장.
-  - 진행: **10개 툴**(getJejuInfo, getWeatherAndAir 추가), build/70 tests green.
-- **서울 버스 활용신청(사용자 액션)**: 결정 D=「전국 TAGO + 서울 별도」. TAGO에 서울 없으므로 data.go.kr에서 **서울 버스도착정보(+정류소정보)** 추가 활용신청 필요(같은 BUS_API_KEY 재사용). 활성화되면 `src/lib/sources/seoul.ts` 구현·연결 예정. 현재 trackBusArrival은 서울 입력 시 "경로 안내 사용" 안내로 폴백.
+  - ⑥ 카카오 Local 키워드/카테고리 장소검색(`KAKAO_REST_API_KEY`) → **보류**(사용자 결정): API 승인 3~5일 소요, 가능성만 열어둠. 진행 시 이름 kakao 금지(`recommendPlaces` 등) + 콘솔 카카오맵 ON(비즈앱 전환) 선행. 참고 API: search/keyword, search/category.
+  - 진행: **11개 툴**(getJejuInfo, getWeatherAndAir, trackSubwayArrival 추가), build/77 tests green.
+- **서울 버스(D-007 전국 TAGO + 서울 별도)**: 서울 버스도착·정류소·위치·노선 4종 활용신청 **승인됨 ✅**(같은 BUS_API_KEY). 다음: `src/lib/sources/seoul.ts` 구현 → trackBusArrival 서울 분기 연결(현재는 서울 입력 시 "경로 안내" 폴백). 낮 라이브 검증.
 - **TAGO getSttnNoList 지연(주의)**: 정류소명 검색이 라이브 3.8~5.8s(새벽 측정) — 기본 2.5s 초과. 디렉터리성 호출(도시/정류소)만 타임아웃 6s로 상향(캐시 1h/1d라 콜드캐시에서만 느림), 실시간 도착 호출은 2.5s 유지. **낮 시간대 재측정 권장** + p99<3s 충돌 여부 모니터.
 - **TAGO 도착필드 미확인**: 새벽 측정이라 도착 0건 → routeno/arrtime/arrprevstationcnt/vehicletp 라이브 확인은 낮 시간대 1회 필요(문서 스펙과는 일치).
 - **검증 완료(참고)**: TAGO 엔드포인트 철자 `BusSttnInfoInqireService`/`ArvlInfoInqireService`(Inqire), 정류소검색 `cityCode`+`nodeNm`(응답에 citycode 없음→주입), city명(영/한)→코드 매핑(getCtyCodeList+별칭). TourAPI `listYN` 제거로 정상(필드 전수 일치). 모두 코드 반영 + 테스트 57개 green.
-- 루트의 `01~07_*.md` 가 `docs/`와 100% 중복 → 드리프트 방지 위해 루트 사본 삭제 권장(사용자 확인 대기).
+- ~~루트의 `01~07_*.md` 중복~~ ✅ 제거 완료(정본 docs/ 단일화).
+- **툴 개수(11) 권장 10 초과** — '명확성' 점수 고려해 유사 장소툴(searchPlaceForeigner·findForeignerFriendlyStore·getJejuInfo·getNowInfo) 통폐합 여부 결정 필요(미결정).
 - 카카오맵 직접연동 가능 여부(선택, 필수 아님)
 - 본선 Kakao Tools의 Widget/elicitation/푸시 지원 범위 (본선 단계 확인)
 
@@ -55,11 +56,11 @@
 ```
 src/server.ts            Streamable HTTP stateless 진입점 (loadEnv 최초 import + 네이밍 린트)
 src/lib/                 constants, env, loadEnv(.env), naming, markdown(24k), footer(칩), http(timeout), cache(TTL), responses
-src/lib/sources/         TourAPI, TAGO(버스), ODsay(경로), VisitJeju, 기상청+에어코리아(weatherair)
-src/tools/               10개 툴 (types, index, *.ts) — 지식툴3 즉시동작 + API툴7 실연동
-scripts/lint-naming.ts   빌드 게이트 (kakao 토큰/charset/중복/개수)
+src/lib/sources/         TourAPI, TAGO(버스), ODsay(경로), VisitJeju, weatherair(기상청+에어코리아), seoulSubway(지하철)
+src/tools/               11개 툴 (types, index, *.ts) — 지식툴3 즉시동작 + API툴8 실연동
+scripts/lint-naming.ts   빌드 게이트 (kakao 토큰/charset/중복/개수, 3~20)
 scripts/verify-live.ts   실 API 호출 점검 (키 필요)
-test/                    vitest 70개 (헬퍼 + 전체 툴 계약 + 핸들러 스모크 + 소스 파서)
+test/                    vitest 77개 (헬퍼 + 전체 툴 계약 + 핸들러 스모크 + 소스 파서)
 Dockerfile               linux/amd64, 루트
 ```
 
@@ -72,4 +73,5 @@ Dockerfile               linux/amd64, 루트
 - 2026-06-25 (6): 서비스 오버뷰 문서 작성(`docs/00_service_overview.md`) — 총정리 + MCP 작동원리 심화(전송/생애주기/도구선택/stateless) + 8개 도구 상세 흐름 + 여정 그래프. README 문서맵·CLAUDE.md 필독순서에 00/08/09 반영.
 - 2026-06-25 (7): **API 키 3종 발급·저장 + 실연동 검증**. `.env`에 BUS/TOUR(동일 data.go.kr 키)/TRANSIT(ODsay) 저장. `scripts/verify-live.ts`로 실호출 검증 → 발견·수정: (1) TourAPI EngService2 GW가 `listYN` 거부 → 제거(필드 전수 일치, 3개 툴 실동작 확인). (2) TAGO 서비스 철자 오타 `Inqire`(BusSttnInfoInqireService/ArvlInfoInqireService)로 정정. 미해결: TAGO 정류소조회 cityCode 필수+서울 미포함 재설계, ODsay ApiKeyAuthFailed(키 재확인 대기). 테스트 56개 green 유지.
 - 2026-06-25 (8, 별도 세션): 스코프 확장 — VisitJeju(getJejuInfo)+기상청·에어코리아(getWeatherAndAir) 신규 툴, ODsay 키 오타 수정, TAGO 전국+서울 분기(city 필수) 재설계. 10툴/70 tests green. (D-006/D-007)
-- 2026-06-25 (9, 메인 세션): 핸드오프 수신·동기화(origin 동일, 70 green 확인). **R-DOC 문서 정합화** — 코드(10툴)와 어긋난 문서 일괄 갱신: docs/03(getJejuInfo·getWeatherAndAir 계약 추가 + trackBusArrival city), docs/02(툴표 10·데이터소스 확정), docs/00(8→10 전면), docs/06(D-006/D-007), docs/07 구조 스냅샷, CLAUDE.md 현재상태, README. **다음**: 낮 시간 라이브 확인(TAGO 도착필드·서울 지하철/버스·카카오 Local) → KC 배포.
+- 2026-06-25 (9, 메인 세션): 핸드오프 수신·동기화(origin 동일, 70 green 확인). **R-DOC 문서 정합화** — 코드(10툴)와 어긋난 문서 일괄 갱신: docs/03(getJejuInfo·getWeatherAndAir 계약 추가 + trackBusArrival city), docs/02(툴표 10·데이터소스 확정), docs/00(8→10 전면), docs/06(D-006/D-007), docs/07 구조 스냅샷, CLAUDE.md 현재상태, README.
+- 2026-06-25 (10, 메인 세션): **서울 지하철 실시간 툴 신규** — 사용자가 OA-12764(realtimeStationArrival)/OA-12601(realtimePosition) 지정. `src/lib/sources/seoulSubway.ts`(도착 파서 + 영문역명→한글 매핑 + 노선/상태 디코드) + `trackSubwayArrival` 툴 구현. 라이브 점검: 키·URL·봉투 OK(새벽이라 `{code:INFO-200}` 빈데이터 → 정상 폴백), 성공 도착필드는 낮 확인. 픽스처 테스트 추가 → **11툴 / 77 tests green**. 툴 개수 권장10 초과 인지(통폐합 미결). docs 02/03/00/07·CLAUDE·README 동기화. 카카오 Local은 사용자 결정으로 보류.

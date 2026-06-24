@@ -4,6 +4,7 @@ import { trackBus, resolveCityCode } from "../src/lib/sources/tago.js";
 import { parseRoutes } from "../src/lib/sources/odsay.js";
 import { parseJeju } from "../src/lib/sources/jeju.js";
 import { parseWeather, parseAir, resolveCity } from "../src/lib/sources/weatherair.js";
+import { parseArrivals, resolveStationName } from "../src/lib/sources/seoulSubway.js";
 
 /** A representative EngService2 response with two items. */
 const TWO_ITEMS = {
@@ -274,5 +275,52 @@ describe("weather/air parsing", () => {
     expect(resolveCity("제주").label).toBe("Jeju");
     expect(resolveCity(undefined).label).toBe("Seoul");
     expect(resolveCity("Atlantis").label).toBe("Seoul");
+  });
+});
+
+describe("Seoul subway", () => {
+  it("resolveStationName maps EN→KO, passes Korean through, strips '역'", () => {
+    expect(resolveStationName("Gangnam")).toBe("강남");
+    expect(resolveStationName("Hongik University")).toBe("홍대입구");
+    expect(resolveStationName("강남역")).toBe("강남");
+    expect(resolveStationName("명동")).toBe("명동");
+    expect(resolveStationName("Atlantis")).toBeUndefined();
+    expect(resolveStationName("")).toBeUndefined();
+  });
+
+  it("parseArrivals maps line, ETA from seconds, status, current location", () => {
+    const arrivals = parseArrivals({
+      errorMessage: { code: "INFO-000", total: 2 },
+      realtimeArrivalList: [
+        {
+          subwayId: "1002",
+          trainLineNm: "성수행 - 신설동방면",
+          bstatnNm: "성수",
+          barvlDt: "120",
+          arvlMsg3: "강남",
+          arvlCd: "99",
+        },
+        {
+          subwayId: "1009",
+          trainLineNm: "중앙보훈병원행",
+          bstatnNm: "중앙보훈병원",
+          barvlDt: "0",
+          arvlCd: "1",
+        },
+      ],
+    });
+    expect(arrivals).toHaveLength(2);
+    expect(arrivals[0].line).toBe("Line 2");
+    expect(arrivals[0].etaMinutes).toBe(2); // 120s
+    expect(arrivals[0].status).toBe("en route");
+    expect(arrivals[0].currentLocation).toBe("강남");
+    expect(arrivals[1].line).toBe("Line 9");
+    expect(arrivals[1].etaMinutes).toBeUndefined(); // 0s
+    expect(arrivals[1].status).toBe("arrived");
+  });
+
+  it("parseArrivals returns [] when no list", () => {
+    expect(parseArrivals({ errorMessage: { code: "INFO-200" } })).toEqual([]);
+    expect(parseArrivals({})).toEqual([]);
   });
 });

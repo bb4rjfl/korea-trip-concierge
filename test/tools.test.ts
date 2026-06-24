@@ -4,9 +4,11 @@ import { SERVICE_NAME, MAX_RESPONSE_CHARS } from "../src/lib/constants.js";
 import { checkToolName } from "../src/lib/naming.js";
 
 describe("tool registry meets Kakao contract rules", () => {
-  it("has 3–10 tools (recommended range)", () => {
+  it("has 3–20 tools (Kakao hard limit; ≤10 is the recommended range)", () => {
     expect(ALL_TOOLS.length).toBeGreaterThanOrEqual(3);
-    expect(ALL_TOOLS.length).toBeLessThanOrEqual(10);
+    expect(ALL_TOOLS.length).toBeLessThanOrEqual(20);
+    // NOTE: >10 exceeds Kakao's *recommended* range — consolidation under review
+    // (see docs/06 D-006). Hard gate is 20 (enforced by scripts/lint-naming.ts).
   });
 
   it("tool names are unique and rule-compliant", () => {
@@ -44,6 +46,7 @@ describe("handlers return guarded text content", () => {
     findForeignerFriendlyStore: { area: "Seongsu" },
     getTransitRoute: { from: "Seoul Station", to: "Myeongdong" },
     trackBusArrival: { busNumber: "143", dropOffStop: "Seomyeon", city: "Busan" },
+    trackSubwayArrival: { station: "Gangnam" },
     explainPayment: { situation: "paying for the subway" },
     getAreaGuide: { area: "Myeongdong" },
     translateMenuContext: { menuText: "tteokbokki" },
