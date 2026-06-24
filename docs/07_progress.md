@@ -56,3 +56,4 @@ Dockerfile               linux/amd64, 루트
 - 2026-06-24 (3): TourAPI(영문) 실연동 클라이언트 구현 + searchPlaceForeigner/findForeignerFriendlyStore 연결(키 가드/에러처리), 픽스처+mock 테스트(52개 통과). 대화예시 3개(docs/09) 작성. API 키 발급 상세 가이드는 별도 세션으로 분기(docs/08 작성 예정).
 - 2026-06-25 (4): 남은 API 툴 3종 실연동 선작성 — tago.ts(TAGO 실시간 버스)+odsay.ts(경로) 소스 구현, trackBusArrival/getTransitRoute/getNowInfo 연결. 파서 픽스처/mock 테스트 추가(56개 통과). git 저장소 초기화 + .gitattributes(LF) + 첫 커밋 → public GitHub repo(bb4rjfl/korea-trip-concierge) 생성·푸시. docs/08 키 발급 가이드 완료 확인.
 - 2026-06-25 (5): 전반 점검 후 하드닝 — (버그) `.env` 미로딩 발견·수정(loadEnv + live getter, end-to-end 검증), 잘못된 JSON 에러 핸들러. repo 위생(루트 중복문서 제거, 로컬설정 untrack). 지식툴 데이터 보강. 카카오 §8 자가점검 통과. build/56 tests green.
+- 2026-06-25 (6): 서비스 오버뷰 문서 작성(`docs/00_service_overview.md`) — 총정리 + MCP 작동원리 심화(전송/생애주기/도구선택/stateless) + 8개 도구 상세 흐름 + 여정 그래프. README 문서맵·CLAUDE.md 필독순서에 00/08/09 반영.

@@ -17,15 +17,16 @@
 ## 1. 작업 시작 전 필독 순서 (매 세션)
 
 1. **이 파일(CLAUDE.md)** — 전체 맥락·규칙 진입점
-2. `docs/01_kakao_playmcp_rules.md` — ⭐ 카카오 PlayMCP 개발가이드 + 심사정책 (반려 방지, 절대 규칙)
-3. `docs/02_product_spec.md` — 제품 정의 + 통합 툴 스펙 (무엇을 만드나)
-4. `docs/03_tool_contracts.md` — 각 툴의 입출력 계약 (JSON, 구현 기준)
-5. `docs/04_ux_interaction.md` — "버튼/선택지로 이어가기" 응답 패턴 (UX 핵심)
-6. `docs/05_working_agreement.md` — 작업 방식·코딩 규칙·정의(DoD)
-7. `docs/06_decision_log.md` — 결정 이력 (왜 이렇게 했나)
-8. `docs/07_progress.md` — 진행 상황·다음 할 일 (세션 간 연속성)
+2. `docs/00_service_overview.md` — 🟢 서비스 총정리 + MCP 작동원리 + 8개 도구 흐름 (전체 그림이 필요할 때)
+3. `docs/01_kakao_playmcp_rules.md` — ⭐ 카카오 PlayMCP 개발가이드 + 심사정책 (반려 방지, 절대 규칙)
+4. `docs/02_product_spec.md` — 제품 정의 + 통합 툴 스펙 (무엇을 만드나)
+5. `docs/03_tool_contracts.md` — 각 툴의 입출력 계약 (JSON, 구현 기준)
+6. `docs/04_ux_interaction.md` — "버튼/선택지로 이어가기" 응답 패턴 (UX 핵심)
+7. `docs/05_working_agreement.md` — 작업 방식·코딩 규칙·정의(DoD)
+8. `docs/06_decision_log.md` — 결정 이력 (왜 이렇게 했나)
+9. `docs/07_progress.md` — 진행 상황·다음 할 일 (세션 간 연속성)
 
-> 관련 없는 단순 작업이면 1·5만 읽어도 되지만, **기능을 추가/변경할 때는 1~5를 모두** 확인한다.
+> 관련 없는 단순 작업이면 1·7만 읽어도 되지만, **기능을 추가/변경할 때는 1~6을 모두** 확인한다. 전체 그림이 필요하면 `docs/00`.
 
 ---
 
