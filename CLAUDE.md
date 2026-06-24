@@ -82,11 +82,12 @@
 
 - [x] 공모전 규칙·심사정책 정독 및 문서화
 - [x] 아이디어 통합 확정 (Concierge + K-Pass Finder + K-Bus Companion → 단일 서버)
-- [x] 런타임/데이터전략 확정 (D-004/D-005) + **TS MCP 서버 스캐폴드 구축** (8툴 계약 등록, 지식툴 3종 실동작, build/46 tests/서버 end-to-end 통과)
-- [ ] 데이터 소스 확정 (**API 키 발급** — 사용자 액션 필요)
-- [ ] API 툴 5종 실데이터 구현 (키 발급 후)
-- [ ] MCP Inspector 정식 통과
-- [ ] KC 배포 → PlayMCP 임시등록 → 도구함 테스트
-- [ ] 대화 예시 3개 작성 → 심사요청(≤7/7) → 전체공개 → 비즈폼 응모(≤7/14)
+- [x] 런타임/데이터전략 확정 (D-004/D-005) + **TS MCP 서버 구축** (8툴 계약 등록, 지식툴 3종 실동작, **API툴 5종 연동 코드 완성**, build/56 tests/서버 end-to-end 통과)
+- [x] **public GitHub repo**: https://github.com/bb4rjfl/korea-trip-concierge
+- [x] 대화 예시 3개(docs/09) + API 키 발급 가이드(docs/08) 작성
+- [ ] 데이터 소스 확정 (**API 키 발급** — 사용자 액션 필요, docs/08 참조)
+- [ ] 키 발급 후 실응답 파서 검증(`verify-live`) + MCP Inspector 정식 통과
+- [ ] KC 배포(이 repo Git 소스 빌드) → PlayMCP 임시등록 → 도구함 테스트
+- [ ] 심사요청(≤7/7) → 전체공개 → 비즈폼 응모(≤7/14)
 
 > 상세 진행은 `docs/07_progress.md` 가 단일 진실 소스(SSOT).

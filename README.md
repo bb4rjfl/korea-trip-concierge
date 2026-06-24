@@ -2,6 +2,18 @@
 
 방한 외국인이 한국에서 막히는 지점(장소탐색·외국인 친화 매장·교통·결제)을 영어로 구조화해 해결하는 **MCP 서버**. 카카오 **Agentic Player 10** 공모전 출품작.
 
+**Repo**: https://github.com/bb4rjfl/korea-trip-concierge · TypeScript + Node 22 · MCP SDK 1.29 · Streamable HTTP (stateless)
+
+## 개발 / 실행
+```bash
+npm install
+npm run build      # 네이밍 린트(kakao 금지) + tsc
+npm test           # vitest (56)
+npm run dev        # tsx watch (로컬 서버, POST /mcp)
+npm start          # node dist/server.js
+```
+API 키는 `.env.example`를 복사해 `.env`에 설정 (발급법: `docs/08_api_key_issuance.md`). 키 없이도 지식 툴 3종은 동작.
+
 ## 이 저장소를 처음 여는 사람(또는 Claude Code)에게
 
 1. **`CLAUDE.md`** 부터 읽으세요. 프로젝트 헌법이자 모든 컨텍스트의 진입점입니다.
