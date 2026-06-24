@@ -2,7 +2,7 @@ import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
-import { searchTopPlace, getPlaceIntro } from "../lib/sources/tourapi.js";
+import { searchTopPlace, getPlaceIntro, normalizeLang } from "../lib/sources/tourapi.js";
 import { CITIES, resolveCity, getWeather, getAir } from "../lib/sources/weatherair.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
@@ -80,6 +80,10 @@ export const getNowInfo: ToolDef = {
     `Part of ${SERVICE_NAME}.`,
   inputSchema: {
     place: z.string().describe("Place or attraction name, e.g. 'Gyeongbokgung Palace'."),
+    language: z
+      .enum(["en", "ja", "zh", "ko"])
+      .optional()
+      .describe("Result language: en (default), ja, zh (Chinese Simplified), ko. Match the visitor's language."),
   },
   annotations: {
     title: "Is It Good to Go Now?",
@@ -90,6 +94,7 @@ export const getNowInfo: ToolDef = {
   },
   handler: async (args) => {
     const place = String(args.place ?? "");
+    const language = normalizeLang(args.language as string | undefined);
 
     if (!hasKey("TOUR_API_KEY")) {
       return notConnected(
@@ -100,7 +105,7 @@ export const getNowInfo: ToolDef = {
     }
 
     try {
-      const top = await searchTopPlace(place);
+      const top = await searchTopPlace(place, language);
       if (!top || !top.contentId || !top.contentTypeId) {
         return fail(
           "Place not found",
@@ -108,7 +113,7 @@ export const getNowInfo: ToolDef = {
           RETRY,
         );
       }
-      const intro = await getPlaceIntro(top.contentId, top.contentTypeId);
+      const intro = await getPlaceIntro(top.contentId, top.contentTypeId, language);
       const now = koreaNow();
       const lines = [
         `🕒 **${top.title} — right now**`,

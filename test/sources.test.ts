@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { parsePlaces, searchPlaces, cleanTitle } from "../src/lib/sources/tourapi.js";
+import { parsePlaces, searchPlaces, cleanTitle, normalizeLang } from "../src/lib/sources/tourapi.js";
 import { trackBus, resolveCityCode } from "../src/lib/sources/tago.js";
 import { parseRoutes } from "../src/lib/sources/odsay.js";
 import { parseJeju } from "../src/lib/sources/jeju.js";
@@ -37,6 +37,46 @@ const TWO_ITEMS = {
     },
   },
 };
+
+describe("TourAPI multilingual (U4)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("normalizeLang maps aliases and defaults to en", () => {
+    expect(normalizeLang("ja")).toBe("ja");
+    expect(normalizeLang("Japanese")).toBe("ja");
+    expect(normalizeLang("chinese")).toBe("zh");
+    expect(normalizeLang("kr")).toBe("ko");
+    expect(normalizeLang(undefined)).toBe("en");
+    expect(normalizeLang("klingon")).toBe("en");
+  });
+
+  it("picks the JpnService2 base and foreign content-type for ja", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(url).toContain("/JpnService2/searchKeyword2");
+      expect(url).toContain("contentTypeId=82"); // foreign numbering for food
+      return { ok: true, json: async () => ({ response: { body: { items: "" } } }) } as unknown as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await searchPlaces({ keyword: "x lang-ja-uniq", category: "food", language: "ja" });
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it("picks the KorService2 base and Korean content-type for ko", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(url).toContain("/KorService2/searchKeyword2");
+      expect(url).toContain("contentTypeId=39"); // Korean numbering for food
+      return { ok: true, json: async () => ({ response: { body: { items: "" } } }) } as unknown as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await searchPlaces({ keyword: "x lang-ko-uniq", category: "food", language: "ko" });
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it("cleanTitle keeps a Korean parenthetical for ko output, strips it otherwise", () => {
+    expect(cleanTitle("서울특별시 (한국)", "ko")).toBe("서울특별시 (한국)"); // ko keeps Hangul paren
+    expect(cleanTitle("Gyeongbokgung(경복궁)", "en")).toBe("Gyeongbokgung"); // en strips it
+  });
+});
 
 describe("cleanTitle (TourAPI title sanitization)", () => {
   it("strips a trailing Korean parenthetical that breaks Markdown", () => {

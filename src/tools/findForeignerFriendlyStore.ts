@@ -2,7 +2,7 @@ import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
-import { searchPlaces, type Place } from "../lib/sources/tourapi.js";
+import { searchPlaces, normalizeLang, type Place } from "../lib/sources/tourapi.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -72,6 +72,10 @@ export const findForeignerFriendlyStore: ToolDef = {
       .optional()
       .describe("Filters to require: noReservationNeeded, acceptsForeignCard, hasMultilingualMenu, walkInOk."),
     category: z.string().optional().describe("Optional category: food, cafe, shopping."),
+    language: z
+      .enum(["en", "ja", "zh", "ko"])
+      .optional()
+      .describe("Result language: en (default), ja, zh (Chinese Simplified), ko. Match the visitor's language."),
   },
   annotations: {
     title: "Find Foreigner-Friendly Stores",
@@ -84,6 +88,7 @@ export const findForeignerFriendlyStore: ToolDef = {
     const area = String(args.area ?? "");
     const needs = Array.isArray(args.needs) ? (args.needs as string[]) : [];
     const category = args.category ? String(args.category) : "food";
+    const language = normalizeLang(args.language as string | undefined);
 
     if (!hasKey("TOUR_API_KEY")) {
       return notConnected(
@@ -94,7 +99,7 @@ export const findForeignerFriendlyStore: ToolDef = {
     }
 
     try {
-      const places = await searchPlaces({ keyword: area, category, limit: 5 });
+      const places = await searchPlaces({ keyword: area, category, limit: 5, language });
       return ok(render(area, needs, places), CHOICES);
     } catch {
       return fail(

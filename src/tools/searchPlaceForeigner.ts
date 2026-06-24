@@ -2,7 +2,7 @@ import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
-import { searchPlacesAny, type Place } from "../lib/sources/tourapi.js";
+import { searchPlacesAny, normalizeLang, type Place } from "../lib/sources/tourapi.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -46,7 +46,7 @@ function renderPlaces(query: string, places: Place[]): string {
     return `**${i + 1}. ${p.title}**${img}\n   📍 ${p.address}${tel}`;
   });
   return [
-    `🔎 **Places for** _"${query}"_ — _English-friendly results from Korea Tourism data_`,
+    `🔎 **Places for** _"${query}"_ — _from Korea Tourism data_`,
     "",
     ...lines,
   ].join("\n");
@@ -62,6 +62,10 @@ export const searchPlaceForeigner: ToolDef = {
     query: z.string().describe("Natural-language intent, e.g. 'quiet cafe near Hongdae with English menu'."),
     area: z.string().optional().describe("Optional area/neighborhood to focus on."),
     category: z.string().optional().describe("Optional category: food, cafe, attraction, shopping, culture."),
+    language: z
+      .enum(["en", "ja", "zh", "ko"])
+      .optional()
+      .describe("Result language: en (default), ja, zh (Chinese Simplified), ko. Match the visitor's language."),
   },
   annotations: {
     title: "Search Places for Foreign Visitors",
@@ -88,8 +92,9 @@ export const searchPlaceForeigner: ToolDef = {
     // category from the query (e.g. "cafe" → food) so the type filter applies.
     const candidates = [[query, area].filter(Boolean).join(" "), area, query];
     const cat = inferCategory(query, category);
+    const language = normalizeLang(args.language as string | undefined);
     try {
-      const places = await searchPlacesAny(candidates, { category: cat, limit: 5 });
+      const places = await searchPlacesAny(candidates, { category: cat, limit: 5, language });
       return ok(renderPlaces(query, places), CHOICES);
     } catch {
       return fail(

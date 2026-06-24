@@ -17,11 +17,22 @@ import { ENV } from "../env.js";
 import { fetchJson } from "../http.js";
 import { TtlCache } from "../cache.js";
 
-const BASE = "http://apis.data.go.kr/B551011/EngService2";
+const API_HOST = "http://apis.data.go.kr/B551011";
 const MOBILE_APP = "KoreaTripConcierge";
 
-/** EngService2 content type IDs (English service uses its own numbering). */
-export const ENG_CONTENT_TYPE: Record<string, number> = {
+/** Supported content languages — one TourAPI service per language (U4). */
+export type Lang = "en" | "ja" | "zh" | "ko";
+
+/** language → TourAPI service path (all on the same TOUR_API_KEY). */
+const SERVICE: Record<Lang, string> = {
+  en: "EngService2",
+  ja: "JpnService2",
+  zh: "ChsService2", // Chinese (Simplified)
+  ko: "KorService2",
+};
+
+/** Foreign services (en/ja/zh) share one content-type numbering… */
+const CONTENT_TYPE_FOREIGN: Record<string, number> = {
   attraction: 76,
   culture: 78,
   festival: 85,
@@ -30,9 +41,35 @@ export const ENG_CONTENT_TYPE: Record<string, number> = {
   accommodation: 80,
   shopping: 79,
   food: 82,
-  cafe: 82, // no distinct cafe type; restaurants
+  cafe: 82,
   restaurant: 82,
 };
+/** …while the Korean service uses the original numbering. */
+const CONTENT_TYPE_KOR: Record<string, number> = {
+  attraction: 12,
+  culture: 14,
+  festival: 15,
+  course: 25,
+  leisure: 28,
+  accommodation: 32,
+  shopping: 38,
+  food: 39,
+  cafe: 39,
+  restaurant: 39,
+};
+
+export function normalizeLang(input?: string): Lang {
+  const v = (input ?? "").toLowerCase();
+  if (v === "ja" || v === "jp" || v === "japanese") return "ja";
+  if (v === "zh" || v === "cn" || v === "chinese" || v === "zh-cn") return "zh";
+  if (v === "ko" || v === "kr" || v === "korean") return "ko";
+  return "en";
+}
+
+function contentTypeFor(lang: Lang, category: string): number | undefined {
+  const map = lang === "ko" ? CONTENT_TYPE_KOR : CONTENT_TYPE_FOREIGN;
+  return map[category.toLowerCase()];
+}
 
 export interface Place {
   title: string;
@@ -78,12 +115,12 @@ interface TourApiResponse {
  * as a broken link and the Hangul is unreadable for our users. Strip any
  * parenthetical containing Hangul so what remains is clean English.
  */
-export function cleanTitle(t?: string): string {
-  return (t ?? "")
-    .replace(/\s*[(（][^()（）]*[가-힣][^()（）]*[)）]/g, "") // Korean parenthetical
-    .replace(/\s*\[[^\]]*\]/g, "") // bracketed tags e.g. "[Tax Refund Shop]"
-    .replace(/\s{2,}/g, " ")
-    .trim();
+export function cleanTitle(t?: string, lang: Lang = "en"): string {
+  let s = (t ?? "").replace(/\s*\[[^\]]*\]/g, ""); // bracketed tags e.g. "[Tax Refund Shop]"
+  // Strip Korean parentheticals only for non-Korean output (for the Korean
+  // service the whole title is Korean and should be kept).
+  if (lang !== "ko") s = s.replace(/\s*[(（][^()（）]*[가-힣][^()（）]*[)）]/g, "");
+  return s.replace(/\s{2,}/g, " ").trim();
 }
 
 /**
@@ -91,13 +128,13 @@ export function cleanTitle(t?: string): string {
  * - `items` is "" (empty string) when there are no results
  * - `items.item` is a single object (not an array) when exactly one result
  */
-export function parsePlaces(json: TourApiResponse): Place[] {
+export function parsePlaces(json: TourApiResponse, lang: Lang = "en"): Place[] {
   // data.go.kr returns "" (falsy) for empty results — caught by `!items`.
   const items = json.response?.body?.items;
   if (!items || !items.item) return [];
   const arr = Array.isArray(items.item) ? items.item : [items.item];
   return arr.map((it) => ({
-    title: cleanTitle(it.title),
+    title: cleanTitle(it.title, lang),
     address: [it.addr1, it.addr2].filter(Boolean).join(" ").trim(),
     tel: it.tel?.trim() || undefined,
     image: it.firstimage?.trim() || it.firstimage2?.trim() || undefined,
@@ -108,7 +145,7 @@ export function parsePlaces(json: TourApiResponse): Place[] {
   }));
 }
 
-function buildUrl(operation: string, params: Record<string, string>): string {
+function buildUrl(operation: string, params: Record<string, string>, lang: Lang): string {
   const sp = new URLSearchParams({
     serviceKey: ENV.TOUR_API_KEY,
     MobileOS: "ETC",
@@ -116,28 +153,30 @@ function buildUrl(operation: string, params: Record<string, string>): string {
     _type: "json",
     numOfRows: "8",
     pageNo: "1",
-    arrange: "O", // by title (EngService2 GW rejects listYN — verified live)
+    arrange: "O", // by title (the *Service2 GW rejects listYN — verified live)
     ...params,
   });
-  return `${BASE}/${operation}?${sp.toString()}`;
+  return `${API_HOST}/${SERVICE[lang]}/${operation}?${sp.toString()}`;
 }
 
 export interface SearchOptions {
   keyword: string;
   category?: string;
   limit?: number;
+  language?: Lang;
 }
 
-/** Keyword search (searchKeyword2). Cached + time-bounded. */
+/** Keyword search (searchKeyword2) in the requested language. Cached + time-bounded. */
 export async function searchPlaces(opts: SearchOptions): Promise<Place[]> {
-  const ctype = opts.category ? ENG_CONTENT_TYPE[opts.category.toLowerCase()] : undefined;
-  const key = `kw:${opts.keyword}:${ctype ?? ""}`;
+  const lang = opts.language ?? "en";
+  const ctype = opts.category ? contentTypeFor(lang, opts.category) : undefined;
+  const key = `kw:${lang}:${opts.keyword}:${ctype ?? ""}`;
   const params: Record<string, string> = { keyword: opts.keyword };
   if (ctype) params.contentTypeId = String(ctype);
 
   const places = await cache.getOrLoad(key, async () => {
-    const json = await fetchJson<TourApiResponse>(buildUrl("searchKeyword2", params));
-    return parsePlaces(json);
+    const json = await fetchJson<TourApiResponse>(buildUrl("searchKeyword2", params, lang));
+    return parsePlaces(json, lang);
   });
   return typeof opts.limit === "number" ? places.slice(0, opts.limit) : places;
 }
@@ -150,21 +189,26 @@ export async function searchPlaces(opts: SearchOptions): Promise<Place[]> {
  */
 export async function searchPlacesAny(
   keywords: string[],
-  opts: { category?: string; limit?: number } = {},
+  opts: { category?: string; limit?: number; language?: Lang } = {},
 ): Promise<Place[]> {
   const seen = new Set<string>();
   for (const kw of keywords.map((k) => k.trim()).filter(Boolean)) {
     if (seen.has(kw)) continue;
     seen.add(kw);
-    const places = await searchPlaces({ keyword: kw, category: opts.category, limit: opts.limit });
+    const places = await searchPlaces({
+      keyword: kw,
+      category: opts.category,
+      limit: opts.limit,
+      language: opts.language,
+    });
     if (places.length) return places;
   }
   return [];
 }
 
 /** Best-match single place for a free-text name (for hours/route lookups). */
-export async function searchTopPlace(keyword: string): Promise<Place | undefined> {
-  const places = await searchPlaces({ keyword, limit: 1 });
+export async function searchTopPlace(keyword: string, language: Lang = "en"): Promise<Place | undefined> {
+  const places = await searchPlaces({ keyword, limit: 1, language });
   return places[0];
 }
 
@@ -195,9 +239,13 @@ function firstField(raw: Record<string, unknown>, fields: string[]): string | un
 const introCache = new TtlCache<PlaceIntro>(30 * 60_000);
 
 /** detailIntro2 — opening hours / closed days for a known content id. */
-export async function getPlaceIntro(contentId: string, contentTypeId: string): Promise<PlaceIntro> {
-  return introCache.getOrLoad(`intro:${contentId}`, async () => {
-    const url = buildUrl("detailIntro2", { contentId, contentTypeId });
+export async function getPlaceIntro(
+  contentId: string,
+  contentTypeId: string,
+  language: Lang = "en",
+): Promise<PlaceIntro> {
+  return introCache.getOrLoad(`intro:${language}:${contentId}`, async () => {
+    const url = buildUrl("detailIntro2", { contentId, contentTypeId }, language);
     const json = await fetchJson<{ response?: { body?: { items?: { item?: unknown } | "" } } }>(url);
     const itemsNode = json.response?.body?.items; // "" when empty (falsy)
     const item = itemsNode ? (itemsNode as { item?: unknown }).item : undefined;

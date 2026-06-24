@@ -12,14 +12,15 @@
 ## 1. `searchPlaceForeigner`
 - **title**: "Search Places for Foreign Visitors"
 - **description(영문)**: "Recommends places in Korea based on a foreign visitor's natural-language intent, weighting foreigner-friendliness (English support, walk-in, foreign-card acceptance). Part of Korea Trip Concierge(코리아 트립 컨시어지)."
-- **inputSchema**: `{ query: string (required), area?: string, category?: string }`
-- **output(Markdown)**: 장소 3~5개, 각 항목 한 줄 요약(영문)+외국인 친화 배지. 끝에 선택지.
+- **inputSchema**: `{ query: string (required), area?: string, category?: string, language?: enum(en,ja,zh,ko) }`
+- **다국어(D-008/U4)**: `language`로 TourAPI 영/일/중간/국 서비스 전환 → 장소명·주소가 해당 언어. 키워드도 그 언어로 매칭(자국어 질의). 기본 en.
+- **output(Markdown)**: 장소 3~5개, 각 항목 한 줄 요약+친화 배지. 끝에 선택지.
 - annotations: readOnly true / destructive false / idempotent false / openWorld true
 
 ## 2. `findForeignerFriendlyStore`  (K-Pass Finder)
 - **title**: "Find Foreigner-Friendly Stores"
 - **description(영문)**: "Filters nearby stores/restaurants that need no Korean phone verification, accept foreign cards, offer multilingual menus, or allow walk-in. Korea Trip Concierge(코리아 트립 컨시어지)."
-- **inputSchema**: `{ area: string (required), needs?: string[] (enum: noReservationNeeded, acceptsForeignCard, hasMultilingualMenu, walkInOk), category?: string }`
+- **inputSchema**: `{ area: string (required), needs?: string[] (enum: noReservationNeeded, acceptsForeignCard, hasMultilingualMenu, walkInOk), category?: string, language?: enum(en,ja,zh,ko) }`
 - **output**: 조건 충족 매장 목록 + 충족 플래그 배지 + 지도 링크(아웃링크 허용, 상업유도 금지). 끝에 선택지(필터 토글 버튼).
 - annotations: readOnly true / destructive false / idempotent false / openWorld true
 
@@ -63,8 +64,8 @@
 ## 8. `getNowInfo`
 - **title**: "Is It Good to Go Now?"
 - **description(영문)**: "Tells a foreign visitor whether a place is worth visiting right now using opening hours, crowd level, and weather. Korea Trip Concierge(코리아 트립 컨시어지)."
-- **inputSchema**: `{ place: string (required) }`
-- **output**: 지금 상태(영업시간 + 현재 KST 시각) + 추천 여부. 끝에 선택지(대안 시간/대안 장소). (혼잡/날씨는 향후 보강 — 현재 시간 기반.)
+- **inputSchema**: `{ place: string (required), language?: enum(en,ja,zh,ko) }`
+- **output**: 지금 상태(영업시간 + 현재 KST 시각 + 실시간 날씨·미세먼지) + 추천 여부. 끝에 선택지(대안 시간/대안 장소).
 - annotations: readOnly true / idempotent false / openWorld true
 
 ## 9. `getJejuInfo`  (제주 특화)
