@@ -21,6 +21,11 @@ export const ENV = {
   get SUBWAY_API_KEY(): string {
     return process.env.SUBWAY_API_KEY ?? "";
   },
+  get SEOUL_API_KEY(): string {
+    // Seoul Open Data Plaza "general" key (openapi.seoul.go.kr) — distinct from
+    // SUBWAY_API_KEY (realtime subway swopenapi). Same account, separate key.
+    return process.env.SEOUL_API_KEY ?? "";
+  },
   get JEJU_API_KEY(): string {
     return process.env.JEJU_API_KEY ?? "";
   },
@@ -46,6 +51,7 @@ export type ApiKeyName =
   | "TOUR_API_KEY"
   | "TRANSIT_API_KEY"
   | "SUBWAY_API_KEY"
+  | "SEOUL_API_KEY"
   | "JEJU_API_KEY"
   | "KAKAO_REST_API_KEY"
   | "NAVER_CLIENT_ID"
