@@ -205,14 +205,35 @@ function score(name: string, q: string): number {
   return 0;
 }
 
+// TAGO's stop search matches Korean names, but visitors type English. Convert
+// common tourist stops EN→KO so "Haeundae" finds 해운대. (Korean input passes
+// through; unknown English still tries as-is.)
+const BUS_STOP_KO: Record<string, string> = {
+  haeundae: "해운대", seomyeon: "서면", "gwangan": "광안리", gwangalli: "광안리",
+  nampo: "남포동", "nampo-dong": "남포동", jagalchi: "자갈치", "busan station": "부산역",
+  taejongdae: "태종대", "gukje market": "국제시장", gukje: "국제시장", songjeong: "송정",
+  "dongdaegu": "동대구역", "daegu station": "대구역", "daejeon station": "대전역",
+  "gwangju station": "광주역", "incheon station": "인천역", chinatown: "차이나타운",
+  songdo: "송도", "jeonju hanok": "전주한옥마을", hanok: "한옥마을",
+};
+
+/** Convert an English stop name to Korean when we know it (else return as-is). */
+function toKoreanStop(name: string): string {
+  const raw = name.trim();
+  if (/[가-힣]/.test(raw)) return raw; // already Korean
+  const key = raw.toLowerCase().replace(/\s*(stop|station|bus stop)\.?$/i, "").trim();
+  return BUS_STOP_KO[key] ?? raw;
+}
+
 export async function trackBus(
   busNumber: string,
   dropOffStop: string,
   cityCode: string,
 ): Promise<TrackResult> {
-  const stops = await resolveStop(dropOffStop, cityCode);
+  const query = toKoreanStop(dropOffStop);
+  const stops = await resolveStop(query, cityCode);
   if (stops.length === 0) return { status: "stop_not_found" };
-  const stop = bestStop(stops, dropOffStop);
+  const stop = bestStop(stops, query);
   const arrivals = await getArrivals(stop.cityCode, stop.nodeId);
   const arrival = arrivals.find((a) => a.routeNo === busNumber.trim());
   if (arrival) return { status: "ok", stop, arrival };
