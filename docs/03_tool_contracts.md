@@ -53,7 +53,8 @@
 - **title**: "Get Neighborhood Guide"
 - **description(영문)**: "Gives a concise English one-paragraph guide and top spots for a Korean neighborhood, tailored to foreign visitors. Korea Trip Concierge(코리아 트립 컨시어지)."
 - **inputSchema**: `{ area: string (required), interest?: string }`
-- **output**: 동네 요약 + 스팟 3~5 + 이동 팁. 끝에 선택지(근처 맛집 찾기 → 툴2 연결).
+- **데이터**: **큐레이션 동네가이드**(키 불필요·항상 동작). **21개 동네**(D-014로 8→21 확장): 서울 14(명동·홍대·강남·인사동·성수·이태원·북촌·동대문 + **여의도·잠실/롯데월드·익선동·을지로·삼청동·가로수길/신사**), **부산 5**(해운대·서면·광안리·남포동/자갈치·감천문화마을), **제주 2**(제주시·서귀포). `keys` 정규식에 한글 별칭 포함, 첫 매칭 우선(순서 주의).
+- **output**: 동네 요약 + 스팟 3~5 + 이동 팁 + interest별 노트. 끝에 선택지(근처 필수시설/길찾기/지금가기/날씨 → 다른 툴 연결). 미수록 동네는 "실제 검색" 유도 폴백.
 - annotations: readOnly true / idempotent true / openWorld true
 
 ## 7. `translateMenuContext`
@@ -67,7 +68,8 @@
 - **title**: "Is It Good to Go Now?"
 - **description(영문, 실제 코드와 일치)**: "Tells a foreign visitor whether a place is worth visiting right now using its listed opening hours and the current Korea time, with a clear go/no-go and reasons. Part of Korea Trip Concierge(코리아 트립 컨시어지)."
 - **inputSchema**: `{ place: string (required), language?: enum(en,ja,zh,ko) }`
-- **output**: 지금 상태(영업시간 + 현재 KST 시각 + 실시간 날씨·미세먼지 통합) + 추천 여부. 끝에 선택지(대안 시간/대안 장소). ⚠️ "crowd level"은 미구현(데이터원 없음) → 설명에서 제외(R-DOC 정합).
+- **데이터/로직(D-014)**: **① 큐레이션 랜드마크 오버레이 우선**(`src/lib/landmarks.ts`, ~27개 외국인 인기명소: 5대궁·종묘·N서울타워·롯데월드/타워·COEX아쿠아리움·한강공원(24h)·북촌(주간)·DDP(일부24h)·광장/남대문/명동 시장·전쟁기념관·리움·부산 해운대/광안리/감천/자갈치·제주 성산일출봉(일출)/만장굴/한라산 등). `fuzzy.resolveName` 신뢰매칭 시 **정확 영업시간 + 현재 KST**로 즉시 🟢열림/🔴닫힘 판정(24h/daylight/sunrise/구간 4유형, closedDays 우선). **키 불필요·API콜 0**(p99 보호) → C7(Han River→호텔, Lotte World→매장) 오매칭 해소. **② 미매칭 시 TourAPI 폴백**(기존 흐름: 검색·되묻기·detailIntro2 시간). 둘 다 실시간 날씨·미세먼지 1줄 통합.
+- **output**: 지금 상태(판정 헤드라인 + 영업시간 + 현재 KST 시각 + 닫는요일 + 한줄노트 + 실시간 날씨·미세먼지) + 추천 여부. 끝에 선택지(대안 시간/대안 장소). ⚠️ "crowd level"은 미구현(데이터원 없음) → 설명에서 제외(R-DOC 정합).
 - annotations: readOnly true / idempotent false / openWorld true
 
 ## 9. `getJejuInfo`  (제주 특화)

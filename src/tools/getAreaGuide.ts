@@ -92,6 +92,129 @@ const AREAS: Area[] = [
     getThere: "Dongdaemun History & Culture Park Stn (Lines 2/4/5).",
     interests: { shopping: "Wholesale & retail fashion malls, many open past midnight.", food: "Late-night street food and Gwangjang Market." },
   },
+
+  // ── More Seoul ───────────────────────────────────────────────────────────────
+  {
+    keys: /(yeouido|여의도)/i,
+    name: "Yeouido (여의도)",
+    blurb:
+      "Seoul's riverfront finance island — skyscrapers, the National Assembly, and a huge Han River park that's the city's go-to picnic and cherry-blossom spot.",
+    spots: ["Yeouido Hangang Park (picnics, bike rental)", "The Hyundai Seoul mall", "63 Building & aquarium", "spring cherry-blossom road (Yunjungno)"],
+    getThere: "Yeouido or Yeouinaru Stn (Line 5); Yeouido also on Line 9.",
+    interests: { shopping: "The Hyundai Seoul — Korea's flashiest department store.", food: "Riverside chicken-and-beer delivered right to your picnic mat." },
+  },
+  {
+    keys: /(jamsil|lotte\s*world|롯데월드|잠실)/i,
+    name: "Jamsil / Lotte World (잠실)",
+    blurb:
+      "Family-and-entertainment hub in southeast Seoul, built around Lotte World theme park and the soaring Lotte World Tower — Korea's tallest building.",
+    spots: ["Lotte World Adventure (indoor + outdoor theme park)", "Seoul Sky observatory (Lotte World Tower)", "Lotte World Mall & Aquarium", "Seokchon Lake (cherry blossoms)"],
+    getThere: "Jamsil Stn (Lines 2/8) — exits connect straight into the complex.",
+    interests: { shopping: "Lotte World Mall + duty-free under one roof.", food: "Mall food courts and lakeside cafés." },
+  },
+  {
+    keys: /(ikseon-?dong|익선동)/i,
+    name: "Ikseon-dong (익선동)",
+    blurb:
+      "A maze of restored 1920s hanok alleys turned into Seoul's prettiest café-and-bistro warren — old tile roofs, tiny courtyards, big photo appeal. Compact and very walkable.",
+    spots: ["hanok cafés & dessert bars", "vintage clothing nooks", "fusion bistros in old courtyards", "Nakwon instrument arcade (nearby)"],
+    getThere: "Jongno 3-ga Stn (Lines 1/3/5), Exit 4 or 6.",
+    interests: { food: "Hanok cafés and creative small-plate restaurants — book ahead at weekends.", history: "1920s hanok alleys; pair with Insadong & Jongmyo nearby." },
+  },
+  {
+    keys: /(euljiro|을지로)/i,
+    name: "Euljiro (을지로)",
+    blurb:
+      "By day a gritty district of printing shops and hardware shops; by night the hip 'Hipjiro' — speakeasy bars and retro cafés hidden up worn stairwells and behind unmarked doors.",
+    spots: ["hidden rooftop & speakeasy bars", "retro 'newtro' cafés", "Euljiro Nogari Alley (beer & dried-pollack)", "tool & lighting shop lanes"],
+    getThere: "Euljiro 3-ga Stn (Lines 2/3) or Euljiro 1-ga (Line 2).",
+    interests: { nightlife: "Speakeasy bars and the open-air Nogari Alley, busiest after 7pm.", food: "Old-school grilled-fish and noodle spots between the workshops." },
+  },
+  {
+    keys: /(samcheong-?dong|samcheong|삼청동)/i,
+    name: "Samcheong-dong (삼청동)",
+    blurb:
+      "A genteel hillside street running up beside Gyeongbokgung — galleries, boutiques, and hanok cafés with a calmer, leafier feel than busier Insadong next door.",
+    spots: ["art galleries & craft boutiques", "hanok cafés with palace-wall views", "National Folk Museum (nearby)", "Bukchon Hanok Village (uphill)"],
+    getThere: "Anguk Stn (Line 3) Exit 1, then a 10-min walk up.",
+    interests: { history: "Walk the Gyeongbokgung stone wall and on to Bukchon.", food: "Quiet hanok cafés, brunch, and traditional sujebi." },
+  },
+  {
+    keys: /(garosu-?gil|garosugil|sinsa|신사|가로수길)/i,
+    name: "Garosu-gil / Sinsa (가로수길)",
+    blurb:
+      "A tree-lined boutique avenue in upmarket Sinsa, just north of Gangnam — designer flagships, beauty stores, and stylish cafés, with quieter 'Serosu-gil' back lanes off the main strip.",
+    spots: ["Garosu-gil flagship boutiques", "K-beauty & fashion concept stores", "Serosu-gil back-alley cafés", "Apgujeong Rodeo (nearby)"],
+    getThere: "Sinsa Stn (Line 3 / Sinbundang Line) Exit 8.",
+    interests: { shopping: "Designer flagships and indie boutiques along the ginkgo-lined street.", food: "Brunch spots, dessert cafés, and rooftop bars." },
+  },
+
+  // ── Busan ────────────────────────────────────────────────────────────────────
+  {
+    keys: /(haeundae|해운대)/i,
+    name: "Haeundae (해운대, Busan)",
+    blurb:
+      "Busan's flagship beach resort district — a wide sandy bay backed by high-rises, seafood restaurants, and a scenic seaside train. The city's summer playground.",
+    spots: ["Haeundae Beach", "Blue Line Park beach train & sky capsule", "Dongbaek Island coastal walk", "Haeundae Market (street food)"],
+    getThere: "Haeundae Stn (Busan Metro Line 2), Exit 3 or 5.",
+    interests: { food: "Fresh raw fish (hoe) and grilled seafood by the bay.", nightlife: "Beachfront bars and night views of Gwangan Bridge." },
+  },
+  {
+    keys: /(seomyeon|서면)/i,
+    name: "Seomyeon (서면, Busan)",
+    blurb:
+      "Busan's downtown crossroads and busiest shopping-and-nightlife hub — department stores, an underground shopping arcade, medical/beauty clinics, and endless eating streets.",
+    spots: ["Seomyeon underground shopping arcade", "Seomyeon 1-beonga eating & bar street", "Bujeon Market", "department stores (Lotte, Judies)"],
+    getThere: "Seomyeon Stn (Busan Metro Lines 1/2) — the city's main interchange.",
+    interests: { food: "Dwaeji-gukbap (pork-soup rice), Busan's signature dish.", nightlife: "Bars, clubs, and pojangmacha around 1-beonga." },
+  },
+  {
+    keys: /(gwangalli|gwangan|광안리|광안)/i,
+    name: "Gwangalli (광안리, Busan)",
+    blurb:
+      "A hip beach lined with cafés and bars facing the illuminated Gwangan Bridge — mellower than Haeundae, with weekend drone light-shows over the water.",
+    spots: ["Gwangalli Beach & Gwangan Bridge view", "beachfront café-and-bar strip", "Millak Waterside Park", "weekend drone light show"],
+    getThere: "Gwangan Stn (Busan Metro Line 2), Exit 3 or 5.",
+    interests: { nightlife: "Sunset-to-late beach bars facing the lit bridge.", food: "Cafés, craft beer, and fresh seafood along the sand." },
+  },
+  {
+    keys: /(nampo-?dong|nampo|jagalchi|자갈치|남포동|남포)/i,
+    name: "Nampo-dong / Jagalchi (남포동, Busan)",
+    blurb:
+      "Busan's old downtown by the harbour — Korea's largest fish market, the BIFF cinema street, and the Gukje street market, all crowned by Yongdusan Park's tower.",
+    spots: ["Jagalchi Fish Market (pick & eat upstairs)", "BIFF Square street food", "Gukje Market", "Busan Tower at Yongdusan Park"],
+    getThere: "Jagalchi or Nampo Stn (Busan Metro Line 1).",
+    interests: { food: "Pick live seafood at Jagalchi; BIFF Square ssiat-hotteok.", shopping: "Gukje Market's warren of stalls — clothes, gear, oddities." },
+  },
+  {
+    keys: /(gamcheon|감천)/i,
+    name: "Gamcheon Culture Village (감천문화마을, Busan)",
+    blurb:
+      "A pastel hillside of stacked houses and art-filled lanes, nicknamed Korea's Santorini. Photogenic murals and viewpoints — but a real residential village, so tread lightly.",
+    spots: ["Little Prince viewpoint photo spot", "art murals & alley installations", "rooftop cafés with hillside views", "stamp-trail craft shops"],
+    getThere: "Toseong Stn (Line 1) Exit 6, then the Saha-gu community bus up the hill.",
+    interests: { history: "A 1950s refugee settlement reborn as an art village — go by day.", food: "Tiny view cafés and snack stalls along the lanes." },
+  },
+
+  // ── Jeju ─────────────────────────────────────────────────────────────────────
+  {
+    keys: /(jeju\s*city|jejusi|제주시|jeju|제주)/i,
+    name: "Jeju City (제주시)",
+    blurb:
+      "The island's main gateway on the north coast — where the airport, ferries, and most nightlife are. A handy base for the eastern coast, markets, and black-pork restaurants.",
+    spots: ["Dongmun Traditional Market", "Black Pork Street (heuk-dwaeji)", "Yongduam (Dragon Head) Rock", "Samyang black-sand beach"],
+    getThere: "Jeju Int'l Airport (CJU); island buses and rental cars fan out from here.",
+    interests: { food: "Jeju black pork BBQ and fresh galchi (cutlassfish).", nightlife: "Bars and night-market food around Dongmun & the city centre." },
+  },
+  {
+    keys: /(seogwipo|서귀포)/i,
+    name: "Seogwipo (서귀포)",
+    blurb:
+      "Jeju's sunnier south-coast town — waterfalls, dramatic sea cliffs, and the Olle coastal trails, plus the resort zone of Jungmun nearby. Warmer and more scenic than the north.",
+    spots: ["Cheonjiyeon & Jeongbang waterfalls", "Jusangjeolli cliff columns", "Olle Trail coastal walks", "Jungmun resort beaches (nearby)"],
+    getThere: "~1 hr by bus (600/Limousine or 281) from Jeju Airport, or rent a car.",
+    interests: { food: "Seafood, hallabong-citrus treats, and harbour restaurants.", history: "Olle trails and waterfalls; whale/cliff scenery along the coast." },
+  },
 ];
 
 const INTERESTS = ["food", "shopping", "history", "nightlife"] as const;

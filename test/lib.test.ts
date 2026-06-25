@@ -13,7 +13,7 @@ import {
 } from "../src/lib/romanize.js";
 import { similarity, resolveName } from "../src/lib/fuzzy.js";
 import { resolvePlaceCoord } from "../src/lib/places.js";
-import { resolvePlaceCoord } from "../src/lib/places.js";
+import { LANDMARKS, resolveLandmark, landmarkVerdict } from "../src/lib/landmarks.js";
 
 describe("buildChoiceFooter", () => {
   it("renders 2–4 chips with command + description", () => {
@@ -163,5 +163,73 @@ describe("fuzzy name resolution", () => {
     expect(resolvePlaceCoord("Incheon Airport Terminal 1")?.label).toBe("Incheon Int'l Airport T1");
     expect(resolvePlaceCoord("Gangnam Statoin")?.label).toBe("Gangnam Station");
     expect(resolvePlaceCoord("nowhere-xyz")).toBeUndefined();
+  });
+});
+
+describe("landmark overlay (C7)", () => {
+  const byName = (prefix: string) => LANDMARKS.find((l) => l.name.startsWith(prefix))!;
+
+  it("resolves canonical names, aliases, EN+KO, and typos", () => {
+    expect(resolveLandmark("Gyeongbokgung Palace")?.name).toBe("Gyeongbokgung Palace");
+    expect(resolveLandmark("gyeongbokgung")?.name).toBe("Gyeongbokgung Palace");
+    expect(resolveLandmark("경복궁")?.name).toBe("Gyeongbokgung Palace");
+    expect(resolveLandmark("Gyeongbokgun")?.name).toBe("Gyeongbokgung Palace"); // typo absorbed
+    expect(resolveLandmark("Haeundae Beach")?.name).toContain("Haeundae");
+    expect(resolveLandmark("Seongsan Ilchulbong")?.city).toBe("Jeju");
+  });
+
+  it("disambiguates Lotte World (theme park) vs the Tower/Seoul Sky", () => {
+    expect(resolveLandmark("Lotte World")?.name).toBe("Lotte World Adventure");
+    expect(resolveLandmark("Seoul Sky")?.name).toContain("Seoul Sky");
+    expect(resolveLandmark("Lotte World Tower")?.name).toContain("Seoul Sky");
+  });
+
+  it("returns undefined for the long tail (falls through to TourAPI)", () => {
+    expect(resolveLandmark("some random hotel xyz")).toBeUndefined();
+    expect(resolveLandmark("")).toBeUndefined();
+    expect(resolveLandmark("palace")).toBeUndefined(); // generic noise word
+  });
+
+  it("verdict: gated hours give open/closed against a fixed time", () => {
+    const gbg = byName("Gyeongbokgung"); // 09:00–18:00, closed Tue
+    const monMorning = landmarkVerdict(gbg, 1, 10 * 60); // Mon 10:00
+    expect(monMorning.status).toBe("open");
+    expect(monMorning.headline).toContain("18:00");
+
+    const monEvening = landmarkVerdict(gbg, 1, 19 * 60); // Mon 19:00
+    expect(monEvening.status).toBe("closed");
+    expect(monEvening.headline).toContain("09:00");
+
+    const earlyMon = landmarkVerdict(gbg, 1, 8 * 60); // Mon 08:00 (before opening)
+    expect(earlyMon.status).toBe("closed");
+    expect(earlyMon.headline).toContain("opens");
+  });
+
+  it("verdict: closed-day takes precedence over the clock", () => {
+    const gbg = byName("Gyeongbokgung");
+    const tueNoon = landmarkVerdict(gbg, 2, 12 * 60); // Tuesday → closed all day
+    expect(tueNoon.status).toBe("closed");
+    expect(tueNoon.headline).toContain("Tuesdays");
+  });
+
+  it("verdict: 24h, daylight, and sunrise specs", () => {
+    const han = byName("Han River"); // 24h
+    expect(landmarkVerdict(han, 3, 2 * 60).status).toBe("open"); // 02:00 still open
+    expect(landmarkVerdict(han, 3, 14 * 60).headline).toContain("24 hours");
+
+    const bukchon = byName("Bukchon"); // daylight / residential
+    expect(landmarkVerdict(bukchon, 3, 12 * 60).status).toBe("open");
+    expect(landmarkVerdict(bukchon, 3, 23 * 60).status).toBe("info"); // after dark → advisory
+
+    const sunrise = byName("Seongsan"); // sunrise spot
+    expect(landmarkVerdict(sunrise, 3, 3 * 60).status).toBe("closed"); // pre-dawn
+    expect(landmarkVerdict(sunrise, 3, 8 * 60).status).toBe("open"); // morning
+  });
+
+  it("verdict: a late-night observatory is open until 23:00", () => {
+    const tower = byName("N Seoul Tower"); // ~10:00–23:00
+    const at22 = landmarkVerdict(tower, 5, 22 * 60);
+    expect(at22.status).toBe("open");
+    expect(at22.headline).toContain("23:00");
   });
 });

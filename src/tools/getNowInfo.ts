@@ -4,6 +4,7 @@ import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
 import { searchPlaces, getPlaceIntro, normalizeLang, type Place } from "../lib/sources/tourapi.js";
 import { CITIES, resolveCity, getWeather, getAir } from "../lib/sources/weatherair.js";
+import { resolveLandmark, landmarkVerdict } from "../lib/landmarks.js";
 import { similarity, normalizeName } from "../lib/fuzzy.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
@@ -103,8 +104,10 @@ const RETRY: Choice[] = [
   { emoji: "🗺️", cmdEn: "Guide me around the area", descEn: "neighborhood overview" },
 ];
 
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
 /** Current time in Korea (KST), independent of server timezone. */
-function koreaNow(): { label: string; hour: number } {
+function koreaNow(): { label: string; hour: number; minute: number; dow: number } {
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Seoul",
     weekday: "short",
@@ -113,9 +116,14 @@ function koreaNow(): { label: string; hour: number } {
     hour12: false,
   });
   const parts = fmt.formatToParts(new Date());
-  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+  // hour12:false can yield "24" at midnight in some runtimes — normalize to 0.
+  const rawHour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+  const hour = rawHour === 24 ? 0 : rawHour;
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  const wd = parts.find((p) => p.type === "weekday")?.value ?? "Sun";
+  const dow = Math.max(0, WEEKDAYS.indexOf(wd as (typeof WEEKDAYS)[number]));
   const label = fmt.format(new Date());
-  return { label, hour };
+  return { label, hour, minute, dow };
 }
 
 export const getNowInfo: ToolDef = {
@@ -141,6 +149,31 @@ export const getNowInfo: ToolDef = {
   handler: async (args) => {
     const place = String(args.place ?? "");
     const language = normalizeLang(args.language as string | undefined);
+
+    // Curated landmark overlay (C7): the iconic attractions visitors ask about
+    // most are exactly the ones TourAPI indexes poorly ("Han River" → a hotel)
+    // and gives no real hours for. A confident match yields a crisp open/closed
+    // verdict from accurate curated hours — instant, and needs no API key.
+    const landmark = resolveLandmark(place);
+    if (landmark) {
+      const now = koreaNow();
+      const minutes = now.hour * 60 + now.minute;
+      const verdict = landmarkVerdict(landmark, now.dow, minutes);
+      const lines = [
+        `🕒 **${landmark.name} — right now**`,
+        "",
+        verdict.headline,
+        "",
+        `⏰ Current Korea time: **${now.label} KST**`,
+        `🏛️ Hours: ${landmark.hoursLabel}`,
+      ];
+      if (landmark.closedLabel) lines.push(`🚫 Closed: ${landmark.closedLabel}`);
+      lines.push("", `📝 ${landmark.note}`);
+      // Live weather + air for the landmark's city (best-effort; U2).
+      const weather = await weatherLine(landmark.city ?? "Seoul");
+      if (weather) lines.push("", weather);
+      return ok(lines.join("\n"), CHOICES);
+    }
 
     if (!hasKey("TOUR_API_KEY")) {
       return notConnected(

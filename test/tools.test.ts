@@ -88,4 +88,30 @@ describe("working knowledge tools produce real content", () => {
     });
     expect(res.content[0].text).toContain("Myeongdong");
   });
+
+  it("getAreaGuide covers the expanded set (Busan, Jeju, more Seoul)", async () => {
+    const guide = ALL_TOOLS.find((t) => t.name === "getAreaGuide")!;
+    const haeundae = await guide.handler({ area: "Haeundae" });
+    expect(haeundae.content[0].text).toContain("Haeundae");
+    expect(haeundae.content[0].text).toContain("Busan");
+
+    const seogwipo = await guide.handler({ area: "Seogwipo" });
+    expect(seogwipo.content[0].text).toContain("Seogwipo");
+
+    const ikseon = await guide.handler({ area: "익선동" }); // Korean alias in the keys regex
+    expect(ikseon.content[0].text).toContain("Ikseon-dong");
+  });
+
+  it("getNowInfo gives a crisp curated landmark verdict without a TourAPI key", async () => {
+    const res = await ALL_TOOLS.find((t) => t.name === "getNowInfo")!.handler({
+      place: "Gyeongbokgung Palace",
+    });
+    const text = res.content[0].text;
+    expect(text).toContain("Gyeongbokgung Palace");
+    expect(text).toContain("Current Korea time");
+    expect(text).toContain("Hours:");
+    // Curated overlay runs before the key guard, so it never degrades to the
+    // "live data temporarily unavailable" path for a known landmark.
+    expect(text).not.toContain("temporarily unavailable");
+  });
 });

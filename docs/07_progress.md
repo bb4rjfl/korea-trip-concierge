@@ -1,7 +1,7 @@
 # 07. 진행 상황 (Progress) — 단일 진실 소스(SSOT)
 
 > 세션 간 연속성. `/handoff`로 갱신. CLAUDE.md "현재 상태"와 어긋나면 이 파일 기준.
-> 최종 갱신: 2026-06-24
+> 최종 갱신: 2026-06-26
 
 ## 마일스톤
 - [x] 공모전 규칙·심사정책 정독 및 문서화 (docs/01)
@@ -78,7 +78,8 @@
   - [x] C9 route 칩 출발지(흔한 출발지 칩 제공) ✅
   - [x] **🆕 도시간 이동 그라운딩**(`src/lib/intercity.ts`) ✅ — 12도시 KTX/SRT·고속버스·항공 + 예매 딥링크(코레일/SRT/코버스). 제주=항공만.
   - [x] findStore Nearby 빈행/노이즈 가드 / Naver 주소 괄호균형 / getAreaGuide interest 인정 ✅
-  - [ ] **잔여(저severity 후속)**: C7 getNowInfo 오매칭 did-you-mean(Han River→호텔) / C10 ODsay 정류장 로마자 무공백(분절 불가, cosmetic) / Naver 영어지역 주소·이름 로마자 일관화 / 지하철 노선제안 강화 / jeju theme 비영어·구festival 필터
+  - [x] **C7 getNowInfo 오매칭 해소 ✅ (D-014)**: 큐레이션 랜드마크 오버레이(`src/lib/landmarks.ts`, ~27 명소)로 TourAPI 검색 전에 신뢰매칭→정확 영업시간+현재 KST로 🟢/🔴 즉시 판정. Han River→호텔, Lotte World→매장 오매칭 제거. **getAreaGuide도 8→21 동네 확장**(부산5·제주2·서울+6). 117 tests green.
+  - [ ] **잔여(저severity 후속)**: C10 ODsay 정류장 로마자 무공백(분절 불가, cosmetic) / Naver 영어지역 주소·이름 로마자 일관화 / 지하철 노선제안 강화 / jeju theme 비영어·구festival 필터
 
 ## 지금 바로 다음 할 일 (Next)
 1. **API 키 발급** (사용자 액션) — docs/08 가이드 따라 data.go.kr(버스 TAGO + TourAPI 영문) + ODsay. `.env`에 보관 후 `npm run dev`로 실응답 확인.
@@ -109,16 +110,18 @@
 ```
 src/server.ts            Streamable HTTP stateless 진입점 (loadEnv 최초 import + 네이밍 린트)
 src/lib/                 constants, env, loadEnv(.env), naming, markdown(24k), footer(칩), http(timeout), cache(TTL), responses, romanize(지명 KO→EN)
+src/lib/                 constants, env, naming, markdown, footer, http, cache, responses, romanize, fuzzy, places, intercity, **landmarks(getNowInfo 큐레이션 영업시간 오버레이, D-014)**
 src/lib/sources/         TourAPI, TAGO(버스), ODsay(경로), VisitJeju, weatherair(기상청+에어코리아), seoulSubway(지하철)
-src/tools/               11개 툴 (types, index, *.ts) — 지식툴3 즉시동작 + API툴8 실연동
+src/tools/               11개 툴 (types, index, *.ts) — 지식툴3 즉시동작 + API툴8 실연동. getNowInfo=랜드마크 오버레이→TourAPI 폴백, getAreaGuide=21 동네
 src/server.ts            +툴별 타이밍 로그(S1), 헬스 키요약(S5)
 scripts/lint-naming.ts   빌드 게이트 (kakao 토큰/charset/중복/개수, 3~20)
 scripts/verify-live.ts   실 API 호출 점검 (키 필요)
-test/                    vitest 87개 (헬퍼 + 로마자 + 다국어 + 전체 툴 계약 + 핸들러 스모크 + 소스 파서)
+test/                    vitest 117개 (헬퍼 + 로마자 + 퍼지 + 랜드마크 + 다국어 + 전체 툴 계약 + 핸들러 스모크 + 소스 파서)
 Dockerfile               linux/amd64, 루트
 ```
 
 ## 세션 로그
+- 2026-06-26 (서브에이전트): **getNowInfo 랜드마크 오버레이 + getAreaGuide 확장 (D-014)**. `src/lib/landmarks.ts` 신설(~27 외국인 인기명소, 정확 영업시간·closedDays·24h/daylight/sunrise 4유형 + `resolveLandmark` 퍼지 + `landmarkVerdict` 순수함수). getNowInfo 핸들러가 TourAPI 검색 **전에** 신뢰매칭 시 현재 KST로 🟢/🔴 즉시 판정(키 불필요·API콜 0, C7 오매칭 해소). getAreaGuide 동네 8→21(부산5·제주2·서울+6, 기존 `Area` 형태). 테스트 +9(lib 랜드마크 resolve/verdict, tools 동네/getNowInfo 큐레이션) → **build+117 tests green**. docs 03/06/07 갱신. ⏳ **KC 재배포해야 라이브 반영**.
 - 2026-06-24 (1): 프로젝트 문서 세트 생성(CLAUDE.md + docs 01~07 + 슬래시 커맨드).
 - 2026-06-24 (2): 런타임 TS 확정(D-004), 데이터 전략 실연동 확정(D-005). TS MCP 서버 스캐폴드 전체 구축 — 8툴 계약 등록, 지식툴 3종 실동작, 공통 인프라(24k가드·칩푸터·네이밍린트·timeout/cache), Dockerfile. build/lint/46 tests/서버 end-to-end 검증 완료.
 - 2026-06-24 (3): TourAPI(영문) 실연동 클라이언트 구현 + searchPlaceForeigner/findForeignerFriendlyStore 연결(키 가드/에러처리), 픽스처+mock 테스트(52개 통과). 대화예시 3개(docs/09) 작성. API 키 발급 상세 가이드는 별도 세션으로 분기(docs/08 작성 예정).
