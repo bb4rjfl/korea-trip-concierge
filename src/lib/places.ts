@@ -8,8 +8,9 @@
  *
  * Coordinates are WGS84 (lng, lat) to ~4 dp — precise enough for ODsay to snap to
  * the nearest stop. Aliases are matched case-insensitively after stripping a
- * trailing "station"/"stn"/"역".
+ * trailing "station"/"stn"/"역", then a confident fuzzy fallback.
  */
+import { resolveName } from "./fuzzy.js";
 
 export interface GeoPlace {
   label: string;
@@ -56,8 +57,8 @@ const PLACES: GeoPlace[] = [
   { label: "War Memorial of Korea", lng: 126.9774, lat: 37.534, aliases: ["war memorial", "전쟁기념관"] },
   { label: "Lotte World Tower", lng: 127.1025, lat: 37.5126, aliases: ["lotte world tower", "롯데타워", "롯데월드타워"] },
   { label: "Gimpo Int'l Airport", lng: 126.8016, lat: 37.5631, aliases: ["gimpo airport", "gimpo", "김포공항"] },
-  { label: "Incheon Int'l Airport T1", lng: 126.4515, lat: 37.4486, aliases: ["incheon airport", "incheon airport t1", "인천공항", "인천공항1터미널"] },
-  { label: "Incheon Int'l Airport T2", lng: 126.4407, lat: 37.4602, aliases: ["incheon airport t2", "인천공항2터미널"] },
+  { label: "Incheon Int'l Airport T1", lng: 126.4515, lat: 37.4486, aliases: ["incheon airport", "incheon airport t1", "incheon international airport", "incheon airport terminal 1", "icn", "인천공항", "인천국제공항", "인천공항1터미널"] },
+  { label: "Incheon Int'l Airport T2", lng: 126.4407, lat: 37.4602, aliases: ["incheon airport t2", "incheon airport terminal 2", "인천공항2터미널"] },
   { label: "Dongmyo Flea Market", lng: 127.0166, lat: 37.5727, aliases: ["dongmyo", "동묘"] },
 ];
 
@@ -73,9 +74,18 @@ function normalize(input: string): string {
     .trim();
 }
 
-/** Resolve a place name to curated coordinates, or undefined for the long tail. */
+const placeKeys = (p: GeoPlace): string[] => [p.label, ...p.aliases];
+
+/** Resolve a place name to curated coordinates, or undefined for the long tail.
+ *  Tolerates typos/spacing/variant phrasings via a confident fuzzy fallback
+ *  (e.g. "Incheon International Airport", "Incheon Airport Terminal 1"). */
 export function resolvePlaceCoord(input: string): GeoPlace | undefined {
   const raw = (input ?? "").trim();
   if (!raw) return undefined;
-  return INDEX.get(raw.toLowerCase()) ?? INDEX.get(normalize(raw));
+  const direct = INDEX.get(raw.toLowerCase()) ?? INDEX.get(normalize(raw));
+  if (direct) return direct;
+  // Confident fuzzy match only (a wrong geocode would misroute) — else undefined
+  // so the caller falls back to TourAPI geocoding.
+  const r = resolveName(raw, PLACES, placeKeys, { exact: 0.84, suggest: 0.84, maxSuggest: 1 });
+  return r.kind === "exact" ? r.item : undefined;
 }

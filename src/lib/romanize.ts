@@ -7,7 +7,9 @@
  * drives both directions: EN/alias→KO (input resolution) and KO→EN (display).
  */
 
-interface StationPair {
+import { resolveName, type Resolution } from "./fuzzy.js";
+
+export interface StationPair {
   ko: string;
   en: string;
   aliases?: string[]; // extra English/colloquial inputs
@@ -182,12 +184,38 @@ for (const s of STATIONS) {
 // Longest Korean names first, so "을지로3가" wins over "을지로" during replace.
 const KO_NAMES_BY_LEN = [...KO_TO_EN.keys()].sort((a, b) => b.length - a.length);
 
-/** Resolve user input (English, alias, or Korean) to the Korean station name. */
-export function resolveStationKo(input: string): string | undefined {
+const stationKeys = (s: StationPair): string[] => [s.en, s.ko, ...(s.aliases ?? [])];
+
+/**
+ * Resolve user input to a station, tolerating typos/case/spacing and offering
+ * "did you mean?" candidates when not confident:
+ *  - exact: an exact map hit, Korean input, or a confident fuzzy match.
+ *  - suggest: plausible but unsure → caller should ask the user.
+ *  - none: nothing close.
+ */
+export function resolveStationFuzzy(input: string): Resolution<StationPair> {
   const raw = input.trim();
-  if (!raw) return undefined;
-  if (/[가-힣]/.test(raw)) return raw.replace(/역$/, ""); // Korean passes through
-  return INPUT_TO_KO.get(raw.toLowerCase());
+  if (!raw) return { kind: "none" };
+  // Korean input → use as the API name directly (unknown Korean passes through).
+  if (/[가-힣]/.test(raw)) {
+    const ko = raw.replace(/역$/u, "");
+    return { kind: "exact", item: STATIONS.find((s) => s.ko === ko) ?? { ko, en: ko } };
+  }
+  // Exact English/alias hit (collapse repeated spaces first).
+  const exactKo = INPUT_TO_KO.get(raw.toLowerCase().replace(/\s+/g, " "));
+  if (exactKo) {
+    const f = STATIONS.find((s) => s.ko === exactKo);
+    if (f) return { kind: "exact", item: f };
+  }
+  // Fuzzy fallback (typos, spacing, partial names).
+  return resolveName(raw, STATIONS, stationKeys, { exact: 0.85, suggest: 0.6, maxSuggest: 3 });
+}
+
+/** Resolve user input (English, alias, Korean, or a close typo) to the Korean
+ *  station name. Returns undefined when not confident (caller may then suggest). */
+export function resolveStationKo(input: string): string | undefined {
+  const r = resolveStationFuzzy(input);
+  return r.kind === "exact" ? r.item.ko : undefined;
 }
 
 // ── General Hangul → Latin transliteration (Revised Romanization, simplified;

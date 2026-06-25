@@ -5,11 +5,14 @@ import { assertNamingOk, checkToolName } from "../src/lib/naming.js";
 import { MAX_RESPONSE_CHARS } from "../src/lib/constants.js";
 import {
   resolveStationKo,
+  resolveStationFuzzy,
   romanizeStation,
   romanizeText,
   romanizeHangul,
   formatSubwayDirection,
 } from "../src/lib/romanize.js";
+import { similarity, resolveName } from "../src/lib/fuzzy.js";
+import { resolvePlaceCoord } from "../src/lib/places.js";
 import { resolvePlaceCoord } from "../src/lib/places.js";
 
 describe("buildChoiceFooter", () => {
@@ -129,5 +132,36 @@ describe("naming rules", () => {
 
   it("throws when tool count is out of 3–20", () => {
     expect(() => assertNamingOk("server", ["a", "b"])).toThrow();
+  });
+});
+
+describe("fuzzy name resolution", () => {
+  it("similarity: exact, containment, typo, unrelated", () => {
+    expect(similarity("Gangnam", "gangnam")).toBe(1);
+    expect(similarity("Incheon Airport Terminal 1", "Incheon Airport T1")).toBeGreaterThan(0.85);
+    expect(similarity("Gangnamm", "Gangnam")).toBeGreaterThan(0.85);
+    expect(similarity("Atlantis", "Gangnam")).toBeLessThan(0.5);
+  });
+
+  it("resolveName: exact vs suggest vs none", () => {
+    const items = [{ n: "Gangnam" }, { n: "Gangdong" }, { n: "Myeongdong" }];
+    const keys = (x: { n: string }) => [x.n];
+    expect(resolveName("gangnam", items, keys)).toEqual({ kind: "exact", item: { n: "Gangnam" } });
+    expect(resolveName("Gangnamm", items, keys).kind).toBe("exact"); // typo absorbed
+    expect(resolveName("xyzqq", items, keys)).toEqual({ kind: "none" });
+  });
+
+  it("resolveStationFuzzy: typos/case/spacing → exact, ambiguous → suggest", () => {
+    expect(resolveStationFuzzy("Gangnamm")).toMatchObject({ kind: "exact", item: { ko: "강남" } });
+    expect(resolveStationFuzzy("Itaewan")).toMatchObject({ kind: "exact", item: { ko: "이태원" } });
+    expect(resolveStationFuzzy("hongik university")).toMatchObject({ kind: "exact", item: { ko: "홍대입구" } });
+    expect(resolveStationFuzzy("Atlantis").kind).toBe("none");
+  });
+
+  it("resolvePlaceCoord: variant airport phrasings + typos", () => {
+    expect(resolvePlaceCoord("Incheon International Airport")?.label).toBe("Incheon Int'l Airport T1");
+    expect(resolvePlaceCoord("Incheon Airport Terminal 1")?.label).toBe("Incheon Int'l Airport T1");
+    expect(resolvePlaceCoord("Gangnam Statoin")?.label).toBe("Gangnam Station");
+    expect(resolvePlaceCoord("nowhere-xyz")).toBeUndefined();
   });
 });
