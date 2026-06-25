@@ -71,6 +71,13 @@ describe("romanize (U1)", () => {
     expect(formatSubwayDirection("성수행 - 신설동방면")).toBe("to Seongsu (via Sinseol-dong)");
     expect(formatSubwayDirection("중앙보훈병원행")).toBe("to Junggang Veterans Hospital");
   });
+
+  it("romanizes subway/rail line names and ODsay-style legs", () => {
+    expect(romanizeText("수도권 4호선 서울역 → 명동")).toBe("Line 4 Seoul Station → Myeongdong");
+    expect(romanizeText("신촌(경의중앙선)")).toBe("Sinchon(Gyeongui–Jungang Line)");
+    expect(romanizeStation("광운대")).toBe("Gwangun-dae");
+    expect(romanizeStation("문산")).toBe("Munsan");
+  });
 });
 
 describe("naming rules", () => {

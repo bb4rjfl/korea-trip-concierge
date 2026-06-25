@@ -4,6 +4,7 @@ import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
 import { searchTopPlace } from "../lib/sources/tourapi.js";
 import { routesBetween, type TransitRoute } from "../lib/sources/odsay.js";
+import { romanizeText } from "../lib/romanize.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -32,8 +33,9 @@ function renderRoute(r: TransitRoute, idx: number): string {
   const legs = r.legs
     .map((l) => {
       const icon = MODE_ICON[l.mode] ?? "•";
-      const line = l.line ? ` **${l.line}**` : "";
-      const seg = l.from && l.to ? ` ${l.from} → ${l.to}` : "";
+      // Romanize Korean line/station names from ODsay for English-first readers (U1).
+      const line = l.line ? ` **${romanizeText(l.line)}**` : "";
+      const seg = l.from && l.to ? ` ${romanizeText(l.from)} → ${romanizeText(l.to)}` : "";
       return `   ${icon}${line}${seg}`;
     })
     .join("\n");
@@ -100,7 +102,9 @@ export const getTransitRoute: ToolDef = {
         return fail("No transit route found", `No public-transit path from **${from}** to **${to}** was returned.`, RETRY);
       }
       const top = routes.slice(0, 2).map(renderRoute).join("\n\n");
-      const body = [`🚇 **${a.title} → ${b.title}**`, "", top].join("\n");
+      // Use the user's own place wording in the header (geocoding may resolve to a
+      // nearby shop with an ugly name; the route itself is correct).
+      const body = [`🚇 **${from} → ${to}**`, "", top].join("\n");
       return ok(body, CHOICES);
     } catch {
       return fail(

@@ -58,10 +58,10 @@ function render(menuText: string, concerns: string[]): string {
       "Try a single dish name (Korean or romanized), e.g. `tteokbokki`, `bibimbap`, `삼겹살`.",
     ].join("\n");
   }
-  const concernNote = concerns.length
-    ? `\n\n_Checking against your allergy concerns: **${concerns.join(", ")}**_`
-    : "";
-  return [head, concernNote, "", ...found.map((d) => renderDish(d, concerns))].join("\n");
+  const lines = [head];
+  if (concerns.length) lines.push("", `_Checking against your allergy concerns: **${concerns.join(", ")}**_`);
+  lines.push("", ...found.map((d) => renderDish(d, concerns)));
+  return lines.join("\n");
 }
 
 const CHOICES: Choice[] = [

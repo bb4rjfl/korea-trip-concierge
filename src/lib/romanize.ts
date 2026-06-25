@@ -80,6 +80,52 @@ const STATIONS: StationPair[] = [
   { ko: "봉은사", en: "Bongeunsa" },
   { ko: "올림픽공원", en: "Olympic Park" },
   { ko: "석촌", en: "Seokchon" },
+  // Line 1 / Gyeongui–Jungang / Suin-Bundang termini & common destinations
+  { ko: "광운대", en: "Gwangun-dae" },
+  { ko: "문산", en: "Munsan" },
+  { ko: "인천", en: "Incheon" },
+  { ko: "소요산", en: "Soyosan" },
+  { ko: "동두천", en: "Dongducheon" },
+  { ko: "양주", en: "Yangju" },
+  { ko: "의정부", en: "Uijeongbu" },
+  { ko: "천안", en: "Cheonan" },
+  { ko: "신창", en: "Sinchang" },
+  { ko: "서동탄", en: "Seodongtan" },
+  { ko: "병점", en: "Byeongjeom" },
+  { ko: "오이도", en: "Oido" },
+  { ko: "안산", en: "Ansan" },
+  { ko: "부평", en: "Bupyeong" },
+  { ko: "용문", en: "Yongmun" },
+  { ko: "지평", en: "Jipyeong" },
+  { ko: "대화", en: "Daehwa" },
+  { ko: "구로", en: "Guro" },
+  { ko: "온수", en: "Onsu" },
+  { ko: "수원", en: "Suwon" },
+  { ko: "정왕", en: "Jeongwang" },
+  { ko: "범계", en: "Beomgye" },
+  { ko: "당고개", en: "Danggogae" },
+  { ko: "오금", en: "Ogeum" },
+  { ko: "마천", en: "Macheon" },
+  { ko: "암사", en: "Amsa" },
+  { ko: "방화", en: "Banghwa" },
+  { ko: "신논현", en: "Sinnonhyeon" },
+  { ko: "사평", en: "Sapyeong" },
+  { ko: "응암", en: "Eungam" },
+  { ko: "장암", en: "Jangam" },
+  { ko: "총신대입구", en: "Chongshin Univ." },
+  { ko: "이수", en: "Isu" },
+  { ko: "구파발", en: "Gupabal" },
+  { ko: "지축", en: "Jichuk" },
+  { ko: "대곡", en: "Daegok" },
+  { ko: "왕십리", en: "Wangsimni" },
+  { ko: "청구", en: "Cheonggu" },
+  { ko: "보문", en: "Bomun" },
+  { ko: "인천공항1터미널", en: "Incheon Airport T1" },
+  { ko: "인천공항2터미널", en: "Incheon Airport T2" },
+  { ko: "서강대", en: "Sogang Univ." },
+  { ko: "공항화물청사", en: "Airport Cargo Terminal" },
+  { ko: "검암", en: "Geomam" },
+  { ko: "계양", en: "Gyeyang" },
 ];
 
 const KO_TO_EN = new Map<string, string>();
@@ -109,12 +155,35 @@ export function romanizeStation(ko: string): string {
   return KO_TO_EN.get(name) ?? trimmed;
 }
 
-/** Replace any known Korean station names inside free text with English. */
+/** Subway/rail line names → English (order matters: longest/most specific first). */
+const LINE_PATTERNS: [RegExp, string][] = [
+  [/수도권\s*(\d)호선/g, "Line $1"],
+  [/(\d)호선/g, "Line $1"],
+  [/경의중앙선/g, "Gyeongui–Jungang Line"],
+  [/수인분당선/g, "Suin–Bundang Line"],
+  [/신분당선/g, "Sinbundang Line"],
+  [/분당선/g, "Bundang Line"],
+  [/공항철도/g, "Airport Railroad"],
+  [/경춘선/g, "Gyeongchun Line"],
+  [/우이신설선/g, "Ui–Sinseol Line"],
+  [/서해선/g, "Seohae Line"],
+  [/김포골드라인/g, "Gimpo Goldline"],
+  [/신림선/g, "Sillim Line"],
+  // common bus-stop descriptive suffixes from ODsay
+  [/버스환승센터/g, " Bus Transfer Center"],
+  [/(\d+)번\s*승강장/g, "Platform $1"],
+  [/(\d+)번\s*출구/g, "Exit $1"],
+  [/\(?급행\)?/g, " (express)"],
+  [/\(?완행\)?/g, " (local)"],
+];
+
+/** Replace known Korean station + line names inside free text with English. */
 export function romanizeText(text: string): string {
   let out = text ?? "";
   for (const ko of KO_NAMES_BY_LEN) {
     if (out.includes(ko)) out = out.split(ko).join(KO_TO_EN.get(ko)!);
   }
+  for (const [re, en] of LINE_PATTERNS) out = out.replace(re, en);
   return out;
 }
 
@@ -126,8 +195,9 @@ export function formatSubwayDirection(trainLineNm: string): string {
   const s = (trainLineNm ?? "").trim();
   const m = s.match(/^(.+?)행(?:\s*-\s*(.+?)방면)?$/);
   if (m) {
-    const dest = romanizeStation(m[1]);
-    return m[2] ? `to ${dest} (via ${romanizeStation(m[2])})` : `to ${dest}`;
+    // romanizeText (substring replace) handles compound names like "신촌(경의중앙선)".
+    const dest = romanizeText(m[1]);
+    return m[2] ? `to ${dest} (via ${romanizeText(m[2])})` : `to ${dest}`;
   }
   return romanizeText(s);
 }
