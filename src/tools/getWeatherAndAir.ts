@@ -55,36 +55,43 @@ export const getWeatherAndAir: ToolDef = {
     }
 
     const city = resolveCity(cityArg);
-    try {
-      const [weather, air] = await Promise.all([getWeather(city), getAir(city)]);
-      const lines = [`🌤️ **${city.label} — weather & air**`, ""];
+    // allSettled, not all: the two sources fail independently (e.g. KMA hits its
+    // daily quota / 429 while AirKorea is fine) — show whatever we did get rather
+    // than throwing the whole response away.
+    const [wRes, aRes] = await Promise.allSettled([getWeather(city), getAir(city)]);
+    const weather = wRes.status === "fulfilled" ? wRes.value : undefined;
+    const air = aRes.status === "fulfilled" ? aRes.value : undefined;
 
-      const w: string[] = [];
-      if (weather.tempC != null) w.push(`🌡️ ${weather.tempC}°C`);
-      if (weather.sky) w.push(weather.sky);
-      if (weather.precip) w.push(`☔ ${weather.precip}`);
-      if (weather.rainProb != null) w.push(`rain ${weather.rainProb}%`);
-      lines.push(w.length ? w.join(" · ") : "_Forecast unavailable right now._");
-
-      lines.push("");
-      const pm: string[] = [];
-      if (air.pm10 != null) pm.push(`PM10 ${air.pm10}`);
-      if (air.pm25 != null) pm.push(`PM2.5 ${air.pm25}`);
-      if (pm.length) {
-        lines.push(`😷 Air quality: **${air.grade}** (${pm.join(", ")} ㎍/㎥)`);
-        lines.push(air.advisory);
-      } else {
-        lines.push("😷 Air quality: _data unavailable right now._");
-      }
-      if (air.dataTime) lines.push(`\n_Air measured ${air.dataTime} (KST), ${air.stations} stations._`);
-
-      return ok(lines.join("\n"), CHOICES);
-    } catch {
+    // Both sources down → honest failure with retry.
+    if (!weather && !air) {
       return fail(
         "Couldn't reach the weather/air service",
-        "The weather or air-quality source didn't respond in time. Please try again in a moment.",
+        "Both the forecast and air-quality sources didn't respond in time. Please try again in a moment.",
         RETRY,
       );
     }
+
+    const lines = [`🌤️ **${city.label} — weather & air**`, ""];
+
+    const w: string[] = [];
+    if (weather?.tempC != null) w.push(`🌡️ ${weather.tempC}°C`);
+    if (weather?.sky) w.push(weather.sky);
+    if (weather?.precip) w.push(`☔ ${weather.precip}`);
+    if (weather?.rainProb != null) w.push(`rain ${weather.rainProb}%`);
+    lines.push(w.length ? w.join(" · ") : "🌡️ _Forecast unavailable right now (try again shortly)._");
+
+    lines.push("");
+    const pm: string[] = [];
+    if (air?.pm10 != null) pm.push(`PM10 ${air.pm10}`);
+    if (air?.pm25 != null) pm.push(`PM2.5 ${air.pm25}`);
+    if (air && pm.length) {
+      lines.push(`😷 Air quality: **${air.grade}** (${pm.join(", ")} ㎍/㎥)`);
+      lines.push(air.advisory);
+      if (air.dataTime) lines.push(`\n_Air measured ${air.dataTime} (KST), ${air.stations} stations._`);
+    } else {
+      lines.push("😷 Air quality: _data unavailable right now._");
+    }
+
+    return ok(lines.join("\n"), CHOICES);
   },
 };

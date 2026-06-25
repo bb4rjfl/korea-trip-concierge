@@ -21,6 +21,45 @@ interface PaymentGuide {
 
 const GUIDES: PaymentGuide[] = [
   {
+    match: /(tip|tipping|gratuity|service charge|팁)/i,
+    label: "Tipping",
+    works: [
+      "**No tipping** — Korea has no tipping culture; service is included in the price.",
+      "Rounding up or leaving change is fine but never expected.",
+    ],
+    avoid: [
+      "Leaving cash on the table — staff may chase you to return it.",
+      "Tipping taxi drivers, cafés, or restaurants — it can cause confusion.",
+    ],
+    tip: "Don't tip. The price you see is the price you pay. (Some hotels and private tour guides accept optional tips.)",
+  },
+  {
+    match: /(split|share the bill|divide the bill|going dutch|separate check|더치|나눠|각자)/i,
+    label: "Splitting the bill",
+    works: [
+      "**Each person taps their own card** at the counter — most places do this happily (“따로 계산이요” = pay separately).",
+      "Or one person pays and friends send their share by cash.",
+    ],
+    avoid: [
+      "Expecting to split one bill across several **foreign** cards — terminals often do one card, so settle the rest in cash.",
+      "Domestic split apps (Toss, KakaoPay 1/N) — they need a Korean bank account.",
+    ],
+    tip: "Say “따로 계산해 주세요” (pay separately). For foreign cards, one card + cash for the rest is the smoothest.",
+  },
+  {
+    match: /(apple ?pay|samsung ?pay|google ?pay|mobile pay|tap to pay|phone pay|애플페이|삼성페이|구글페이)/i,
+    label: "Mobile pay (Apple / Samsung / Google Pay)",
+    works: [
+      "**Apple Pay** works at terminals showing the contactless / Apple Pay logo — but only **some** Korean merchants support it (growing, not universal).",
+      "**Samsung Pay** generally needs a **Korean-issued** card to be useful.",
+    ],
+    avoid: [
+      "Assuming mobile pay works everywhere — coverage is **spotty**, especially small shops and transit gates.",
+      "**Google Pay** — not usable for in-store payments in Korea.",
+    ],
+    tip: "Treat mobile pay as a nice bonus, not your main method. Always carry a physical foreign card **and** some cash.",
+  },
+  {
     match: /(bus|subway|metro|transit|transport|t-?money|tmoney|교통|버스|지하철)/i,
     label: "Public transit (bus / subway)",
     works: [
@@ -84,6 +123,42 @@ const GUIDES: PaymentGuide[] = [
     ],
     tip: "If a kiosk only offers domestic-app QR, ask staff to ring it up at the counter instead.",
   },
+  {
+    match: /(restaurant|dining|eatery|diner|food court|식당|음식점|밥집|맛집)/i,
+    label: "Restaurants & dining",
+    works: [
+      "**Foreign cards** at most sit-down restaurants, franchises, and department-store food courts.",
+      "**Cash** always.",
+    ],
+    avoid: [
+      "Small old eateries, pojangmacha, and some noodle/gukbap shops are **cash-only**.",
+      "Assuming you pay at the table — in Korea you usually pay at the **counter on the way out**.",
+    ],
+    tip: "Ask “카드 되나요?” (do you take card?). Carry some cash for the small local spots that don't.",
+  },
+  {
+    match: /(hotel|accommodation|guesthouse|hostel|motel|pension|lodging|check.?in|숙소|호텔|모텔|게스트하우스)/i,
+    label: "Hotels & accommodation",
+    works: [
+      "**Foreign cards** at all hotels; a **card hold / deposit** at check-in is normal.",
+      "**Passport** required at check-in for foreign guests.",
+    ],
+    avoid: [
+      "Expecting the deposit hold to release instantly — it can take a few days.",
+      "Budget guesthouses/pensions that are **cash- or bank-transfer-only** — confirm before booking.",
+    ],
+    tip: "Bring the card you booked with + your passport. Keep some cash for small family-run stays.",
+  },
+  {
+    match: /(temple|palace|admission|entrance|entry fee|ticket booth|museum|attraction|사찰|입장|관람|매표|입장료)/i,
+    label: "Admission (palaces, temples, attractions)",
+    works: [
+      "**Cards / kiosks** at major sites (Gyeongbokgung, big museums, theme parks).",
+      "**Cash** at small temple and local-museum ticket booths.",
+    ],
+    avoid: ["Assuming a small temple or rural attraction takes cards — many gates are **cash-only**."],
+    tip: "Carry ₩10,000–₩20,000 cash for admission. Many palaces are ~₩3,000 (some free) and close one day a week (often Mon/Tue).",
+  },
 ];
 
 const GENERIC: PaymentGuide = {
@@ -101,12 +176,18 @@ const GENERIC: PaymentGuide = {
 };
 
 function render(situation: string, cardType?: string): string {
-  const g = GUIDES.find((x) => x.match.test(situation)) ?? GENERIC;
+  const matched = GUIDES.find((x) => x.match.test(situation));
+  const g = matched ?? GENERIC;
   const cardNote = cardType
     ? `\n\n_Your card: **${cardType}** — foreign-issued cards follow the same rules above; acceptance depends on the merchant terminal, not the brand._`
     : "";
+  // Signal when we couldn't match the situation, so the user knows this is
+  // general guidance (not silently pretending we understood "tipping" etc.).
+  const head = matched
+    ? `💳 **Paying as a foreign visitor — ${g.label}**`
+    : `💳 **General payment in Korea**\n\n_(I gave general guidance — name the exact situation, e.g. "taxi", "tipping", "Apple Pay", for tailored tips.)_`;
   return [
-    `💳 **Paying as a foreign visitor — ${g.label}**`,
+    head,
     "",
     "**✅ What works**",
     ...g.works.map((w) => `- ${w}`),
@@ -118,17 +199,20 @@ function render(situation: string, cardType?: string): string {
   ].join("\n");
 }
 
+// Location-free chips: keep the user in explainPayment (which needs no area) and
+// surface the high-value new topics, instead of a "find stores nearby" dead-end.
 const CHOICES: Choice[] = [
-  { emoji: "🚌", cmdEn: "How do I pay on the bus?", cmdKo: "버스 결제", descEn: "transit payment details" },
-  { emoji: "🏪", cmdEn: "Pay at a kiosk", cmdKo: "키오스크 결제", descEn: "self-order kiosk caveats" },
-  { emoji: "🍜", cmdEn: "Find foreigner-friendly stores nearby", descEn: "stores that take foreign cards" },
+  { emoji: "🚌", cmdEn: "How do I pay on the bus or subway?", cmdKo: "교통 결제", descEn: "T-money + transit cards" },
+  { emoji: "📱", cmdEn: "Can I use Apple Pay or Samsung Pay?", descEn: "mobile-pay reality in Korea" },
+  { emoji: "💵", cmdEn: "Do I tip, and how do we split the bill?", descEn: "tipping + splitting etiquette" },
 ];
 
 export const explainPayment: ToolDef = {
   name: "explainPayment",
   description:
-    "Explains which payment methods a foreign visitor can actually use in a given Korean situation " +
-    "(transit, taxi, market, kiosk), including foreign-card and contactless caveats and cash alternatives. " +
+    "Explains which payment methods a foreign visitor can actually use in a given Korean situation — transit, " +
+    "taxi, market, kiosk, restaurant, hotel, admission — plus tipping etiquette, bill-splitting, and Apple/" +
+    "Samsung Pay reality, including foreign-card and contactless caveats and cash alternatives. " +
     `Part of ${SERVICE_NAME}.`,
   inputSchema: {
     situation: z.string().describe("The situation, e.g. 'paying for the subway' or 'street food market'."),
