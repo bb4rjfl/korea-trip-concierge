@@ -97,7 +97,7 @@
   - ⚠️ 운행 05:30~01:00, 데이터없음 `{code:"INFO-200"}` → 빈 목록.
 - **output**: station→[🔄][🗺️][🏙️] / 여정→정거장수+"~까지 N stops"+다음열차 [🔄 Where am I now][🏁 Arrivals at dest][🗺️ Route] / line→종착지별 위치(방면당 8대 cap) [🔄][🚉][🗺️]. **푸시 아님 — 조회**(타며 재조회로 카운트다운).
 - annotations: readOnly true / idempotent false (실시간) / openWorld true
-- 검증: parseArrivals/parsePositions/parseStationIds/resolveStationName/resolveLineName 테스트 락(103). **알려진 한계**: 순환 2호선은 statnId 차가 짧은쪽/긴쪽 구분 약함, 방면 칩에 dest 방향 필터 미적용(MVP). 역사전 갭(교대=Gyodae 등)·로마자(서울대입구/지선)는 사전 보강 단계.
+- 검증: parseArrivals/parsePositions/parseStationIds/resolveStationName/resolveLineName 테스트 락(103). **여정 모드 운행外**: statnId는 실시간 도착에서만 얻으므로 01:00~05:30엔 ids 없음 → "라이브 데이터 없음(운행 05:30~01:00)" 안내(≠"다른 노선"). **알려진 한계**: 순환 2호선 statnId 차 짧은/긴쪽 구분 약함, 방면필터 미적용(MVP).
 
 ---
 

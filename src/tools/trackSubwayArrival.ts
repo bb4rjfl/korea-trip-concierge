@@ -184,7 +184,14 @@ export const trackSubwayArrival: ToolDef = {
       }
       try {
         const [info, arrivals] = await Promise.all([stopsBetween(fromKo, toKo), getStationArrivals(fromKo)]);
-        if (!info) {
+        if (!info.ok && info.reason === "no-data") {
+          return fail(
+            "Couldn't get live subway data right now",
+            `Live stop counts need running trains, and the Seoul subway runs about **05:30–01:00**. Try during service hours, or ask me to **plan a route** from ${station} to ${to}.`,
+            RETRY,
+          );
+        }
+        if (!info.ok) {
           return fail(
             `${station} and ${to} aren't on the same line`,
             `You'll need a transfer. Ask me to **plan a route** from ${station} to ${to} and I'll pick the lines and stops.`,

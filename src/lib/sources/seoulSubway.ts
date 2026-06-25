@@ -144,25 +144,26 @@ export async function getStationLineIds(stationKo: string): Promise<StationLineI
   return parseStationIds(await fetchStation(stationKo));
 }
 
-export interface StopsInfo {
-  line: string;
-  subwayId: string;
-  stops: number;
-}
+export type StopsResult =
+  | { ok: true; line: string; stops: number }
+  | { ok: false; reason: "different-lines" | "no-data" };
 
-/** Stops between two stations IF they share a line. undefined = no shared line
- *  (a transfer is needed → use getTransitRoute) or a station wasn't found.
+/** Stops between two stations using their (live) statnId.
+ *  - ok: they share a line; stops = |statnId gap|.
+ *  - different-lines: both resolved but no shared line → a transfer is needed.
+ *  - no-data: a station returned no live ids — Seoul subway runs ~05:30–01:00,
+ *    so off-hours there are no arrivals to read statnId from (don't mislabel
+ *    this as "different lines").
  *  Note (MVP): for the Line-2 loop the raw statnId gap can be the long way; a
  *  short-way/direction refinement is deferred (docs/03 §11). */
-export async function stopsBetween(fromKo: string, toKo: string): Promise<StopsInfo | undefined> {
+export async function stopsBetween(fromKo: string, toKo: string): Promise<StopsResult> {
   const [a, b] = await Promise.all([getStationLineIds(fromKo), getStationLineIds(toKo)]);
+  if (!a.length || !b.length) return { ok: false, reason: "no-data" };
   for (const x of a) {
     const y = b.find((bb) => bb.subwayId === x.subwayId);
-    if (y) {
-      return { line: x.line, subwayId: x.subwayId, stops: Math.abs(y.statnId - x.statnId) };
-    }
+    if (y) return { ok: true, line: x.line, stops: Math.abs(y.statnId - x.statnId) };
   }
-  return undefined;
+  return { ok: false, reason: "different-lines" };
 }
 
 // ── Line mode: realtimePosition (OA-12601) ──────────────────────────────────
