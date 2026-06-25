@@ -33,11 +33,11 @@ const DISHES: Dish[] = [
   { match: /잡채|japchae/i, en: "Glass noodle stir-fry", desc: "Sweet-savory sweet-potato glass noodles with vegetables and beef.", spice: 0, allergens: ["soy", "sesame", "egg"] },
   { match: /해장국|haejangguk/i, en: "Hangover soup", desc: "Hearty soup (often with ox-blood, pork spine, or cabbage) eaten to recover from drinking.", spice: 1, allergens: ["soy"] },
   { match: /순대|sundae/i, en: "Korean blood sausage", desc: "Steamed pig-intestine sausage filled with noodles and barley — savory, often with offal.", spice: 0, allergens: ["pork", "soy"] },
-  { match: /파전|pajeon|jeon/i, en: "Savory pancake", desc: "Pan-fried scallion (and often seafood) pancake; crispy edges, soft center.", spice: 0, allergens: ["gluten", "egg", "shellfish", "soy"] },
+  { match: /파전|해물전|pajeon|\bjeon\b/i, en: "Savory pancake", desc: "Pan-fried scallion (and often seafood) pancake; crispy edges, soft center.", spice: 0, allergens: ["gluten", "egg", "shellfish", "soy"] },
   { match: /부대찌개|budae|army stew/i, en: "Army stew", desc: "Spicy hot-pot of kimchi, sausage, Spam, tofu, and instant noodles — a post-war fusion classic, shared at the table.", spice: 2, allergens: ["gluten", "pork", "soy"] },
   { match: /갈비찜|galbi.?jjim/i, en: "Braised short ribs", desc: "Beef short ribs braised until tender in a sweet soy sauce with vegetables.", spice: 0, allergens: ["soy", "sesame", "gluten"] },
   { match: /갈비탕|galbitang/i, en: "Short-rib soup", desc: "Clear, mild beef short-rib soup with glass noodles — comforting and not spicy.", spice: 0, allergens: ["egg", "soy"] },
-  { match: /갈비|galbi|kalbi/i, en: "Grilled short ribs", desc: "Marinated beef short ribs grilled at the table; sweet-savory and tender.", spice: 0, allergens: ["soy", "sesame", "gluten"] },
+  { match: /(?<![닭돼지])갈비(?![탕찜])|\bgalbi\b|\bkalbi\b/i, en: "Grilled short ribs", desc: "Marinated beef short ribs grilled at the table; sweet-savory and tender.", spice: 0, allergens: ["soy", "sesame", "gluten"] },
   { match: /닭갈비|dak.?galbi/i, en: "Spicy stir-fried chicken", desc: "Chicken stir-fried with cabbage, rice cakes, and gochujang on a hot plate — a Chuncheon specialty.", spice: 2, allergens: ["soy", "sesame", "gluten"] },
   { match: /찜닭|jjimdak/i, en: "Braised chicken", desc: "Chicken braised in sweet soy sauce with glass noodles, potato, and carrot — mildly sweet (Andong style can be spicy).", spice: 1, allergens: ["soy", "gluten", "sesame"] },
   { match: /보쌈|bossam/i, en: "Boiled pork wraps", desc: "Thin-sliced boiled pork belly wrapped in cabbage/kimchi with salted shrimp — savory, not spicy.", spice: 0, allergens: ["pork", "shellfish", "soy"] },
@@ -49,30 +49,41 @@ const DISHES: Dish[] = [
   { match: /라면|라멘|ramyeon|ramen/i, en: "Instant ramen", desc: "Korean-style instant wheat noodles in a spicy broth — a national comfort food.", spice: 2, allergens: ["gluten", "soy", "egg"] },
   { match: /만두|mandu|dumpling/i, en: "Dumplings", desc: "Steamed or fried dumplings filled with pork, vegetables, or kimchi.", spice: 0, allergens: ["gluten", "pork", "soy", "sesame"] },
   { match: /돈[까가]스|돈카츠|donkatsu|donkkaseu|tonkatsu/i, en: "Pork cutlet", desc: "Breaded, deep-fried pork cutlet with a sweet-savory brown sauce — kid-friendly, not spicy.", spice: 0, allergens: ["gluten", "egg", "pork"] },
-  { match: /치킨|후라이드|fried chicken/i, en: "Korean fried chicken", desc: "Extra-crispy double-fried chicken, plain or in a sweet-spicy sauce; the classic beer pairing (chimaek).", spice: 1, allergens: ["gluten", "soy"] },
+  { match: /(?<!양념)치킨|후라이드|fried chicken/i, en: "Korean fried chicken", desc: "Extra-crispy double-fried chicken, plain or in a sweet-spicy sauce; the classic beer pairing (chimaek).", spice: 1, allergens: ["gluten", "soy"] },
   { match: /양념치킨|yangnyeom/i, en: "Sweet-spicy fried chicken", desc: "Fried chicken glazed in a sticky sweet-and-spicy gochujang sauce.", spice: 2, allergens: ["gluten", "soy", "sesame"] },
   { match: /회덮밥|hoedeopbap/i, en: "Raw-fish rice bowl", desc: "Diced raw fish over rice and vegetables, mixed with spicy-sweet sauce.", spice: 1, allergens: ["fish", "soy", "sesame", "egg"] },
-  { match: /회|sashimi|raw fish/i, en: "Korean sashimi (hoe)", desc: "Fresh raw fish slices, dipped in chili-vinegar (chojang) or soy — usually flatfish or sea bream.", spice: 1, allergens: ["fish", "soy"] },
+  { match: /(?<![육물])회(?!덮밥)|sashimi|raw fish/i, en: "Korean sashimi (hoe)", desc: "Fresh raw fish slices, dipped in chili-vinegar (chojang) or soy — usually flatfish or sea bream.", spice: 1, allergens: ["fish", "soy"] },
   { match: /곱창|gopchang/i, en: "Grilled beef intestines", desc: "Rich, chewy grilled offal — a beloved drinking food, often very fatty.", spice: 1, allergens: ["soy", "sesame"] },
   { match: /떡국|tteokguk/i, en: "Rice-cake soup", desc: "Sliced oval rice cakes in a clear beef broth with egg — eaten on Lunar New Year.", spice: 0, allergens: ["egg", "soy", "gluten"] },
   { match: /호떡|hotteok/i, en: "Sweet syrup pancake", desc: "Griddled pancake filled with melted brown sugar, cinnamon, and nuts — a winter street snack.", spice: 0, allergens: ["gluten", "peanut"] },
   { match: /붕어빵|bungeoppang/i, en: "Fish-shaped pastry", desc: "Fish-shaped waffle filled with sweet red-bean paste (or custard) — a winter street treat.", spice: 0, allergens: ["gluten", "egg"] },
   { match: /어묵|오뎅|eomuk|odeng/i, en: "Fish cake", desc: "Skewered fish-cake simmered in warm broth — a cheap, savory street snack.", spice: 0, allergens: ["fish", "gluten", "soy"] },
+  { match: /아[구귀]찜|agujjim|agwijjim/i, en: "Braised monkfish", desc: "Monkfish braised with bean sprouts in a spicy sauce — meaty, very spicy, a Korean seafood classic.", spice: 3, allergens: ["fish", "shellfish", "soy", "sesame"] },
+  { match: /도토리묵|dotori|acorn jelly/i, en: "Acorn jelly", desc: "Wobbly acorn-starch jelly in a savory soy-sesame sauce with vegetables — light, nutty, low-calorie.", spice: 1, allergens: ["soy", "sesame"] },
+  { match: /비빔국수|bibim.?guksu|spicy.*noodles/i, en: "Spicy cold noodles", desc: "Chewy thin noodles tossed in a sweet-spicy gochujang sauce — served cold.", spice: 2, allergens: ["gluten", "soy", "sesame", "egg"] },
+  { match: /콩나물국밥|kongnamul/i, en: "Bean-sprout soup rice", desc: "Rice in a clear, peppery bean-sprout broth — light and a popular hangover cure.", spice: 1, allergens: ["soy", "fish", "egg"] },
+  { match: /두부김치|dubu.?kimchi/i, en: "Tofu with stir-fried kimchi", desc: "Warm tofu slices served with stir-fried pork kimchi — a classic drinking snack.", spice: 2, allergens: ["soy", "pork"] },
+  { match: /보리밥|bori.?bap/i, en: "Barley rice (mixed)", desc: "Barley-and-rice mix served with assorted vegetables and gochujang to mix yourself — wholesome and light.", spice: 1, allergens: ["gluten", "soy", "sesame"] },
 ];
 
 const SPICE_LABEL = ["🌶️ none", "🌶️ mild", "🌶️🌶️ medium", "🌶️🌶️🌶️ hot"];
 
-function renderDish(d: Dish, concerns: string[]): string {
-  const hits = d.allergens.filter((a) => concerns.includes(a));
-  const allergenLine = d.allergens.length
-    ? `Allergens: ${d.allergens.join(", ")}`
-    : "No common allergens";
+// Allergen tokens our dictionary actually tracks — so we never silently "pass" a
+// concern we can't check (e.g. dairy), which would be dangerous false reassurance.
+const SUPPORTED_ALLERGENS = new Set(DISHES.flatMap((d) => d.allergens));
+
+function renderDish(d: Dish, supportedConcerns: string[]): string {
+  const hits = d.allergens.filter((a) => supportedConcerns.includes(a));
+  const allergenLine = d.allergens.length ? `Allergens: ${d.allergens.join(", ")}` : "No common allergens";
   const warn = hits.length ? `\n  - ⚠️ **Contains ${hits.join(", ")}** (you flagged this)` : "";
   return `- **${d.en}** — ${d.desc}\n  - Spice: ${SPICE_LABEL[d.spice]} · ${allergenLine}${warn}`;
 }
 
 function render(menuText: string, concerns: string[]): string {
-  const found = DISHES.filter((d) => d.match.test(menuText));
+  // Preserve the order dishes appear in the user's text, not dictionary order.
+  const found = DISHES.filter((d) => d.match.test(menuText)).sort(
+    (a, b) => menuText.search(a.match) - menuText.search(b.match),
+  );
   const head = `🍽️ **Menu, explained in context**`;
   if (found.length === 0) {
     return [
@@ -82,9 +93,28 @@ function render(menuText: string, concerns: string[]): string {
       "Try a single dish name (Korean or romanized), e.g. `tteokbokki`, `bibimbap`, `삼겹살`.",
     ].join("\n");
   }
+
+  // Split concerns into ones we can actually check vs ones we can't.
+  const supported = concerns.filter((c) => SUPPORTED_ALLERGENS.has(c));
+  const unsupported = concerns.filter((c) => !SUPPORTED_ALLERGENS.has(c));
+  const veg = concerns.some((c) => /veg|vegan|meat|pork.?free|halal|beef/.test(c));
+
   const lines = [head];
-  if (concerns.length) lines.push("", `_Checking against your allergy concerns: **${concerns.join(", ")}**_`);
-  lines.push("", ...found.map((d) => renderDish(d, concerns)));
+  if (supported.length) lines.push("", `_Checking against: **${supported.join(", ")}** (⚠️ marks dishes that contain these)_`);
+  lines.push("", ...found.map((d) => renderDish(d, supported)));
+
+  const notes: string[] = [];
+  // Honesty: don't pretend to verify allergens/diets we don't track.
+  const cantCheck = unsupported.filter((c) => !/veg|vegan|meat|pork.?free|halal|beef/.test(c));
+  if (cantCheck.length) {
+    notes.push(`⚠️ I don't yet track **${cantCheck.join(", ")}** per dish — please confirm with the restaurant.`);
+  }
+  if (veg) {
+    notes.push(
+      "🌱 Vegetarian/halal note: many Korean dishes use **fish sauce, anchovy stock, or meat broth** even when they look meat-free. Ask “고기·생선 없이 돼요?” (without meat or fish?).",
+    );
+  }
+  if (notes.length) lines.push("", ...notes.map((n) => `> ${n}`));
   return lines.join("\n");
 }
 
