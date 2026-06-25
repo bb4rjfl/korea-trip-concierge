@@ -37,6 +37,23 @@ const RETRY: Choice[] = [
 
 const MODE_ICON: Record<string, string> = { subway: "🚇", bus: "🚌", walk: "🚶" };
 
+/** Primary mode of a route — used to label the option (🚇 / 🚌 / both). */
+function primaryMode(r: TransitRoute): "subway" | "bus" | "mixed" {
+  const transit = r.legs.filter((l) => l.mode !== "walk");
+  const hasSub = transit.some((l) => l.mode === "subway");
+  const hasBus = transit.some((l) => l.mode === "bus");
+  if (hasSub && hasBus) return "mixed";
+  if (hasSub) return "subway";
+  if (hasBus) return "bus";
+  return "mixed";
+}
+
+const MODE_LABEL: Record<string, string> = {
+  subway: "🚇 Subway",
+  bus: "🚌 Bus",
+  mixed: "🚇🚌 Subway + Bus",
+};
+
 function renderRoute(r: TransitRoute, idx: number): string {
   const fare = r.fare ? ` · 💳 ₩${r.fare.toLocaleString()}` : "";
   const legs = r.legs
@@ -48,7 +65,34 @@ function renderRoute(r: TransitRoute, idx: number): string {
       return `   ${icon}${line}${seg}`;
     })
     .join("\n");
-  return `**Option ${idx + 1} — ${r.totalMinutes} min${fare}**\n${legs}`;
+  return `**Option ${idx + 1} · ${MODE_LABEL[primaryMode(r)]} — ${r.totalMinutes} min${fare}**\n${legs}`;
+}
+
+/**
+ * Build dynamic "track this" chips from the actual routes so the user can pick a
+ * mode and jump straight into live tracking (journey UX). A subway option →
+ * "Track subway at {boarding}", a bus option → "Track bus {no}".
+ */
+function trackChips(routes: TransitRoute[]): Choice[] {
+  const legs = routes.flatMap((r) => r.legs);
+  const subLeg = legs.find((l) => l.mode === "subway" && l.from);
+  const busLeg = legs.find((l) => l.mode === "bus" && l.line);
+  const chips: Choice[] = [];
+  if (subLeg?.from) {
+    chips.push({
+      emoji: "🚇",
+      cmdEn: `Track the subway at ${romanizeText(subLeg.from)}`,
+      descEn: "live arrivals + train position",
+    });
+  }
+  if (busLeg?.line) {
+    chips.push({ emoji: "🚌", cmdEn: `Track bus ${romanizeText(busLeg.line)}`, descEn: "where the bus is + when it arrives" });
+  }
+  chips.push({ emoji: "💳", cmdEn: "How do I pay for this?", descEn: "transit payment guide" });
+  // Always offer a recompute; add destination-area only if there's still room.
+  if (chips.length < 3) chips.push({ emoji: "🗺️", cmdEn: "Tell me about the destination area", descEn: "neighborhood guide" });
+  chips.push({ emoji: "🔄", cmdEn: "Refresh for leaving now", cmdKo: "지금 출발 새로고침", descEn: "recompute" });
+  return chips.slice(0, 4);
 }
 
 export const getTransitRoute: ToolDef = {
@@ -110,8 +154,9 @@ export const getTransitRoute: ToolDef = {
       const top = routes.slice(0, 2).map(renderRoute).join("\n\n");
       // Use the user's own place wording in the header (geocoding may resolve to a
       // nearby shop with an ugly name; the route itself is correct).
-      const body = [`🚇 **${from} → ${to}**`, "", top].join("\n");
-      return ok(body, CHOICES);
+      const body = [`🚇🚌 **${from} → ${to}** — pick how you want to go`, "", top].join("\n");
+      // Dynamic chips: tap a mode to jump into live tracking (journey UX, Phase 1).
+      return ok(body, trackChips(routes.slice(0, 2)));
     } catch {
       return fail(
         "Couldn't reach the routing service",
