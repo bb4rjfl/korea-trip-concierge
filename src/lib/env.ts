@@ -36,6 +36,9 @@ export const ENV = {
   get FOURSQUARE_API_KEY(): string {
     return process.env.FOURSQUARE_API_KEY ?? "";
   },
+  get VISITSEOUL_API_KEY(): string {
+    return process.env.VISITSEOUL_API_KEY ?? "";
+  },
 };
 
 export type ApiKeyName =
@@ -47,7 +50,8 @@ export type ApiKeyName =
   | "KAKAO_REST_API_KEY"
   | "NAVER_CLIENT_ID"
   | "NAVER_CLIENT_SECRET"
-  | "FOURSQUARE_API_KEY";
+  | "FOURSQUARE_API_KEY"
+  | "VISITSEOUL_API_KEY";
 
 export function hasKey(name: ApiKeyName): boolean {
   return ENV[name].trim().length > 0;
