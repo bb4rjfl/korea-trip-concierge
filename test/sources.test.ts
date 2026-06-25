@@ -242,19 +242,47 @@ describe("TAGO trackBus (mocked fetch)", () => {
     );
 
     const res = await trackBus("143", "Seomyeon unique-stop", "21");
-    expect(res).not.toBeNull();
-    expect(res!.arrival.routeNo).toBe("143");
-    expect(res!.arrival.stopsRemaining).toBe(3);
-    expect(res!.arrival.etaMinutes).toBe(6); // 360s -> 6 min
-    expect(res!.stop.cityCode).toBe("21"); // injected from the query, not the response
+    expect(res.status).toBe("ok");
+    if (res.status !== "ok") throw new Error("expected ok");
+    expect(res.arrival.routeNo).toBe("143");
+    expect(res.arrival.stopsRemaining).toBe(3);
+    expect(res.arrival.etaMinutes).toBe(6); // 360s -> 6 min
+    expect(res.stop.cityCode).toBe("21"); // injected from the query, not the response
   });
 
-  it("returns null when no stop matches", async () => {
+  it("reports stop_not_found when no stop matches", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({ ok: true, json: async () => ({ response: { body: { items: "" } } }) }) as unknown as Response),
     );
-    expect(await trackBus("9", "nowhere unique-stop-2", "21")).toBeNull();
+    const res = await trackBus("9", "nowhere unique-stop-2", "21");
+    expect(res.status).toBe("stop_not_found");
+  });
+
+  it("reports no_arrival with the buses that ARE arriving", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("getSttnNoList")) {
+          return {
+            ok: true,
+            json: async () => ({
+              response: { body: { items: { item: [{ nodeid: "N9", nodenm: "Stop X unique-3" }] } } },
+            }),
+          } as unknown as Response;
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            response: { body: { items: { item: [{ routeno: 100, arrtime: 120, arrprevstationcnt: 1 }, { routeno: 472, arrtime: 300, arrprevstationcnt: 2 }] } } },
+          }),
+        } as unknown as Response;
+      }),
+    );
+    const res = await trackBus("999", "Stop X unique-3", "21");
+    expect(res.status).toBe("no_arrival");
+    if (res.status !== "no_arrival") throw new Error("expected no_arrival");
+    expect(res.available).toEqual(["100", "472"]);
   });
 
   it("resolveCityCode maps an English alias to a TAGO city code", async () => {

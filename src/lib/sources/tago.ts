@@ -173,19 +173,33 @@ export async function getArrivals(cityCode: string, nodeId: string): Promise<Bus
 }
 
 /**
+ * Result of trackBus — distinguishes the failure modes so the tool can give
+ * helpful guidance instead of a dead-end "not arriving":
+ *  - stop_not_found : no stop by that name in the city (likely a name typo)
+ *  - no_arrival     : stop found, but that route isn't showing — we return the
+ *                     routes that ARE arriving so the user can pick/correct
+ *  - ok             : matching live arrival
+ */
+export type TrackResult =
+  | { status: "stop_not_found" }
+  | { status: "no_arrival"; stop: BusStop; available: string[] }
+  | { status: "ok"; stop: BusStop; arrival: BusArrival };
+
+/**
  * High-level: track a specific bus toward a drop-off stop in a given city.
- * `cityCode` must be resolved first (resolveCityCode). Returns the matching
- * arrival (stops remaining = stops until the bus reaches that stop) or null.
+ * `cityCode` must be resolved first (resolveCityCode).
  */
 export async function trackBus(
   busNumber: string,
   dropOffStop: string,
   cityCode: string,
-): Promise<{ stop: BusStop; arrival: BusArrival } | null> {
+): Promise<TrackResult> {
   const stops = await resolveStop(dropOffStop, cityCode);
-  if (stops.length === 0) return null;
+  if (stops.length === 0) return { status: "stop_not_found" };
   const stop = stops[0];
   const arrivals = await getArrivals(stop.cityCode, stop.nodeId);
   const arrival = arrivals.find((a) => a.routeNo === busNumber.trim());
-  return arrival ? { stop, arrival } : null;
+  if (arrival) return { status: "ok", stop, arrival };
+  const available = [...new Set(arrivals.map((a) => a.routeNo).filter(Boolean))];
+  return { status: "no_arrival", stop, available };
 }

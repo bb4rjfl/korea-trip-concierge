@@ -3,6 +3,7 @@ import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
 import { trackBus, resolveCityCode } from "../lib/sources/tago.js";
+import { romanizeText } from "../lib/romanize.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -91,13 +92,26 @@ export const trackBusArrival: ToolDef = {
         );
       }
       const result = await trackBus(bus, stop, cityCode);
-      if (!result) {
+
+      // No stop by that name — most likely a spelling mismatch.
+      if (result.status === "stop_not_found") {
         return fail(
-          `Bus ${bus} isn't arriving at ${stop} right now`,
-          "No live arrival found — the bus may not serve this stop, the stop name may differ, or service may have ended. Try the exact stop name shown on the sign.",
+          `I couldn't find a stop named "${stop}" in ${city}`,
+          "Korean bus stops are matched by their exact name — check the name on the stop's sign (it can differ slightly), or plan a transit route instead and I'll pick the stops for you.",
           RETRY,
         );
       }
+
+      // Stop found, but the requested route isn't in the live list. Show which
+      // buses ARE arriving so the user can correct the number or pick another.
+      if (result.status === "no_arrival") {
+        const foundStop = romanizeText(result.stop.nodeName);
+        const detail = result.available.length
+          ? `I found the stop (**${foundStop}**), but bus **${bus}** isn't in the live list right now.\n\n🚌 Buses arriving here now: **${result.available.slice(0, 12).join(", ")}**.\n\nDouble-check your bus number (say e.g. \"track bus ${result.available[0]}\"), or it may have stopped running for the night.`
+          : `I found the stop (**${foundStop}**), but no buses are showing right now — service may have ended for the night.`;
+        return fail(`Bus ${bus} isn't showing at ${stop} yet`, detail, RETRY);
+      }
+
       const { arrival } = result;
       const stopsWord = arrival.stopsRemaining === 1 ? "stop" : "stops";
       // Show the user's own stop wording (their language) rather than the API's
