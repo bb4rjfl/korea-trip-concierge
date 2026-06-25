@@ -14,6 +14,7 @@
 import { ENV, hasKey } from "../env.js";
 import { fetchJson } from "../http.js";
 import { TtlCache } from "../cache.js";
+import { romanizeHangul } from "../romanize.js";
 
 export interface PoiPlace {
   name: string;
@@ -44,15 +45,51 @@ interface NaverResponse {
 
 const stripTags = (s?: string): string => (s ?? "").replace(/<\/?[^>]+>/g, "").trim();
 
+/** Translate a Naver Korean category into an English cuisine label (keyword-based). */
+export function translateNaverCategory(cat?: string): string | undefined {
+  const c = cat ?? "";
+  if (!c) return undefined;
+  const has = (...ks: string[]) => ks.some((k) => c.includes(k));
+  if (has("삼겹살", "갈비", "고기", "육류", "곱창", "구이")) return "Korean BBQ";
+  if (has("해물", "생선", "회", "조개", "수산")) return "Seafood";
+  if (has("곰탕", "설렁탕", "국밥", "백반", "가정식", "한정식", "찌개", "전골", "한식")) return "Korean";
+  if (has("초밥", "스시", "돈가스", "라멘", "우동", "japanese", "일식", "이자카야")) return "Japanese";
+  if (has("중식", "중국", "마라", "양꼬치")) return "Chinese";
+  if (has("이탈리", "파스타", "피자", "스테이크", "프랑스", "양식")) return "Western";
+  if (has("베트남", "쌀국수", "태국", "인도", "터키", "케밥", "아시아")) return "Asian";
+  if (has("카페", "커피", "디저트", "베이커리", "빵", "브런치")) return "Café";
+  if (has("떡볶이", "분식", "김밥")) return "Korean street food";
+  if (has("치킨", "닭")) return "Chicken";
+  if (has("버거", "햄버거")) return "Burger";
+  if (has("뷔페", "부페")) return "Buffet";
+  if (has("주점", "호프", "포장마차", "바", "술집", "와인", "맥주", "펍")) return "Bar / pub";
+  return "Restaurant";
+}
+
+/** Korean address → readable English-ish: drop admin/floor noise, then transliterate. */
+function romanizeAddress(ko: string): string {
+  const cleaned = (ko ?? "")
+    .replace(/서울특별시|서울시/g, "Seoul")
+    .replace(/(지하\s*)?\d+층|지하\s*\d+|[BbＢ]\d+/g, "") // floor / basement
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return romanizeHangul(cleaned).replace(/\s{2,}/g, " ").trim();
+}
+
 export function parseNaver(json: NaverResponse): PoiPlace[] {
   const items = Array.isArray(json.items) ? json.items : [];
-  return items.map((it) => ({
-    name: stripTags(it.title),
-    address: (it.roadAddress?.trim() || it.address?.trim() || "").trim(),
-    category: it.category?.split(">").pop()?.trim() || it.category?.trim() || undefined,
-    tel: it.telephone?.trim() || undefined,
-    source: "naver" as const,
-  }));
+  return items.map((it) => {
+    const ko = stripTags(it.title);
+    const roman = romanizeHangul(ko);
+    return {
+      // Romanized (pronounceable) + Korean for matching the storefront sign.
+      name: roman && roman !== ko ? `${roman} (${ko})` : ko,
+      address: romanizeAddress(it.roadAddress?.trim() || it.address?.trim() || ""),
+      category: translateNaverCategory(it.category),
+      tel: it.telephone?.trim() || undefined,
+      source: "naver" as const,
+    };
+  });
 }
 
 async function naverSearch(query: string): Promise<PoiPlace[]> {
@@ -132,17 +169,19 @@ export async function searchForeignerPois(opts: PoiSearchOptions): Promise<PoiPl
   const key = `poi:${opts.area}:${what}`;
 
   const places = await cache.getOrLoad(key, async () => {
-    // Prefer Foursquare when we have coordinates — English names + categories,
-    // which is what foreign visitors need.
-    if (hasKey("FOURSQUARE_API_KEY") && opts.coord) {
-      const r = await foursquareSearch(opts.coord.lat, opts.coord.lng, what);
+    // Naver first — richest coverage; Korean output is converted to English
+    // (category translated, name/address transliterated).
+    if (hasKey("NAVER_CLIENT_ID") && hasKey("NAVER_CLIENT_SECRET")) {
+      const r = await naverSearch(`${opts.area} ${what}`.trim());
       if (r.length) return r;
     }
-    // Naver: deep Korean coverage, keyword-based (works without coordinates).
-    if (hasKey("NAVER_CLIENT_ID") && hasKey("NAVER_CLIENT_SECRET")) {
-      return naverSearch(`${opts.area} ${what}`.trim());
+    // Foursquare fallback — native English names, by coordinate.
+    if (hasKey("FOURSQUARE_API_KEY") && opts.coord) {
+      return foursquareSearch(opts.coord.lat, opts.coord.lng, what);
     }
     return [];
+    // TODO(visitseoul): when VISITSEOUL_API_KEY is live, merge its (natively
+    // multilingual) results here and dedupe for richer combined output (D-010).
   });
   return places.slice(0, limit);
 }

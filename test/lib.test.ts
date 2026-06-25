@@ -7,6 +7,7 @@ import {
   resolveStationKo,
   romanizeStation,
   romanizeText,
+  romanizeHangul,
   formatSubwayDirection,
 } from "../src/lib/romanize.js";
 import { resolvePlaceCoord } from "../src/lib/places.js";
@@ -57,10 +58,10 @@ describe("romanize (U1)", () => {
     expect(resolveStationKo("Atlantis")).toBeUndefined();
   });
 
-  it("romanizes a Korean station, falls back to Korean for unknown", () => {
-    expect(romanizeStation("성수")).toBe("Seongsu");
+  it("romanizes a Korean station; transliterates unknown ones", () => {
+    expect(romanizeStation("성수")).toBe("Seongsu"); // curated official name
     expect(romanizeStation("강남역")).toBe("Gangnam");
-    expect(romanizeStation("없는역")).toBe("없는역");
+    expect(romanizeStation("없는역")).toBe("Eopneun"); // not in map -> Revised Romanization (역 stripped)
   });
 
   it("romanizes known stations inside free text (longest match wins)", () => {
@@ -78,6 +79,17 @@ describe("romanize (U1)", () => {
     expect(romanizeText("신촌(경의중앙선)")).toBe("Sinchon(Gyeongui–Jungang Line)");
     expect(romanizeStation("광운대")).toBe("Gwangun-dae");
     expect(romanizeStation("문산")).toBe("Munsan");
+  });
+
+  it("transliterates arbitrary Hangul (Revised Romanization), capitalizing each run", () => {
+    expect(romanizeHangul("강남")).toBe("Gangnam");
+    expect(romanizeHangul("단풍나무집")).toBe("Danpungnamujip");
+    expect(romanizeHangul("near 충정로")).toBe("near Chungjeongro");
+    expect(romanizeHangul("ABC")).toBe("ABC"); // non-Hangul untouched
+  });
+
+  it("romanizeText transliterates Korean the maps didn't cover", () => {
+    expect(romanizeText("near 충정로")).toBe("near Chungjeongro");
   });
 
   it("parses a direction with a trailing express marker", () => {

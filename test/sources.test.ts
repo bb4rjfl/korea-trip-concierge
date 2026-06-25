@@ -94,8 +94,29 @@ describe("POI providers (Naver / Foursquare parsers)", () => {
     });
     expect(out[0].name).toBe("Kervan Turkish Restaurant");
     expect(out[0].address).toBe("192 Itaewon-ro");
-    expect(out[0].category).toBe("터키음식");
+    expect(out[0].category).toBe("Asian"); // 터키음식 -> translated
     expect(out[0].source).toBe("naver");
+  });
+
+  it("translateNaverCategory maps Korean food categories to English", async () => {
+    const { translateNaverCategory } = await import("../src/lib/sources/poi.js");
+    expect(translateNaverCategory("한식>육류,고기요리")).toBe("Korean BBQ");
+    expect(translateNaverCategory("카페,디저트")).toBe("Café");
+    expect(translateNaverCategory("베트남음식")).toBe("Asian");
+    expect(translateNaverCategory("음식점>기타")).toBe("Restaurant");
+  });
+
+  it("parseNaver converts to English: romanized name + translated category", async () => {
+    const { parseNaver } = await import("../src/lib/sources/poi.js");
+    const out = parseNaver({
+      items: [
+        { title: "<b>단풍나무집</b>", category: "한식>육류,고기요리", address: "서울특별시 용산구 …", roadAddress: "서울특별시 용산구 이태원로27가길 26 1층" },
+      ],
+    });
+    expect(out[0].name).toBe("Danpungnamujip (단풍나무집)");
+    expect(out[0].category).toBe("Korean BBQ");
+    expect(out[0].address.startsWith("Seoul")).toBe(true);
+    expect(out[0].address).not.toContain("1층");
   });
 
   it("parseFoursquare maps name/address/category", async () => {

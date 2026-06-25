@@ -175,11 +175,44 @@ export function resolveStationKo(input: string): string | undefined {
   return INPUT_TO_KO.get(raw.toLowerCase());
 }
 
+// ── General Hangul → Latin transliteration (Revised Romanization, simplified;
+// no cross-syllable liaison). Covers ANY Korean text — restaurant names,
+// addresses, residual station names — so we never show raw Hangul. ─────────────
+const RR_CHO = ["g", "kk", "n", "d", "tt", "r", "m", "b", "pp", "s", "ss", "", "j", "jj", "ch", "k", "t", "p", "h"];
+const RR_JUNG = ["a", "ae", "ya", "yae", "eo", "e", "yeo", "ye", "o", "wa", "wae", "oe", "yo", "u", "wo", "we", "wi", "yu", "eu", "ui", "i"];
+const RR_JONG = ["", "k", "k", "k", "n", "n", "n", "t", "l", "k", "m", "l", "l", "l", "p", "l", "m", "p", "p", "t", "t", "ng", "t", "t", "k", "t", "p", "t"];
+
+/**
+ * Transliterate Korean to readable Latin. Each Hangul "run" is capitalized at its
+ * start (so "near 충정로" → "near Chungjeongro", not "Near ..."); non-Hangul passes
+ * through unchanged. Phonetic, not a translation — names become pronounceable.
+ */
+export function romanizeHangul(text: string): string {
+  let out = "";
+  let runStart = true; // capitalize the first romanized letter of each Hangul run
+  for (const ch of text ?? "") {
+    const code = ch.codePointAt(0)!;
+    if (code >= 0xac00 && code <= 0xd7a3) {
+      const s = code - 0xac00;
+      let r = RR_CHO[Math.floor(s / 588)] + RR_JUNG[Math.floor((s % 588) / 28)] + RR_JONG[s % 28];
+      if (runStart && r) {
+        r = r[0].toUpperCase() + r.slice(1);
+        runStart = false;
+      }
+      out += r;
+    } else {
+      out += ch;
+      runStart = true;
+    }
+  }
+  return out;
+}
+
 /** Romanize a single Korean station name. Falls back to the original Korean. */
 export function romanizeStation(ko: string): string {
   const trimmed = (ko ?? "").trim();
   const name = trimmed.replace(/역$/, ""); // station names from the API omit 역
-  return KO_TO_EN.get(name) ?? trimmed;
+  return KO_TO_EN.get(name) ?? romanizeHangul(name); // official name, else transliterate
 }
 
 /** Subway/rail line names → English (order matters: longest/most specific first). */
@@ -211,7 +244,7 @@ export function romanizeText(text: string): string {
     if (out.includes(ko)) out = out.split(ko).join(KO_TO_EN.get(ko)!);
   }
   for (const [re, en] of LINE_PATTERNS) out = out.replace(re, en);
-  return out;
+  return romanizeHangul(out); // transliterate any Korean the maps didn't cover
 }
 
 /**
