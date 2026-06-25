@@ -2,10 +2,41 @@ import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
-import { searchTopPlace, getPlaceIntro, normalizeLang } from "../lib/sources/tourapi.js";
+import { searchPlaces, getPlaceIntro, normalizeLang, type Place } from "../lib/sources/tourapi.js";
 import { CITIES, resolveCity, getWeather, getAir } from "../lib/sources/weatherair.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
+
+/** TourAPI content type → human label (both foreign and Korean numberings). */
+const TYPE_LABEL: Record<string, string> = {
+  "76": "attraction", "12": "attraction",
+  "78": "cultural site", "14": "cultural site",
+  "85": "festival", "15": "festival",
+  "75": "travel course", "25": "travel course",
+  "77": "leisure", "28": "leisure",
+  "80": "accommodation", "32": "accommodation",
+  "79": "shop", "38": "shop",
+  "82": "restaurant", "39": "restaurant",
+};
+const typeLabel = (ct?: string): string => (ct && TYPE_LABEL[ct]) || "place";
+const TYPE_EMOJI: Record<string, string> = {
+  attraction: "🏛️", "cultural site": "🎭", festival: "🎉", restaurant: "🍽️",
+  shop: "🛍️", accommodation: "🏨", leisure: "🏞️", "travel course": "🧭", place: "📍",
+};
+
+/** Pick one candidate per distinct kind (palace vs restaurant …), up to 3. */
+function distinctByType(places: Place[]): Place[] {
+  const seen = new Set<string>();
+  const out: Place[] = [];
+  for (const p of places) {
+    const lbl = typeLabel(p.contentTypeId);
+    if (seen.has(lbl)) continue;
+    seen.add(lbl);
+    out.push(p);
+    if (out.length >= 3) break;
+  }
+  return out;
+}
 
 /** Detect a known city from a TourAPI (English) address; defaults to Seoul. */
 function cityFromAddress(address: string): string {
@@ -105,8 +136,36 @@ export const getNowInfo: ToolDef = {
     }
 
     try {
-      const top = await searchTopPlace(place, language);
-      if (!top || !top.contentId || !top.contentTypeId) {
+      const matches = await searchPlaces({ keyword: place, language, limit: 6 });
+      if (matches.length === 0) {
+        return fail(
+          "Place not found",
+          `I couldn't find **${place}** in the tourism data. Try the official name or a nearby landmark.`,
+          RETRY,
+        );
+      }
+
+      // Ask the user to disambiguate only when there's no exact-name match AND the
+      // candidates are genuinely different KINDS of place (e.g. a palace vs a
+      // restaurant both named "Gyeongbokgung"). Otherwise proceed with the best.
+      const exact = matches.find((p) => p.title.trim().toLowerCase() === place.trim().toLowerCase());
+      if (!exact) {
+        const distinct = distinctByType(matches);
+        if (distinct.length >= 2) {
+          const chips: Choice[] = distinct.map((p) => ({
+            emoji: TYPE_EMOJI[typeLabel(p.contentTypeId)] ?? "📍",
+            cmdEn: p.title,
+            descEn: `${typeLabel(p.contentTypeId)}${p.address ? ` · ${p.address.split(",")[0]}` : ""}`,
+          }));
+          const body =
+            `🤔 **A few places match "${place}" — which one?**\n\n` +
+            `Tap the one you mean and I'll check if it's good to go right now.`;
+          return ok(body, chips);
+        }
+      }
+
+      const top = exact ?? matches[0];
+      if (!top.contentId || !top.contentTypeId) {
         return fail(
           "Place not found",
           `I couldn't find **${place}** in the tourism data. Try the official name or a nearby landmark.`,

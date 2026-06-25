@@ -166,26 +166,22 @@ export interface SearchOptions {
   language?: Lang;
 }
 
-/** Attraction-ish content types (sights/culture/festival) for both numberings. */
-const ATTRACTION_TYPES = new Set(["76", "78", "85", "12", "14", "15"]);
-
 /**
- * Re-rank results so the place the user likely means floats to the top:
- * exact title match > prefix > contains > attraction-type > original order
- * (e.g. "Gyeongbokgung" → the palace, not a nearby flagship store). Pure,
- * deterministic — no external grounding (A).
+ * Re-rank results by NAME match only — accuracy-first, no type guessing:
+ * exact title > prefix > contains > original order (e.g. "Gyeongbokgung" floats
+ * "Gyeongbokgung Palace" above "Andersson Bell Gyeongbokgung Store"). When the
+ * remaining ambiguity is about *kind of place* (palace vs restaurant), the tool
+ * layer asks the user instead of guessing (see getNowInfo). Pure/deterministic (A).
  */
 export function rankPlaces(places: Place[], keyword: string): Place[] {
   const q = keyword.trim().toLowerCase();
   if (!q) return places;
   const score = (p: Place): number => {
     const t = p.title.toLowerCase();
-    let s = 0;
-    if (t === q) s += 100;
-    else if (t.startsWith(q)) s += 50;
-    else if (t.includes(q)) s += 20;
-    if (p.contentTypeId && ATTRACTION_TYPES.has(p.contentTypeId)) s += 10;
-    return s;
+    if (t === q) return 100;
+    if (t.startsWith(q)) return 50;
+    if (t.includes(q)) return 20;
+    return 0;
   };
   // Stable sort: equal scores keep TourAPI's original order.
   return places
