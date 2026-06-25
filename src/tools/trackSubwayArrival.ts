@@ -6,14 +6,19 @@ import {
   getStationArrivals,
   getLinePositions,
   stopsBetween,
-  resolveStationName,
   resolveLineName,
   type SubwayArrival,
   type TrainPosition,
 } from "../lib/sources/seoulSubway.js";
-import { formatSubwayDirection, romanizeText } from "../lib/romanize.js";
+import { formatSubwayDirection, romanizeText, resolveStationFuzzy, type StationPair } from "../lib/romanize.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
+
+/** "Did you mean?" chips from fuzzy station candidates — each re-issues the call
+ *  with the confirmed station baked in (cmdFn decides the wording per mode). */
+function suggestChips(items: StationPair[], cmdFn: (s: StationPair) => string): Choice[] {
+  return items.slice(0, 3).map((s) => ({ emoji: "🚇", cmdEn: cmdFn(s), descEn: "Seoul subway station" }));
+}
 
 /**
  * trackSubwayArrival — real-time Seoul subway info in English, via TOPIS
@@ -172,16 +177,31 @@ export const trackSubwayArrival: ToolDef = {
 
     // Journey mode (D-012 Phase 2): station + destination → stops remaining.
     if (station && to) {
-      const fromKo = resolveStationName(station);
-      const toKo = resolveStationName(to);
-      if (!fromKo || !toKo) {
-        const bad = !fromKo ? station : to;
+      const fromRes = resolveStationFuzzy(station);
+      const toRes = resolveStationFuzzy(to);
+      // Unknown endpoint → ask; close-but-unsure → "did you mean?" candidates.
+      if (fromRes.kind === "none" || toRes.kind === "none") {
+        const bad = fromRes.kind === "none" ? station : to;
         return fail(
           `I don't recognize the station "${bad}" yet`,
           "Try major Seoul stations (e.g. Gangnam, Hongik University, Myeongdong, Seoul Station) or the Korean name.",
           RETRY,
         );
       }
+      if (fromRes.kind === "suggest") {
+        return ok(
+          `🤔 Which starting station did you mean by **"${station}"**?`,
+          suggestChips(fromRes.items, (s) => `Stops from ${s.en} to ${to}`),
+        );
+      }
+      if (toRes.kind === "suggest") {
+        return ok(
+          `🤔 Which destination did you mean by **"${to}"**?`,
+          suggestChips(toRes.items, (s) => `Stops from ${station} to ${s.en}`),
+        );
+      }
+      const fromKo = fromRes.item.ko;
+      const toKo = toRes.item.ko;
       try {
         const [info, arrivals] = await Promise.all([stopsBetween(fromKo, toKo), getStationArrivals(fromKo)]);
         if (!info.ok && info.reason === "no-data") {
@@ -246,14 +266,21 @@ export const trackSubwayArrival: ToolDef = {
       );
     }
 
-    const stationKo = resolveStationName(station);
-    if (!stationKo) {
+    const res = resolveStationFuzzy(station);
+    if (res.kind === "none") {
       return fail(
         `I don't recognize the station "${station}" yet`,
         "Try a major Seoul station (e.g. Gangnam, Hongik University, Myeongdong, Seoul Station, Itaewon) or type the Korean name (e.g. 강남).",
         RETRY,
       );
     }
+    if (res.kind === "suggest") {
+      return ok(
+        `🤔 I'm not sure which station you mean by **"${station}"**. Did you mean:`,
+        suggestChips(res.items, (s) => `Next trains at ${s.en}`),
+      );
+    }
+    const stationKo = res.item.ko;
 
     try {
       const arrivals = await getStationArrivals(stationKo);
