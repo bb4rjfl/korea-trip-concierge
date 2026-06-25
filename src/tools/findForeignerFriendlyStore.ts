@@ -2,7 +2,8 @@ import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
-import { searchPlaces, normalizeLang, type Place } from "../lib/sources/tourapi.js";
+import { searchPlaces, searchPlacesNearby, normalizeLang, type Place } from "../lib/sources/tourapi.js";
+import { resolvePlaceCoord } from "../lib/places.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -99,7 +100,15 @@ export const findForeignerFriendlyStore: ToolDef = {
     }
 
     try {
-      const places = await searchPlaces({ keyword: area, category, limit: 5, language });
+      // (C) If the area is a known place, do a distance-based radius search for
+      // far better coverage than a title-keyword match; fall back to keyword.
+      const coord = resolvePlaceCoord(area);
+      let places = coord
+        ? await searchPlacesNearby({ lat: coord.lat, lng: coord.lng, category, limit: 5, language })
+        : [];
+      if (places.length === 0) {
+        places = await searchPlaces({ keyword: area, category, limit: 5, language });
+      }
       return ok(render(area, needs, places), CHOICES);
     } catch {
       return fail(

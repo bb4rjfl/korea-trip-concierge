@@ -210,6 +210,40 @@ export async function searchPlaces(opts: SearchOptions): Promise<Place[]> {
   return typeof opts.limit === "number" ? ranked.slice(0, opts.limit) : ranked;
 }
 
+export interface NearbyOptions {
+  lat: number;
+  lng: number;
+  radius?: number; // meters (default 1000)
+  category?: string;
+  limit?: number;
+  language?: Lang;
+}
+
+/**
+ * Radius search (locationBasedList2) around coordinates, distance-sorted (C).
+ * Better coverage than title-keyword search for "<food> near <area>" — pairs
+ * with the curated coord index. Returns [] when the area has no nearby listings.
+ */
+export async function searchPlacesNearby(opts: NearbyOptions): Promise<Place[]> {
+  const lang = opts.language ?? "en";
+  const ctype = opts.category ? contentTypeFor(lang, opts.category) : undefined;
+  const radius = opts.radius ?? 1000;
+  const key = `loc:${lang}:${opts.lng.toFixed(4)},${opts.lat.toFixed(4)}:${ctype ?? ""}:${radius}`;
+  const params: Record<string, string> = {
+    mapX: String(opts.lng),
+    mapY: String(opts.lat),
+    radius: String(radius),
+    arrange: "E", // by distance
+  };
+  if (ctype) params.contentTypeId = String(ctype);
+
+  const places = await cache.getOrLoad(key, async () => {
+    const json = await fetchJson<TourApiResponse>(buildUrl("locationBasedList2", params, lang));
+    return parsePlaces(json, lang);
+  });
+  return typeof opts.limit === "number" ? places.slice(0, opts.limit) : places;
+}
+
 /**
  * Try several keyword candidates in order, returning the first non-empty result.
  * searchKeyword2 matches the keyword against the TITLE, so a combined phrase like
