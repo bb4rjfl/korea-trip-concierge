@@ -39,6 +39,7 @@ API 키는 `.env.example`를 복사해 `.env`에 설정 (발급법: `docs/08_api
 | `docs/11_deployment.md` | 배포 실행 런북 (KC→PlayMCP→심사요청) |
 | `docs/12_local_api_application.md` | 로컬비즈니스 API 신청 가이드 |
 | `docs/13_handoff.md` | **최신 핸드오프 — 새 세션 진입점** |
+| `docs/14_playmcp_official_guide.md` | PlayMCP 공식 가이드·절차 (KC배포·등록·심사·공개·Claude커넥터) |
 
 ## Claude Code 슬래시 커맨드
 - `/sync` 세션 시작(컨텍스트 로드 + 다음 할 일)
