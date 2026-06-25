@@ -29,6 +29,11 @@
 - [ ] PlayMCP 임시등록 → 도구함 테스트 → 대화예시 3개
 - [ ] /check 통과 → 심사요청(≤7/7) → 전체공개 → 비즈폼 응모(≤7/14)
 
+## 🚀 배포 상태 (2026-06-25) — 새 세션은 docs/13_handoff.md 먼저
+- ✅ **KC Active 배포됨**(Git소스빌드): `https://korea-trip-concierge.playmcp-endpoint.kakaocloud.io/mcp`, 11툴 인식·라이브검증. 단 **키 미주입(sources 전부 false)**.
+- 키 주입 = **B2**(GitHub Secrets→비공개 ghcr 이미지→KC 컨테이너 등록). Secrets 9개 설정·워크플로 동작 검증 완료. **남음**: (사용자) ghcr Private확인 → Run workflow(키포함 빌드) → PAT(read:packages) → KC 컨테이너 이미지로 재등록 → 헬스 sources=true 검증. 상세 docs/13 §1.
+- 🔴 키 커밋 금지(B1 차단됨). 노출키 재발급 권장.
+
 ## 지금 바로 다음 할 일 (Next)
 1. **API 키 발급** (사용자 액션) — docs/08 가이드 따라 data.go.kr(버스 TAGO + TourAPI 영문) + ODsay. `.env`에 보관 후 `npm run dev`로 실응답 확인.
 2. 키 확보 후: 각 소스의 `NOTE(verify-live)` 지점을 실응답 필드와 대조해 파서 보정(특히 TAGO nodeid/citycode, TourAPI detailIntro2 hours 필드명).
@@ -77,6 +82,7 @@ Dockerfile               linux/amd64, 루트
 - 2026-06-25 (7): **API 키 3종 발급·저장 + 실연동 검증**. `.env`에 BUS/TOUR(동일 data.go.kr 키)/TRANSIT(ODsay) 저장. `scripts/verify-live.ts`로 실호출 검증 → 발견·수정: (1) TourAPI EngService2 GW가 `listYN` 거부 → 제거(필드 전수 일치, 3개 툴 실동작 확인). (2) TAGO 서비스 철자 오타 `Inqire`(BusSttnInfoInqireService/ArvlInfoInqireService)로 정정. 미해결: TAGO 정류소조회 cityCode 필수+서울 미포함 재설계, ODsay ApiKeyAuthFailed(키 재확인 대기). 테스트 56개 green 유지.
 - 2026-06-25 (8, 별도 세션): 스코프 확장 — VisitJeju(getJejuInfo)+기상청·에어코리아(getWeatherAndAir) 신규 툴, ODsay 키 오타 수정, TAGO 전국+서울 분기(city 필수) 재설계. 10툴/70 tests green. (D-006/D-007)
 - 2026-06-25 (9, 메인 세션): 핸드오프 수신·동기화(origin 동일, 70 green 확인). **R-DOC 문서 정합화** — 코드(10툴)와 어긋난 문서 일괄 갱신: docs/03(getJejuInfo·getWeatherAndAir 계약 추가 + trackBusArrival city), docs/02(툴표 10·데이터소스 확정), docs/00(8→10 전면), docs/06(D-006/D-007), docs/07 구조 스냅샷, CLAUDE.md 현재상태, README.
+- 2026-06-25 (23, 메인 세션): **KC 배포 성공(Active)** — Git소스빌드, 11툴 라이브검증(공개 endpoint). 키 주입 막힘 발견(KC 폼에 env란 없음, Git/이미지 둘 다). B1(키 커밋)은 안전분류기 차단=옳음. **B2 채택**: GitHub Secrets 9개 설정 + `.github/workflows/deploy-image.yml`(ghcr 빌드·푸시) 작성·키없이 빌드성공. Dockerfile에 11키 ARG→ENV. **남은 단계**(사용자): ghcr Private확인→Run workflow(키포함)→PAT→KC 컨테이너 재등록. POI 검색 라우팅(한글→Naver영문변환/영어→Foursquare), romanizeHangul, searchPlaceForeigner POI확장도 이 즈음 완료. **종합 핸드오프 docs/13 작성**. 99 tests green.
 - 2026-06-25 (22b, 정정): **서울 버스 = 전파 대기로 확정**. 동일 BUS_API_KEY가 **TAGO(apis.data.go.kr)에선 NORMAL SERVICE**, **서울 ws.bus.go.kr에선 에러30**. 키는 유효 → 서울버스는 서울시 자체서버 호스팅이라 data.go.kr→서울TOPIS **키 동기화(전파)** 필요(6/25 신청, 보통 1~2일). **별도 api.bus.go.kr 등록 불필요**(앞 22 결론 정정). 전파되면 BUS_API_KEY 그대로 동작 → seoul.ts 즉시 구현.
 - 2026-06-25 (22, 메인 세션): **버스 API 가이드 9종 정독 + 전 키 테스트(확정)**. TAGO=apis.data.go.kr/1613000+BUS_API_KEY(동작), 서울버스=ws.bus.go.kr(TOPIS, api.bus.go.kr 발급). 정확 Call-Back URL(getLowArrInfoByStId/getStationByUid)로 **4키(data.go.kr·서울일반·지하철·지하철서브) 전부 에러30** → 서울버스는 TOPIS 별도 등록 필요(키선택 무관). 서울키 정리: 일반=SEOUL_API_KEY(openapi 일반), 지하철 2개=swopenapi(SUBWAY로 동작). **조치(사용자): api.bus.go.kr 직접 등록 또는 data.go.kr 승인/전파 확인.** TOPIS 키 확보 시 seoul.ts 즉시 구현(스펙 확정: getStationByName→stId/arsId, getStationByUid→arrmsg).
 - 2026-06-25 (21, 메인 세션): **searchPlaceForeigner POI 확장 + 스마트 공급자 라우팅**. searchForeignerPois가 키워드 언어로 공급자 선택(한글→Naver우선, 영어→Foursquare우선·좌표). searchPlaceForeigner 식당류 질의→POI(영문), 명소/쇼핑→TourAPI. 라이브: "cafe Hongdae"→Foursquare 영어카페, "강남 맛집"→Naver(로마자+한글 Western), "Gyeongbokgung"→TourAPI 궁궐. 99 tests. **버스 재탐침: ws.bus.go.kr이 BUS·SUBWAY·SEOUL 키 3종 모두 에러30** → TOPIS 등록문제(키선택 아님), api.bus.go.kr 직접등록/데이터포털 전파 필요(사용자). 열린데이터광장 Admin: 일반인증키 사용 안내(=SEOUL_API_KEY, openapi.seoul.go.kr엔 인증통과 확인).

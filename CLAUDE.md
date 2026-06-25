@@ -86,9 +86,10 @@
 - [x] 런타임/데이터전략 확정 (D-004/D-005) + **TS MCP 서버 구축** — **11툴**(D-006, 권장10 초과→유지), 지식툴 3종 즉시동작 + **API툴 8종 실데이터 검증**, **다국어 en/ja/zh/ko**(D-008), UI/UX·구조 하드닝(로마자화·날씨통합·타이틀정제), build/**87 tests**/서버 end-to-end 통과
 - [x] **public GitHub repo**: https://github.com/bb4rjfl/korea-trip-concierge
 - [x] 대화 예시 3개(docs/09) + API 키 발급 가이드(docs/08) + 핸드오프(docs/10) 작성
-- [x] **API 키 발급·저장**(.env) + 실연동 검증 — TourAPI/TAGO(비서울)/ODsay/VisitJeju/날씨·미세먼지 ✅
-- [ ] 낮 시간 라이브 확인: TAGO 도착필드 / 서울 지하철·버스 / 카카오 Local(콘솔 ON)
-- [ ] MCP Inspector 정식 통과 → KC 배포(ODsay IP를 KC IP로 갱신) → PlayMCP 임시등록 → 도구함 테스트
-- [ ] 심사요청(≤7/7) → 전체공개 → 비즈폼 응모(≤7/14)
+- [x] **API 키 발급·저장**(.env)+실연동 검증 — TourAPI다국어/TAGO/ODsay/VisitJeju/날씨/지하철/**POI(네이버+Foursquare 영문변환)**. 99 tests.
+- [x] **KC 배포 Active** — `https://korea-trip-concierge.playmcp-endpoint.kakaocloud.io/mcp`, 11툴 라이브검증 ✅ (단 키 미주입=sources false)
+- [ ] **🔥 진행중: 배포 이미지에 키 주입(B2)** — GitHub Secrets→비공개 ghcr 이미지→KC 컨테이너 재등록. 상세 **docs/13_handoff.md §1**
+- [ ] PlayMCP 임시등록→도구함 테스트→심사요청(≤7/7)→전체공개→비즈폼(≤7/14)
+- [ ] 대기: 서울버스 전파 / VisitSeoul·카카오Local 승인
 
-> 상세 진행은 `docs/07_progress.md` 가 단일 진실 소스(SSOT).
+> 상세 진행은 `docs/07_progress.md`(SSOT). **새 세션 진입점: `docs/13_handoff.md`**.
