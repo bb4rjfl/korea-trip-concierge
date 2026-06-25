@@ -168,16 +168,20 @@ export async function searchForeignerPois(opts: PoiSearchOptions): Promise<PoiPl
   const limit = opts.limit ?? 5;
   const key = `poi:${opts.area}:${what}`;
 
+  const naverOk = hasKey("NAVER_CLIENT_ID") && hasKey("NAVER_CLIENT_SECRET");
+  const fsqOk = hasKey("FOURSQUARE_API_KEY") && !!opts.coord;
+  const naver = () => naverSearch(`${opts.area} ${what}`.trim());
+  const fsq = () => foursquareSearch(opts.coord!.lat, opts.coord!.lng, what);
+
   const places = await cache.getOrLoad(key, async () => {
-    // Naver first — richest coverage; Korean output is converted to English
-    // (category translated, name/address transliterated).
-    if (hasKey("NAVER_CLIENT_ID") && hasKey("NAVER_CLIENT_SECRET")) {
-      const r = await naverSearch(`${opts.area} ${what}`.trim());
+    // Korean keyword → Naver first (deep Korean coverage, converted to English).
+    // English keyword → Foursquare first (native English names), by coordinate.
+    const koreanQuery = /[가-힣]/.test(opts.area);
+    const order = koreanQuery ? [naverOk && naver, fsqOk && fsq] : [fsqOk && fsq, naverOk && naver];
+    for (const run of order) {
+      if (!run) continue;
+      const r = await run();
       if (r.length) return r;
-    }
-    // Foursquare fallback — native English names, by coordinate.
-    if (hasKey("FOURSQUARE_API_KEY") && opts.coord) {
-      return foursquareSearch(opts.coord.lat, opts.coord.lng, what);
     }
     return [];
     // TODO(visitseoul): when VISITSEOUL_API_KEY is live, merge its (natively

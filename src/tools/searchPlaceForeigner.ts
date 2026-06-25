@@ -3,6 +3,8 @@ import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
 import { searchPlacesAny, normalizeLang, type Place } from "../lib/sources/tourapi.js";
+import { searchForeignerPois, hasPoiProvider, type PoiPlace } from "../lib/sources/poi.js";
+import { resolvePlaceCoord } from "../lib/places.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -32,6 +34,15 @@ function inferCategory(query: string, explicit?: string): string | undefined {
   if (/museum|palace|temple|park|attraction|sight|landmark|tour|관광|명소/.test(q)) return "attraction";
   if (/hotel|stay|guesthouse|hostel|accommodation|숙소|호텔/.test(q)) return "accommodation";
   return undefined;
+}
+
+function renderPois(query: string, pois: PoiPlace[]): string {
+  const lines = pois.map((p, i) => {
+    const tel = p.tel ? ` · ☎ ${p.tel}` : "";
+    const cat = p.category ? ` · _${p.category}_` : "";
+    return `**${i + 1}. ${p.name}**${cat}\n   📍 ${p.address}${tel}`;
+  });
+  return [`🔎 **Places for** _"${query}"_ — _live local search_`, "", ...lines].join("\n");
 }
 
 function renderPlaces(query: string, places: Place[]): string {
@@ -78,21 +89,38 @@ export const searchPlaceForeigner: ToolDef = {
     const query = String(args.query ?? "");
     const area = args.area ? String(args.area) : "";
     const category = args.category ? String(args.category) : undefined;
+    const cat = inferCategory(query, category);
+    const language = normalizeLang(args.language as string | undefined);
+
+    // Dining queries → richer comprehensive POI (Naver/Foursquare, converted to
+    // English) rather than TourAPI's sparse tourism dining data.
+    if (cat === "food" && hasPoiProvider()) {
+      try {
+        const what = /cafe|coffee|카페/i.test(query) ? "cafe" : "restaurant";
+        const coord = resolvePlaceCoord(area) ?? resolvePlaceCoord(query);
+        const pois = await searchForeignerPois({
+          area: area || query,
+          query: what,
+          coord: coord ? { lat: coord.lat, lng: coord.lng } : undefined,
+          limit: 6,
+        });
+        if (pois.length) return ok(renderPois(query, pois), CHOICES);
+      } catch {
+        /* fall through to TourAPI */
+      }
+    }
 
     if (!hasKey("TOUR_API_KEY")) {
       return notConnected(
         "Search Places",
-        `Source: **Korea Tourism Organization TourAPI** (English service). Query received: _"${query.slice(0, 120)}"_.`,
+        `Sources: **comprehensive POI (Naver/Foursquare) + Korea Tourism TourAPI**. Query: _"${query.slice(0, 120)}"_.`,
         CHOICES,
       );
     }
 
     // Try the combined phrase first, then fall back to area-only / query-only so
-    // a literal "cafe Hongdae" miss still surfaces useful results. Infer the
-    // category from the query (e.g. "cafe" → food) so the type filter applies.
+    // a literal "cafe Hongdae" miss still surfaces useful results.
     const candidates = [[query, area].filter(Boolean).join(" "), area, query];
-    const cat = inferCategory(query, category);
-    const language = normalizeLang(args.language as string | undefined);
     try {
       const places = await searchPlacesAny(candidates, { category: cat, limit: 5, language });
       return ok(renderPlaces(query, places), CHOICES);
