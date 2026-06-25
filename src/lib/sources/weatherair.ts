@@ -209,3 +209,66 @@ export async function getAir(city: CityGeo): Promise<Air> {
     return parseAir(json.response?.body?.items ?? []);
   });
 }
+
+// ---------- Weather warnings (기상특보) ----------
+// KMA WthrWrnInfoService/getPwnStatus → currently-active special-weather warnings
+// nationwide (the t6 field). Warning types are a fixed vocabulary, so we map them
+// to English (curated mapping, not free translation) — typhoon/heavy-rain alerts
+// are high-value safety info for a foreign visitor.
+
+const WRN_BASE = "http://apis.data.go.kr/1360000/WthrWrnInfoService/getPwnStatus";
+
+const WARN_TYPE: [RegExp, string][] = [
+  [/태풍/, "Typhoon"],
+  [/호우/, "Heavy rain"],
+  [/대설/, "Heavy snow"],
+  [/한파/, "Cold wave"],
+  [/폭염/, "Heat wave"],
+  [/강풍/, "Strong wind"],
+  [/풍랑/, "High seas"],
+  [/건조/, "Dry/fire risk"],
+  [/황사/, "Yellow dust"],
+  [/(폭풍)?해일/, "Storm surge"],
+  [/안개/, "Dense fog"],
+];
+const WARN_LEVEL: [RegExp, string][] = [
+  [/경보/, "warning"],
+  [/주의보/, "advisory"],
+];
+
+/** Parse the t6 "active warnings" text into deduped English "Type level" labels. */
+export function parseAlerts(t6?: string): string[] {
+  const text = (t6 ?? "").trim();
+  if (!text || /없\s*음/.test(text)) return [];
+  const out = new Set<string>();
+  for (const line of text.split(/\n|o\s/)) {
+    const s = line.trim();
+    if (!s) continue;
+    const type = WARN_TYPE.find(([re]) => re.test(s));
+    const level = WARN_LEVEL.find(([re]) => re.test(s));
+    if (type) out.add(`${type[1]} ${level ? level[1] : "alert"}`);
+  }
+  return [...out];
+}
+
+interface PwnItem {
+  t6?: string; // current active warnings
+  other?: string;
+}
+const alertCache = new TtlCache<string[]>(15 * 60_000);
+
+/** Currently-active weather warnings nationwide (English labels). Best-effort. */
+export async function getWeatherAlerts(): Promise<string[]> {
+  return alertCache.getOrLoad("alerts", async () => {
+    const sp = new URLSearchParams({
+      serviceKey: ENV.BUS_API_KEY,
+      dataType: "JSON",
+      numOfRows: "10",
+      pageNo: "1",
+    });
+    const json = await fetchJson<{ response?: { body?: { items?: { item?: PwnItem[] } } } }>(`${WRN_BASE}?${sp}`);
+    const items = json.response?.body?.items?.item ?? [];
+    const t6 = items.map((i) => i.t6 ?? "").join("\n");
+    return parseAlerts(t6);
+  });
+}

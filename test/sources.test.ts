@@ -3,7 +3,7 @@ import { parsePlaces, searchPlaces, cleanTitle, normalizeLang, rankPlaces } from
 import { trackBus, resolveCityCode } from "../src/lib/sources/tago.js";
 import { parseRoutes } from "../src/lib/sources/odsay.js";
 import { parseJeju } from "../src/lib/sources/jeju.js";
-import { parseWeather, parseAir, resolveCity } from "../src/lib/sources/weatherair.js";
+import { parseWeather, parseAir, resolveCity, parseAlerts } from "../src/lib/sources/weatherair.js";
 import {
   parseArrivals,
   resolveStationName,
@@ -137,8 +137,10 @@ describe("POI providers (Naver / Foursquare parsers)", () => {
         },
       ],
     });
-    expect(out[0].name).toBe("Maple Tree House (단풍나무집)");
-    expect(out[0].address).toBe("용산구 이태원로27가길 26, 서울특별시"); // address + locality, not the verbose formatted
+    expect(out[0].name).toBe("Maple Tree House (단풍나무집)"); // already has English → left as-is
+    // address is romanized (address + locality, not the verbose formatted)
+    expect(out[0].address).toContain("Seoul");
+    expect(/[가-힣]/.test(out[0].address)).toBe(false);
     expect(out[0].category).toBe("Korean BBQ Restaurant");
     expect(out[0].tel).toBe("02-790-7977");
     expect(out[0].source).toBe("foursquare");
@@ -431,6 +433,16 @@ describe("weather/air parsing", () => {
     expect(air.pm25).toBe(5); // (4+6)/2
     expect(air.grade).toBe("Good"); // both low
     expect(air.stations).toBe(2);
+  });
+
+  it("parseAlerts maps Korean warning vocabulary to English, dedupes, handles none", () => {
+    expect(parseAlerts("o 없 음")).toEqual([]);
+    expect(parseAlerts("")).toEqual([]);
+    const a = parseAlerts("o 호우경보 : 제주도\no 강풍주의보 : 울릉도.독도\no 호우주의보 : 전라남도");
+    expect(a).toContain("Heavy rain warning");
+    expect(a).toContain("Strong wind advisory");
+    expect(a).toContain("Heavy rain advisory");
+    expect(parseAlerts("o 태풍경보 : 제주도")).toEqual(["Typhoon warning"]);
   });
 
   it("resolveCity maps aliases and defaults to Seoul", () => {

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
-import { resolveCity, getWeather, getAir } from "../lib/sources/weatherair.js";
+import { resolveCity, getWeather, getAir, getWeatherAlerts } from "../lib/sources/weatherair.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -55,12 +55,13 @@ export const getWeatherAndAir: ToolDef = {
     }
 
     const city = resolveCity(cityArg);
-    // allSettled, not all: the two sources fail independently (e.g. KMA hits its
+    // allSettled, not all: the three sources fail independently (e.g. KMA hits its
     // daily quota / 429 while AirKorea is fine) — show whatever we did get rather
     // than throwing the whole response away.
-    const [wRes, aRes] = await Promise.allSettled([getWeather(city), getAir(city)]);
+    const [wRes, aRes, alertRes] = await Promise.allSettled([getWeather(city), getAir(city), getWeatherAlerts()]);
     const weather = wRes.status === "fulfilled" ? wRes.value : undefined;
     const air = aRes.status === "fulfilled" ? aRes.value : undefined;
+    const alerts = alertRes.status === "fulfilled" ? alertRes.value : [];
 
     // Both sources down → honest failure with retry.
     if (!weather && !air) {
@@ -72,6 +73,11 @@ export const getWeatherAndAir: ToolDef = {
     }
 
     const lines = [`🌤️ **${city.label} — weather & air**`, ""];
+
+    // Safety first: surface any active nationwide weather warnings (typhoon, etc.).
+    if (alerts.length) {
+      lines.push(`🚨 **Weather warnings in effect:** ${alerts.join(", ")} _(nationwide — check your local area)_`, "");
+    }
 
     const w: string[] = [];
     if (weather?.tempC != null) w.push(`🌡️ ${weather.tempC}°C`);
