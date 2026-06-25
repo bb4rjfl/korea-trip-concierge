@@ -25,13 +25,46 @@ const RETRY: Choice[] = [
   { emoji: "🗺️", cmdEn: "Guide me around this area", descEn: "neighborhood overview instead" },
 ];
 
+// Food sub-keywords → the concrete term we hand to the POI search, so "vegan
+// ramen" actually searches ramen instead of the literal word "restaurant".
+const FOOD_TERMS: [RegExp, string][] = [
+  [/ramen|라멘|라면/i, "ramen"],
+  [/sushi|초밥|스시/i, "sushi"],
+  [/bbq|barbecue|gogi|고기|구이|삼겹/i, "barbecue"],
+  [/pizza|피자/i, "pizza"],
+  [/burger|버거|햄버거/i, "burger"],
+  [/fried chicken|치킨|chimaek|치맥/i, "chicken"],
+  [/vegan|vegetarian|plant.?based|비건|채식/i, "vegan"],
+  [/halal|할랄/i, "halal"],
+  [/pho|쌀국수|vietnam/i, "pho"],
+  [/hot ?pot|전골|샤브|마라/i, "hotpot"],
+  [/dumpling|만두/i, "dumpling"],
+  [/seafood|해산물|회|sashimi/i, "seafood"],
+  [/dessert|디저트|케이크|cake/i, "dessert"],
+  [/bakery|베이커리|빵|bread/i, "bakery"],
+  [/bar|pub|호프|술집|이자카야|izakaya/i, "bar"],
+  [/noodle|국수|면요리/i, "noodles"],
+  [/brunch|브런치/i, "brunch"],
+  [/cafe|coffee|카페|커피/i, "cafe"],
+];
+
+/** Pick a concrete food keyword from the query for the POI search (else "restaurant"). */
+function foodKeyword(query: string): string {
+  for (const [re, kw] of FOOD_TERMS) if (re.test(query)) return kw;
+  return "restaurant";
+}
+
 /** Infer a TourAPI category from the natural-language query when not given. */
 function inferCategory(query: string, explicit?: string): string | undefined {
   if (explicit) return explicit;
   const q = query.toLowerCase();
-  if (/cafe|coffee|restaurant|brunch|dining|eat|food|맛집|카페|레스토랑/.test(q)) return "food";
-  if (/shop|shopping|mall|store|market|boutique|쇼핑|상점/.test(q)) return "shopping";
-  if (/museum|palace|temple|park|attraction|sight|landmark|tour|관광|명소/.test(q)) return "attraction";
+  if (
+    /cafe|coffee|restaurant|brunch|dining|eat|food|meal|lunch|dinner|breakfast|hungry|tasty|맛집|카페|레스토랑|식당|음식/.test(q) ||
+    FOOD_TERMS.some(([re]) => re.test(q))
+  )
+    return "food";
+  if (/shop|shopping|mall|store|market|boutique|outlet|쇼핑|상점|쇼핑몰/.test(q)) return "shopping";
+  if (/museum|palace|temple|park|attraction|sight|landmark|tour|view|관광|명소|구경/.test(q)) return "attraction";
   if (/hotel|stay|guesthouse|hostel|accommodation|숙소|호텔/.test(q)) return "accommodation";
   return undefined;
 }
@@ -96,7 +129,7 @@ export const searchPlaceForeigner: ToolDef = {
     // English) rather than TourAPI's sparse tourism dining data.
     if (cat === "food" && hasPoiProvider()) {
       try {
-        const what = /cafe|coffee|카페/i.test(query) ? "cafe" : "restaurant";
+        const what = foodKeyword(query); // concrete term (ramen/sushi/vegan…) not just "restaurant"
         const coord = resolvePlaceCoord(area) ?? resolvePlaceCoord(query);
         const pois = await searchForeignerPois({
           area: area || query,

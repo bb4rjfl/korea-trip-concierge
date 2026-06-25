@@ -136,7 +136,15 @@ export const getNowInfo: ToolDef = {
     }
 
     try {
-      const matches = await searchPlaces({ keyword: place, language, limit: 6 });
+      // Search in the requested language; if a non-English locale returns nothing
+      // (the place name was given in English/romanized), fall back to the English
+      // service so ja/zh users don't hit a dead end for a place that exists.
+      let effLang = language;
+      let matches = await searchPlaces({ keyword: place, language, limit: 6 });
+      if (matches.length === 0 && language !== "en") {
+        effLang = "en";
+        matches = await searchPlaces({ keyword: place, language: "en", limit: 6 });
+      }
       if (matches.length === 0) {
         return fail(
           "Place not found",
@@ -172,7 +180,7 @@ export const getNowInfo: ToolDef = {
           RETRY,
         );
       }
-      const intro = await getPlaceIntro(top.contentId, top.contentTypeId, language);
+      const intro = await getPlaceIntro(top.contentId, top.contentTypeId, effLang);
       const now = koreaNow();
       const lines = [
         `🕒 **${top.title} — right now**`,

@@ -59,8 +59,17 @@
 - [x] **구조·서비스 전체 점검 ✅** (서브에이전트 감사) → findStore 재설계(D-013, 외국인 필수시설 큐레이션) + getAreaGuide enum/막다른칩 수정 + getNowInfo 문서정합 + StopsInfo.forward 정리. 🔴 위반 0 확인.
 - [ ] **`/check`** 카카오 규칙 최종 점검
 - [x] **콘텐츠 보강 + 로마자 사전 ✅**: 메뉴 +25종(부대찌개·갈비·치킨·감자탕 등), 역사전 +교대(alias)·서울대입구·서초·방배·낙성대·봉천·신림 등 17역, 로마자 지선→Branch. **버그수정**: 여정 모드 운행外 "다른 노선" 오메시지 → "라이브 데이터 없음" 정정.
-- [ ] **전체 UI/UX 플로우 확인**
-- [ ] **시나리오 ~100개** 생성 → 전체 흐름 편의성 점검(끊김/막힘 발견)
+- [x] **전체 UI/UX 플로우 확인 ✅** (칩-플로우 감사 step 6) → searchPlace 카드칩 재조준
+- [x] **시나리오 ~107개 점검 ✅** (5 서브에이전트 병렬, per-scenario 리포트) → 🔴 다수 발견
+- [ ] **🔧 시나리오 발견 수정 (전부)** — 진행중:
+  - [x] C1 weather allSettled / explainPayment 6가이드(팁·더치·모바일페이·식당·호텔·입장) ✅
+  - [x] C4 메뉴 regex 오매칭(닭갈비→치킨 등) / C5 알레르기 거짓안심 제거 / +dish ✅
+  - [ ] C6 searchPlace inferCategory 음식키워드 확장+원쿼리 전달
+  - [ ] C7 getNowInfo 오매칭 disambiguation / C8 ja·zh 0건시 en/ko 폴백
+  - [ ] **🆕 퍼지/시맨틱 이름해소 + "이거 맞나요?" 확인절차**(src/lib/fuzzy.ts) — 오타·대소문자·띄어쓰기 흡수, 후보 제시. 적용: 역·정류장·장소. 인천공항 미인식 해소.
+  - [ ] C2 버스 정류장 EN→KO(로마자 매칭) / C9 route 칩 출발지 / C10 ODsay 정류장 로마자 무공백
+  - [ ] **🆕 도시간 이동(서울↔부산 등) 그라운딩** — KTX/SRT·고속버스 안내 + 딥링크(코레일/코버스)
+  - [ ] findStore Nearby 노이즈/빈주소 가드 / Naver 주소 로마자 / 지하철 노선제안 강화 / getAreaGuide interest 인정 / jeju 필터
 
 ## 지금 바로 다음 할 일 (Next)
 1. **API 키 발급** (사용자 액션) — docs/08 가이드 따라 data.go.kr(버스 TAGO + TourAPI 영문) + ODsay. `.env`에 보관 후 `npm run dev`로 실응답 확인.
