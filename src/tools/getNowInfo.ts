@@ -4,8 +4,23 @@ import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
 import { searchPlaces, getPlaceIntro, normalizeLang, type Place } from "../lib/sources/tourapi.js";
 import { CITIES, resolveCity, getWeather, getAir } from "../lib/sources/weatherair.js";
+import { similarity, normalizeName } from "../lib/fuzzy.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
+
+/** Name relevance of a candidate to the query — TourAPI returns matches in an
+ *  arbitrary order, so we prefer titles the query actually names (a prefix beats
+ *  a mere substring beats a fuzzy resemblance). Keeps "Lotte" from picking a
+ *  random "8 Seconds - LOTTE …" counter over "Lotte World". */
+function relevance(query: string, title: string): number {
+  const q = normalizeName(query);
+  const t = normalizeName(title);
+  if (!q || !t) return 0;
+  if (t === q) return 3;
+  if (t.startsWith(q)) return 2;
+  if (t.includes(q)) return 1.5;
+  return similarity(query, title);
+}
 
 /** TourAPI content type → human label (both foreign and Korean numberings). */
 const TYPE_LABEL: Record<string, string> = {
@@ -152,6 +167,8 @@ export const getNowInfo: ToolDef = {
           RETRY,
         );
       }
+      // Re-rank by name relevance so the best-named match wins over TourAPI order.
+      matches = [...matches].sort((a, b) => relevance(place, b.title) - relevance(place, a.title));
 
       // Ask the user to disambiguate only when there's no exact-name match AND the
       // candidates are genuinely different KINDS of place (e.g. a palace vs a
