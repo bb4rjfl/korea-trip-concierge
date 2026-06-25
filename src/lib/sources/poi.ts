@@ -124,12 +124,16 @@ export function parseFoursquare(json: FsqResponse): PoiPlace[] {
   const results = Array.isArray(json.results) ? json.results : [];
   return results.map((r) => {
     const loc = r.location ?? {};
-    const address =
+    const rawAddr =
       [loc.address, loc.locality].filter(Boolean).join(", ").trim() ||
       (loc.formatted_address ?? "").trim();
+    const ko = (r.name ?? "").trim();
+    const roman = romanizeHangul(ko);
     return {
-      name: (r.name ?? "").trim(),
-      address,
+      // Foursquare names/addresses are often still Korean — romanize so an
+      // English-first reader can use them (romanizeHangul leaves English as-is).
+      name: roman && roman !== ko ? `${roman} (${ko})` : ko,
+      address: romanizeAddress(rawAddr),
       category: r.categories?.[0]?.name?.trim() || undefined,
       tel: r.tel?.trim() || undefined,
       source: "foursquare" as const,

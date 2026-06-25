@@ -78,6 +78,18 @@ export function parseJeju(json: SearchResponse): JejuPlace[] {
 
 const cache = new TtlCache<JejuPlace[]>(30 * 60_000); // Jeju catalog is static
 
+// VisitJeju's multilingual catalog occasionally leaks a non-English (e.g.
+// Vietnamese) entry into the English feed — drop those for an English tool.
+const NON_ENGLISH = /[ạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹđĐ぀-ヿ一-鿿]/;
+// Past-dated festival titles ("2019 …") shouldn't show as current.
+const STALE_YEAR = /\b20(0\d|1\d|2[0-4])\b/;
+
+function isFresh(p: JejuPlace, category?: string): boolean {
+  if (NON_ENGLISH.test(p.title)) return false;
+  if (category === "festival" && STALE_YEAR.test(p.title)) return false;
+  return true;
+}
+
 export interface JejuOptions {
   category?: string;
   limit?: number;
@@ -97,7 +109,7 @@ export async function searchJeju(opts: JejuOptions = {}): Promise<JejuPlace[]> {
     });
     if (ccode) sp.set("category", ccode);
     const json = await fetchJson<SearchResponse>(`${BASE}?${sp.toString()}`);
-    return parseJeju(json);
+    return parseJeju(json).filter((p) => isFresh(p, opts.category?.toLowerCase()));
   });
   return typeof opts.limit === "number" ? places.slice(0, opts.limit) : places;
 }
