@@ -37,10 +37,20 @@
 - 🔴 키 커밋 금지(B1 차단됨). 채팅 노출키(NAVER_SECRET·FOURSQUARE·SEOUL계열) + PAT(`ghp_s0fb…`)는 전체공개/심사 전 재발급 권장.
 - **다음**: PlayMCP 등록(Endpoint 입력→정보불러오기→**임시등록**→도구함→AI채팅/Claude커넥터 테스트→대화예시 docs/09)→**심사요청 ≤7/7**→전체공개→비즈폼 ≤7/14. (docs/14 §3)
 
-### 🧪 KC 라이브 전수 점검 (2026-06-25, 키 주입 후) — 10/11 정상
-- ✅ **10툴 실데이터 동작**: searchPlaceForeigner(Naver)·findForeignerFriendlyStore(Foursquare 명동)·trackBusArrival(TAGO 부산 서면 실시간)·trackSubwayArrival(서울 지하철)·explainPayment·getAreaGuide·translateMenuContext·getNowInfo·getJejuInfo(VisitJeju)·getWeatherAndAir. (한글 인자는 UTF-8 파일로 검증 — 셸 직접입력은 mojibake 주의)
-- 🔴 **getTransitRoute(ODsay) = KC에서 2회 연속 타임아웃**(일시현상 아님, 신규 블로커). 원인 후보: (a) ODsay 등록 IP 제한(KC outbound IP 미등록, docs/13 §36 예측) / (b) 외부 3연쇄(TourAPI 지오코딩×2+ODsay)로 2.5s 초과. **조치안**: ① odsay/지오코딩 타임아웃 상향(TAGO처럼 ~6s) 후 재배포·재시험 → 여전히 실패면 ② lab.odsay.com 내 애플리케이션에 KC outbound IP 등록.
-- 🟡 translateMenuContext 사전에 `부대찌개`(army stew) 미등록 = 콘텐츠 보강 후보.
+### 🧪 KC 라이브 전수 점검 (2026-06-25, 키 주입 후) — ✅ 11/11 정상
+- ✅ **11툴 전부 실데이터 동작**: searchPlaceForeigner(Naver)·findForeignerFriendlyStore(Foursquare 명동)·getTransitRoute(ODsay 서울역→강남 33min/₩1,650)·trackBusArrival(TAGO 부산 서면 실시간)·trackSubwayArrival(서울 지하철)·explainPayment·getAreaGuide·translateMenuContext·getNowInfo·getJejuInfo(VisitJeju)·getWeatherAndAir. (한글 인자는 UTF-8 파일로 검증 — 셸 직접입력은 mojibake 주의)
+- ✅ **getTransitRoute(ODsay) 해결**: KC egress IP가 ingress와 다름(egress=`210.109.82.101`). 임시 `/egress-ip` 진단 엔드포인트로 추출 → lab.odsay.com Server IP에 등록 → 라이브 정상. **`/egress-ip` 진단은 제거 완료**(이번 배포). egress IP 변경 시 다시 심어 재추출→ODsay 갱신.
+- ✅ **지하철 위치 추가(D-012)**: trackSubwayArrival에 `line` 모드 통합(realtimePosition OA-12601). line 입력 시 노선 전체 열차 실시간 위치(현재역·종착·상태·급행·막차), station 입력은 기존 도착정보. **툴 11개 유지**. 라이브 검증(2호선 39열차) + 테스트 102 green. ⏳ KC 재배포 필요(아래).
+- 🟡 translateMenuContext 사전에 `부대찌개`(army stew) 미등록 = 콘텐츠 보강 후보. (+ 큐레이션 fallback을 "가장 가까운 항목 제안"으로 개선 아이디어)
+
+### 📌 트랜스크립트 마이닝으로 회수한 미기록 항목 (2026-06-25) — 유실 방지
+- 🔴 **비즈 정보 심사 반려 건**(별도 세션) — 카카오 비즈니스 정보 심사가 (1)사업자 정보 미확인 (2)서비스 화면 부족으로 반려됨. 해소용 서비스화면 목업 `C:\Users\user\Downloads\kpass-service-screen.png` 제작했으나 **사업자등록번호가 placeholder(000-00-00000)** → 실번호(케이커브 487-01-04137, 대표 강상호; memory `business-info`)로 교체 후 재제출 필요. 비즈폼(≤7/14) 게이트. (memory엔 일부 있으나 docs엔 없었음)
+- 🟡 **보너스 미사용 역량(메모만)**: 기상특보(태풍·호우 경보, 외국인 체감↑) / 관광코스별 날씨 / TAGO 고속버스(도시간 이동) / 지하철 realtimePosition(OA-12601) 보강. 저비용·고가치 후보, 어디에도 미기록이라 여기 보존.
+- 🟡 **trackBusArrival = 최약체 툴** — 서울 키 막힘 + TAGO 비서울 콜드 ~7.5s(p99 위반) + 빈응답 잦음. **서울 전파 계속 막히면 이 툴 드롭 → 10툴(권장상한)로 정리** 옵션(통폐합 1순위 searchPlace+findStore와 별개 선택지).
+- 🟡 **U5 첫사용 발견성 약함** — "11개 기능인데 진입점 불명확". 한 툴이 다른 기능을 칩으로 노출하거나 description 강화 제안(미해결).
+- ⬜ **2번째 제출 슬롯**(내국인용 '장보기 가격 디코더' 별도 MCP) — 순수 placeholder, 컨셉/스펙/데이터 미논의. 사용 여부 결정 대기(KC 2서버·최대 2제출).
+- ⬜ **MCP Inspector 정식 통과**(배포 URL 대상) — 여전히 미실시(로컬 curl만).
+- (보안 결정 기록) 카카오 Admin 키는 계정전체 권한이라 **저장·사용 거부**, REST 키만 사용.
 
 ## 지금 바로 다음 할 일 (Next)
 1. **API 키 발급** (사용자 액션) — docs/08 가이드 따라 data.go.kr(버스 TAGO + TourAPI 영문) + ODsay. `.env`에 보관 후 `npm run dev`로 실응답 확인.

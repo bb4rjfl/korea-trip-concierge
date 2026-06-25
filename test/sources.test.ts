@@ -4,7 +4,12 @@ import { trackBus, resolveCityCode } from "../src/lib/sources/tago.js";
 import { parseRoutes } from "../src/lib/sources/odsay.js";
 import { parseJeju } from "../src/lib/sources/jeju.js";
 import { parseWeather, parseAir, resolveCity } from "../src/lib/sources/weatherair.js";
-import { parseArrivals, resolveStationName } from "../src/lib/sources/seoulSubway.js";
+import {
+  parseArrivals,
+  resolveStationName,
+  parsePositions,
+  resolveLineName,
+} from "../src/lib/sources/seoulSubway.js";
 
 /** A representative EngService2 response with two items. */
 const TWO_ITEMS = {
@@ -479,5 +484,60 @@ describe("Seoul subway", () => {
   it("parseArrivals returns [] when no list", () => {
     expect(parseArrivals({ errorMessage: { code: "INFO-200" } })).toEqual([]);
     expect(parseArrivals({})).toEqual([]);
+  });
+
+  it("resolveLineName maps numbered + named lines, rejects unknown", () => {
+    expect(resolveLineName("Line 2")).toBe("2호선");
+    expect(resolveLineName("2")).toBe("2호선");
+    expect(resolveLineName("2호선")).toBe("2호선");
+    expect(resolveLineName("line9")).toBe("9호선");
+    expect(resolveLineName("Sinbundang")).toBe("신분당선");
+    expect(resolveLineName("AREX")).toBe("공항철도");
+    expect(resolveLineName("Line 12")).toBeUndefined();
+    expect(resolveLineName("")).toBeUndefined();
+  });
+
+  it("parsePositions maps line, current station, destination (strips 종착), status, flags", () => {
+    const trains = parsePositions({
+      errorMessage: { code: "INFO-000", total: 2 },
+      realtimePositionList: [
+        {
+          subwayId: "1002",
+          subwayNm: "2호선",
+          statnNm: "동대문역사문화공원",
+          statnTnm: "성수종착",
+          trainSttus: "0",
+          updnLine: "0",
+          directAt: "0",
+          lstcarAt: "0",
+        },
+        {
+          subwayId: "1002",
+          subwayNm: "2호선",
+          statnNm: "강남",
+          statnTnm: "신도림행",
+          trainSttus: "1",
+          updnLine: "1",
+          directAt: "1",
+          lstcarAt: "1",
+        },
+      ],
+    });
+    expect(trains).toHaveLength(2);
+    expect(trains[0].line).toBe("Line 2");
+    expect(trains[0].currentStation).toBe("동대문역사문화공원");
+    expect(trains[0].towards).toBe("성수"); // 종착 stripped
+    expect(trains[0].status).toBe("approaching");
+    expect(trains[0].express).toBe(false);
+    expect(trains[0].lastTrain).toBe(false);
+    expect(trains[1].towards).toBe("신도림"); // 행 stripped
+    expect(trains[1].status).toBe("at station");
+    expect(trains[1].express).toBe(true);
+    expect(trains[1].lastTrain).toBe(true);
+  });
+
+  it("parsePositions returns [] when no list", () => {
+    expect(parsePositions({ errorMessage: { code: "INFO-200" } })).toEqual([]);
+    expect(parsePositions({})).toEqual([]);
   });
 });

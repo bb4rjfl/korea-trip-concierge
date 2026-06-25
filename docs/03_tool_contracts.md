@@ -84,14 +84,17 @@
 - **output**: 기온·하늘·강수확률 + PM10/PM2.5 등급 + 마스크 권고(영문). 끝에 선택지(옷차림/실내장소/경로).
 - annotations: readOnly true / idempotent false (시간 변동) / openWorld true
 
-## 11. `trackSubwayArrival`  (서울 지하철 실시간, 조회형)
+## 11. `trackSubwayArrival`  (서울 지하철 실시간, 조회형 — 2모드 D-012)
 - **title**: "Track Subway Arrival"
-- **description(영문)**: "Looks up real-time next-train arrivals at a Seoul subway station — line, direction, destination, and minutes away — explained in English for foreign visitors. Query-based (refresh to update). Part of Korea Trip Concierge(코리아 트립 컨시어지)."
-- **inputSchema**: `{ station: string (required, 영문/한글) }`
-- **데이터**: **서울 TOPIS swopenAPI `realtimeStationArrival`**(`SUBWAY_API_KEY`, 키는 path 세그먼트). 영문 역명→한글 매핑(주요/관광역) 후 조회. ⚠️ 지하철 운행 05:30~01:00, 운행外/데이터없음은 top-level `{status,code:"INFO-200",...}` → 빈 목록 처리. (위치정보 `realtimePosition` OA-12601은 향후 옵션.)
-- **output**: 방면별 다음 열차(노선·N분·현재위치)·상태. **푸시 아님 — 조회**. 끝에 **[🔄 Refresh] [🗺️ Route] [🏙️ Around]** 선택지.
+- **description(영문)**: "Real-time Seoul subway info in English for foreign visitors. By station: the next-train arrivals (line, direction, destination, minutes away). By line: the live position of every train (current station, direction, status). Query-based (refresh to update). Part of Korea Trip Concierge(코리아 트립 컨시어지)."
+- **inputSchema**: `{ station?: string (영문/한글), line?: string ("Line 2"/"2"/"Sinbundang") }` — **station 또는 line 중 하나 필수**(둘 다 없으면 무엇을 볼지 되묻는 칩).
+- **데이터**: 서울 TOPIS swopenAPI(`SUBWAY_API_KEY`, 키는 path 세그먼트), 2 오퍼레이션:
+  - **station 모드** → `realtimeStationArrival`: 영문 역명→한글 매핑 후 조회.
+  - **line 모드** → `realtimePosition`(OA-12601): 영문 노선명→한글("2호선") 매핑 후 노선 전체 열차 위치(현재역·종착·진입/도착 상태·급행·막차). **라이브 검증 완료**(2호선 39~42열차).
+  - ⚠️ 운행 05:30~01:00, 운행外/데이터없음은 top-level `{code:"INFO-200"}` → 빈 목록 처리.
+- **output**: station=방면별 다음 열차(노선·N분·현재위치)·상태 → [🔄 Refresh][🗺️ Route][🏙️ Around]. line=종착지별 열차 위치(현재역·상태, 방면당 8대 cap+"…N more") → [🔄 Refresh][🚉 Arrivals][🗺️ Route]. **푸시 아님 — 조회**.
 - annotations: readOnly true / idempotent false (실시간) / openWorld true
-- ⚠️ verify-live: 성공 응답의 도착 필드(subwayId/trainLineNm/bstatnNm/barvlDt/arvlMsg3/arvlCd)는 낮 시간 1회 확인. 키·URL·봉투는 검증 완료.
+- 검증: parseArrivals/parsePositions/resolveStationName/resolveLineName 테스트 락. (로마자 흠: 서울대입구/지선 등 사전 보강 후보)
 
 ---
 
