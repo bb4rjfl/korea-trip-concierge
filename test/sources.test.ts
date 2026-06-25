@@ -78,6 +78,44 @@ describe("TourAPI multilingual (U4)", () => {
   });
 });
 
+describe("POI providers (Naver / Foursquare parsers)", () => {
+  it("parseNaver strips <b> markup and prefers road address", async () => {
+    const { parseNaver } = await import("../src/lib/sources/poi.js");
+    const out = parseNaver({
+      items: [
+        {
+          title: "<b>Kervan</b> Turkish Restaurant",
+          category: "음식점>레스토랑>터키음식",
+          telephone: "02-555",
+          address: "지번주소",
+          roadAddress: "192 Itaewon-ro",
+        },
+      ],
+    });
+    expect(out[0].name).toBe("Kervan Turkish Restaurant");
+    expect(out[0].address).toBe("192 Itaewon-ro");
+    expect(out[0].category).toBe("터키음식");
+    expect(out[0].source).toBe("naver");
+  });
+
+  it("parseFoursquare maps name/address/category", async () => {
+    const { parseFoursquare } = await import("../src/lib/sources/poi.js");
+    const out = parseFoursquare({
+      results: [
+        {
+          name: "Linus' Bama Style BBQ",
+          location: { formatted_address: "Itaewon, Seoul" },
+          categories: [{ name: "BBQ Joint" }],
+        },
+      ],
+    });
+    expect(out[0].name).toBe("Linus' Bama Style BBQ");
+    expect(out[0].address).toBe("Itaewon, Seoul");
+    expect(out[0].category).toBe("BBQ Joint");
+    expect(out[0].source).toBe("foursquare");
+  });
+});
+
 describe("rankPlaces (A — relevance ranking)", () => {
   const shop = { title: "Andersson Bell Gyeongbokgung Flagship Store", address: "", contentTypeId: "79" };
   const palace = { title: "Gyeongbokgung Palace", address: "", contentTypeId: "76" };

@@ -2,10 +2,18 @@ import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
-import { searchPlaces, searchPlacesNearby, normalizeLang, type Place } from "../lib/sources/tourapi.js";
+import { searchPlaces, searchPlacesNearby, normalizeLang } from "../lib/sources/tourapi.js";
+import { searchForeignerPois, hasPoiProvider } from "../lib/sources/poi.js";
 import { resolvePlaceCoord } from "../lib/places.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
+
+interface StoreItem {
+  name: string;
+  address: string;
+  tel?: string;
+  note: string;
+}
 
 /**
  * findForeignerFriendlyStore — K-Pass Finder. Lists stores/restaurants in an
@@ -38,16 +46,16 @@ const RETRY: Choice[] = [
   { emoji: "🗺️", cmdEn: "Guide me around this area", descEn: "neighborhood overview instead" },
 ];
 
-function render(area: string, needs: string[], places: Place[]): string {
+function render(area: string, needs: string[], items: StoreItem[]): string {
   const filterLine = needs.length
     ? `Filters requested: ${needs.map((n) => `**${NEED_LABEL[n] ?? n}**`).join(", ")}`
-    : "No filters — showing English-listed spots.";
-  if (places.length === 0) {
-    return `🍜 **No English-listed stores found in** _"${area}"_.\n\n${filterLine}\n\nTry a nearby, larger area name.`;
+    : "No filters — showing foreigner-oriented spots.";
+  if (items.length === 0) {
+    return `🍜 **No stores found in** _"${area}"_.\n\n${filterLine}\n\nTry a nearby, larger area name.`;
   }
-  const lines = places.map((p, i) => {
+  const lines = items.map((p, i) => {
     const tel = p.tel ? ` · ☎ ${p.tel}` : "";
-    return `**${i + 1}. ${p.title}**\n   📍 ${p.address}${tel}\n   🌐 _Listed in Korea Tourism's English dataset (foreigner-oriented)_`;
+    return `**${i + 1}. ${p.name}**\n   📍 ${p.address}${tel}\n   🌐 _${p.note}_`;
   });
   return [
     `🍜 **Foreigner-friendly spots in ${area}**`,
@@ -91,25 +99,50 @@ export const findForeignerFriendlyStore: ToolDef = {
     const category = args.category ? String(args.category) : "food";
     const language = normalizeLang(args.language as string | undefined);
 
-    if (!hasKey("TOUR_API_KEY")) {
+    if (!hasKey("TOUR_API_KEY") && !hasPoiProvider()) {
       return notConnected(
         "Find Foreigner-Friendly Stores",
-        `Source: **TourAPI (English) + curated foreign-payment data**. Area: **${area}**, filters: ${needs.join(", ") || "none"}.`,
+        `Sources: **comprehensive POI (Naver/Foursquare) + TourAPI English**. Area: **${area}**, filters: ${needs.join(", ") || "none"}.`,
         CHOICES,
       );
     }
 
     try {
-      // (C) If the area is a known place, do a distance-based radius search for
-      // far better coverage than a title-keyword match; fall back to keyword.
       const coord = resolvePlaceCoord(area);
-      let places = coord
-        ? await searchPlacesNearby({ lat: coord.lat, lng: coord.lng, category, limit: 5, language })
-        : [];
-      if (places.length === 0) {
-        places = await searchPlaces({ keyword: area, category, limit: 5, language });
+      let items: StoreItem[] = [];
+
+      // 1) Prefer comprehensive POI providers (Naver/Foursquare) when configured.
+      if (hasPoiProvider()) {
+        const pois = await searchForeignerPois({
+          area,
+          query: category,
+          coord: coord ? { lat: coord.lat, lng: coord.lng } : undefined,
+          limit: 5,
+        });
+        items = pois.map((p) => ({
+          name: p.name,
+          address: p.address,
+          tel: p.tel,
+          note: `${p.category ? `${p.category} · ` : ""}via ${p.source === "naver" ? "Naver" : "Foursquare"} local search`,
+        }));
       }
-      return ok(render(area, needs, places), CHOICES);
+
+      // 2) Fall back to TourAPI English data (radius search, then keyword) (C).
+      if (items.length === 0 && hasKey("TOUR_API_KEY")) {
+        let places = coord
+          ? await searchPlacesNearby({ lat: coord.lat, lng: coord.lng, category, limit: 5, language })
+          : [];
+        if (places.length === 0) {
+          places = await searchPlaces({ keyword: area, category, limit: 5, language });
+        }
+        items = places.map((p) => ({
+          name: p.title,
+          address: p.address,
+          tel: p.tel,
+          note: "Listed in Korea Tourism's English dataset (foreigner-oriented)",
+        }));
+      }
+      return ok(render(area, needs, items), CHOICES);
     } catch {
       return fail(
         "Couldn't reach the store-data service",

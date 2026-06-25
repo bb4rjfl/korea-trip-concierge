@@ -27,6 +27,15 @@ export const ENV = {
   get KAKAO_REST_API_KEY(): string {
     return process.env.KAKAO_REST_API_KEY ?? "";
   },
+  get NAVER_CLIENT_ID(): string {
+    return process.env.NAVER_CLIENT_ID ?? "";
+  },
+  get NAVER_CLIENT_SECRET(): string {
+    return process.env.NAVER_CLIENT_SECRET ?? "";
+  },
+  get FOURSQUARE_API_KEY(): string {
+    return process.env.FOURSQUARE_API_KEY ?? "";
+  },
 };
 
 export type ApiKeyName =
@@ -35,7 +44,10 @@ export type ApiKeyName =
   | "TRANSIT_API_KEY"
   | "SUBWAY_API_KEY"
   | "JEJU_API_KEY"
-  | "KAKAO_REST_API_KEY";
+  | "KAKAO_REST_API_KEY"
+  | "NAVER_CLIENT_ID"
+  | "NAVER_CLIENT_SECRET"
+  | "FOURSQUARE_API_KEY";
 
 export function hasKey(name: ApiKeyName): boolean {
   return ENV[name].trim().length > 0;

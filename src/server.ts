@@ -53,6 +53,8 @@ app.get("/", (_req: Request, res: Response) => {
       transit: hasKey("TRANSIT_API_KEY"),
       subway: hasKey("SUBWAY_API_KEY"),
       jeju: hasKey("JEJU_API_KEY"),
+      naver: hasKey("NAVER_CLIENT_ID") && hasKey("NAVER_CLIENT_SECRET"),
+      foursquare: hasKey("FOURSQUARE_API_KEY"),
     },
   });
 });
