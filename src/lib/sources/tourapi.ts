@@ -16,6 +16,7 @@
 import { ENV } from "../env.js";
 import { fetchJson } from "../http.js";
 import { TtlCache } from "../cache.js";
+import { romanizeHangul } from "../romanize.js";
 
 const API_HOST = "http://apis.data.go.kr/B551011";
 const MOBILE_APP = "KoreaTripConcierge";
@@ -133,16 +134,28 @@ export function parsePlaces(json: TourApiResponse, lang: Lang = "en"): Place[] {
   const items = json.response?.body?.items;
   if (!items || !items.item) return [];
   const arr = Array.isArray(items.item) ? items.item : [items.item];
-  return arr.map((it) => ({
-    title: cleanTitle(it.title, lang),
-    address: [it.addr1, it.addr2].filter(Boolean).join(" ").trim(),
-    tel: it.tel?.trim() || undefined,
-    image: it.firstimage?.trim() || it.firstimage2?.trim() || undefined,
-    mapx: it.mapx ? Number(it.mapx) : undefined,
-    mapy: it.mapy ? Number(it.mapy) : undefined,
-    contentId: it.contentid,
-    contentTypeId: it.contenttypeid,
-  }));
+  return arr.map((it) => {
+    let title = cleanTitle(it.title, lang);
+    let address = [it.addr1, it.addr2].filter(Boolean).join(" ").trim();
+    // The Korean service (KorService2) has ~3× the data but Korean text — romanize
+    // names/addresses so an English-first reader can use them (D-005 coverage,
+    // names become pronounceable & match storefront signs; "이름 (Romanized)").
+    if (lang === "ko") {
+      const roman = romanizeHangul(title);
+      if (roman && roman !== title) title = `${roman} (${title})`;
+      address = romanizeHangul(address);
+    }
+    return {
+      title,
+      address,
+      tel: it.tel?.trim() || undefined,
+      image: it.firstimage?.trim() || it.firstimage2?.trim() || undefined,
+      mapx: it.mapx ? Number(it.mapx) : undefined,
+      mapy: it.mapy ? Number(it.mapy) : undefined,
+      contentId: it.contentid,
+      contentTypeId: it.contenttypeid,
+    };
+  });
 }
 
 function buildUrl(operation: string, params: Record<string, string>, lang: Lang): string {

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
-import { searchPlacesAny, normalizeLang, type Place } from "../lib/sources/tourapi.js";
+import { searchPlacesAny, searchPlacesNearby, normalizeLang, type Place } from "../lib/sources/tourapi.js";
 import { searchForeignerPois, hasPoiProvider, type PoiPlace } from "../lib/sources/poi.js";
 import { resolvePlaceCoord } from "../lib/places.js";
 import type { Choice } from "../lib/footer.js";
@@ -156,6 +156,31 @@ export const searchPlaceForeigner: ToolDef = {
     const candidates = [[query, area].filter(Boolean).join(" "), area, query];
     try {
       const places = await searchPlacesAny(candidates, { category: cat, limit: 5, language });
+      // The English TourAPI is sparse (~15k vs ~50k entries). When it's thin and
+      // we know the area's coordinates, broaden with the much larger KOREAN
+      // dataset by radius (romanized) — far better national/long-tail coverage.
+      if (places.length < 5 && language === "en") {
+        const coord = resolvePlaceCoord(area) ?? resolvePlaceCoord(query);
+        if (coord) {
+          const ko = await searchPlacesNearby({
+            lat: coord.lat,
+            lng: coord.lng,
+            radius: 2000,
+            category: cat,
+            limit: 8,
+            language: "ko",
+          });
+          const seen = new Set(places.map((p) => p.title.toLowerCase()));
+          for (const p of ko) {
+            if (places.length >= 6) break;
+            const k = p.title.toLowerCase();
+            if (!seen.has(k)) {
+              seen.add(k);
+              places.push(p);
+            }
+          }
+        }
+      }
       return ok(renderPlaces(query, places), CHOICES);
     } catch {
       return fail(
