@@ -189,6 +189,22 @@ export type TrackResult =
  * High-level: track a specific bus toward a drop-off stop in a given city.
  * `cityCode` must be resolved first (resolveCityCode).
  */
+/**
+ * Pick the best stop among candidates for a query: exact name > starts-with >
+ * shortest containing name (the bare "서면" beats "(구)NC서면점"). Helps when
+ * getSttnNoList returns many partial matches in an arbitrary order.
+ */
+function bestStop(stops: BusStop[], query: string): BusStop {
+  const q = query.trim();
+  return [...stops].sort((a, b) => score(b.nodeName, q) - score(a.nodeName, q) || a.nodeName.length - b.nodeName.length)[0];
+}
+function score(name: string, q: string): number {
+  if (name === q) return 3;
+  if (name.startsWith(q)) return 2;
+  if (name.includes(q)) return 1;
+  return 0;
+}
+
 export async function trackBus(
   busNumber: string,
   dropOffStop: string,
@@ -196,7 +212,7 @@ export async function trackBus(
 ): Promise<TrackResult> {
   const stops = await resolveStop(dropOffStop, cityCode);
   if (stops.length === 0) return { status: "stop_not_found" };
-  const stop = stops[0];
+  const stop = bestStop(stops, dropOffStop);
   const arrivals = await getArrivals(stop.cityCode, stop.nodeId);
   const arrival = arrivals.find((a) => a.routeNo === busNumber.trim());
   if (arrival) return { status: "ok", stop, arrival };
