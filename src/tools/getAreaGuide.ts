@@ -94,17 +94,9 @@ const AREAS: Area[] = [
   },
 ];
 
-function render(areaQuery: string, interest?: string): string {
-  const a = AREAS.find((x) => x.keys.test(areaQuery));
-  if (!a) {
-    const known = AREAS.map((x) => x.name.split(" ")[0]).join(", ");
-    return [
-      `🗺️ **No guide yet for "${areaQuery}"**`,
-      "",
-      `Curated areas so far: ${known}.`,
-      "Ask for one of those, or use **Search places** to explore freely.",
-    ].join("\n");
-  }
+const INTERESTS = ["food", "shopping", "history", "nightlife"] as const;
+
+function renderGuide(a: Area, interest?: string): string {
   const lines = [
     `🗺️ **${a.name}**`,
     "",
@@ -116,19 +108,39 @@ function render(areaQuery: string, interest?: string): string {
     `**Getting there:** ${a.getThere}`,
   ];
   if (interest) {
-    const key = interest.toLowerCase() as keyof Area["interests"];
-    const note = a.interests[key];
+    const note = a.interests[interest as keyof Area["interests"]];
     if (note) lines.push("", `**For ${interest}:** ${note}`);
   }
   return lines.join("\n");
 }
 
+function renderUnknown(areaQuery: string): string {
+  const known = AREAS.map((x) => x.name.split(" ")[0]).join(", ");
+  return [
+    `🗺️ **No hand-written guide for "${areaQuery}" yet**`,
+    "",
+    `I have curated guides for: ${known}.`,
+    `Want one of those, or should I **search real places in ${areaQuery}** instead?`,
+  ].join("\n");
+}
+
+// Footer for a matched guide — chips chain into the other tools for "here".
 const CHOICES: Choice[] = [
-  { emoji: "🍜", cmdEn: "Find foreigner-friendly restaurants here", cmdKo: "근처 맛집", descEn: "stores that take foreign cards" },
+  { emoji: "🧭", cmdEn: "Find foreigner essentials here", cmdKo: "근처 필수시설", descEn: "ATM, pharmacy, exchange" },
   { emoji: "🚇", cmdEn: "How do I get here?", cmdKo: "가는 길", descEn: "public-transit route" },
   { emoji: "🕒", cmdEn: "Is it good to go now?", descEn: "live hours + weather" },
   { emoji: "🌤️", cmdEn: "Weather & fine dust today", descEn: "forecast + air quality" },
 ];
+
+/** Footer when the area isn't in our curated set — steer to a real search of
+ *  that same area instead of dead-end "here" chips. */
+function unknownChoices(areaQuery: string): Choice[] {
+  return [
+    { emoji: "🔎", cmdEn: `Search real places in ${areaQuery}`, descEn: "live place search" },
+    { emoji: "🧭", cmdEn: `Find foreigner essentials in ${areaQuery}`, descEn: "ATM, pharmacy, exchange" },
+    { emoji: "🗺️", cmdEn: "Show me a curated area instead", descEn: "Myeongdong, Hongdae, Gangnam…" },
+  ];
+}
 
 export const getAreaGuide: ToolDef = {
   name: "getAreaGuide",
@@ -139,7 +151,7 @@ export const getAreaGuide: ToolDef = {
   inputSchema: {
     area: z.string().describe("Neighborhood name, e.g. 'Myeongdong' or '성수동'."),
     interest: z
-      .string()
+      .enum(INTERESTS)
       .optional()
       .describe("Optional focus: food, shopping, history, or nightlife."),
   },
@@ -151,8 +163,10 @@ export const getAreaGuide: ToolDef = {
     openWorldHint: true,
   },
   handler: (args) => {
-    const area = String(args.area ?? "");
+    const area = String(args.area ?? "").trim();
     const interest = args.interest ? String(args.interest) : undefined;
-    return ok(render(area, interest), CHOICES);
+    const a = AREAS.find((x) => x.keys.test(area));
+    if (!a) return ok(renderUnknown(area), unknownChoices(area));
+    return ok(renderGuide(a, interest), CHOICES);
   },
 };

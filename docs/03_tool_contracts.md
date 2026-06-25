@@ -17,12 +17,14 @@
 - **output(Markdown)**: 장소 3~5개, 각 항목 한 줄 요약+친화 배지. 끝에 선택지.
 - annotations: readOnly true / destructive false / idempotent false / openWorld true
 
-## 2. `findForeignerFriendlyStore`  (K-Pass Finder)
-- **title**: "Find Foreigner-Friendly Stores"
-- **description(영문)**: "Filters nearby stores/restaurants that need no Korean phone verification, accept foreign cards, offer multilingual menus, or allow walk-in. Korea Trip Concierge(코리아 트립 컨시어지)."
-- **inputSchema**: `{ area: string (required), needs?: string[] (enum: noReservationNeeded, acceptsForeignCard, hasMultilingualMenu, walkInOk), category?: string, language?: enum(en,ja,zh,ko) }`
-- **output**: 조건 충족 매장 목록 + 충족 플래그 배지 + 지도 링크(아웃링크 허용, 상업유도 금지). 끝에 선택지(필터 토글 버튼).
+## 2. `findForeignerFriendlyStore`  (외국인 필수시설 파인더 — D-013)
+- **title**: "Find Foreigner Essentials"
+- **description(영문)**: "Finds the foreigner essentials a visitor gets stuck on in a Korean neighborhood — currency exchange, foreign-card ATMs, pharmacies, 24h convenience stores, tourist-information centers, and foreign-card-friendly food — with curated tips on which chains and options actually work for foreigners, plus real nearby places. Part of Korea Trip Concierge(코리아 트립 컨시어지)."
+- **inputSchema**: `{ area: string (required), need?: enum(currencyExchange, atm, pharmacy, convenience, touristInfo, foreignCardDining) }` — need 생략 시 필수시설 오버뷰(메뉴).
+- **데이터**: **큐레이션 지식**(D-009: 외국인에게 실제 되는 체인·옵션·방법, 키 불필요·항상 동작 = 차별점) + need별 **근처 실제 POI**(Naver/Foursquare, query=환전/ATM/약국/편의점/관광안내소/맛집). searchPlaceForeigner(일반 장소추천)와 역할 명확 구분.
+- **output**: need지정→큐레이션 팁+근처 목록 [💳 결제][🚇 길찾기][🧭 다른 필수시설] / 오버뷰→6종 메뉴 [🏧 ATM][💱 환전][💊 약국][🏪 편의점]. 상업유도/리워드 금지.
 - annotations: readOnly true / destructive false / idempotent false / openWorld true
+- 참고: 기존 needs[] 에코방식(원천데이터 부재로 빈약)을 D-013로 폐기·재설계. ATM/환전 POI 검색에 약간 노이즈 가능(쿼리 정제 여지).
 
 ## 3. `getTransitRoute`
 - **title**: "Get Public Transit Route"
@@ -63,9 +65,9 @@
 
 ## 8. `getNowInfo`
 - **title**: "Is It Good to Go Now?"
-- **description(영문)**: "Tells a foreign visitor whether a place is worth visiting right now using opening hours, crowd level, and weather. Korea Trip Concierge(코리아 트립 컨시어지)."
+- **description(영문, 실제 코드와 일치)**: "Tells a foreign visitor whether a place is worth visiting right now using its listed opening hours and the current Korea time, with a clear go/no-go and reasons. Part of Korea Trip Concierge(코리아 트립 컨시어지)."
 - **inputSchema**: `{ place: string (required), language?: enum(en,ja,zh,ko) }`
-- **output**: 지금 상태(영업시간 + 현재 KST 시각 + 실시간 날씨·미세먼지) + 추천 여부. 끝에 선택지(대안 시간/대안 장소).
+- **output**: 지금 상태(영업시간 + 현재 KST 시각 + 실시간 날씨·미세먼지 통합) + 추천 여부. 끝에 선택지(대안 시간/대안 장소). ⚠️ "crowd level"은 미구현(데이터원 없음) → 설명에서 제외(R-DOC 정합).
 - annotations: readOnly true / idempotent false / openWorld true
 
 ## 9. `getJejuInfo`  (제주 특화)

@@ -148,18 +148,18 @@ export interface StopsInfo {
   line: string;
   subwayId: string;
   stops: number;
-  forward: boolean; // destination has a higher statnId (toward statnFid direction)
 }
 
 /** Stops between two stations IF they share a line. undefined = no shared line
- *  (a transfer is needed → use getTransitRoute) or a station wasn't found. */
+ *  (a transfer is needed → use getTransitRoute) or a station wasn't found.
+ *  Note (MVP): for the Line-2 loop the raw statnId gap can be the long way; a
+ *  short-way/direction refinement is deferred (docs/03 §11). */
 export async function stopsBetween(fromKo: string, toKo: string): Promise<StopsInfo | undefined> {
   const [a, b] = await Promise.all([getStationLineIds(fromKo), getStationLineIds(toKo)]);
   for (const x of a) {
     const y = b.find((bb) => bb.subwayId === x.subwayId);
     if (y) {
-      const diff = y.statnId - x.statnId;
-      return { line: x.line, subwayId: x.subwayId, stops: Math.abs(diff), forward: diff > 0 };
+      return { line: x.line, subwayId: x.subwayId, stops: Math.abs(y.statnId - x.statnId) };
     }
   }
   return undefined;

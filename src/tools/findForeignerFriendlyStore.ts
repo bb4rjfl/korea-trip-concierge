@@ -1,58 +1,113 @@
 import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
-import { ok, fail, notConnected } from "../lib/responses.js";
-import { hasKey } from "../lib/env.js";
-import { searchPlaces, searchPlacesNearby, normalizeLang } from "../lib/sources/tourapi.js";
-import { searchForeignerPois, hasPoiProvider } from "../lib/sources/poi.js";
+import { ok, fail } from "../lib/responses.js";
+import { searchForeignerPois, hasPoiProvider, type PoiPlace } from "../lib/sources/poi.js";
 import { resolvePlaceCoord } from "../lib/places.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
-interface StoreItem {
-  name: string;
-  address: string;
-  tel?: string;
-  note: string;
+/**
+ * findForeignerFriendlyStore — "foreigner essentials" finder (D-013). The things
+ * a visitor actually gets stuck on in a Korean neighborhood: currency exchange,
+ * foreign-card ATMs, pharmacies, 24h convenience stores, tourist-info centers,
+ * and foreign-card-friendly food.
+ *
+ * Differentiator = CURATED foreigner knowledge (which chains/options really work
+ * for foreigners, how each works) — always available, no key needed (D-009
+ * curation-grounding). When a POI key is present we also list real nearby spots
+ * of that category. This is distinct from searchPlaceForeigner (general place
+ * recommendations); here the need-type drives a known foreigner-readiness answer.
+ */
+
+const NEEDS = [
+  "currencyExchange",
+  "atm",
+  "pharmacy",
+  "convenience",
+  "touristInfo",
+  "foreignCardDining",
+] as const;
+type Need = (typeof NEEDS)[number];
+
+interface Essential {
+  label: string;
+  emoji: string;
+  short: string; // one-liner for the overview
+  tip: string; // curated foreigner guidance (the differentiator)
+  query: string; // Korean keyword for live nearby POI search
 }
 
-/**
- * findForeignerFriendlyStore — K-Pass Finder. Lists stores/restaurants in an
- * area that are documented in Korea Tourism's ENGLISH dataset (a real,
- * foreigner-oriented signal) and echoes the visitor's need-filters.
- *
- * Honesty note: TourAPI does not carry per-store "accepts foreign card /
- * multilingual menu" flags. We surface English-listed places (a genuine
- * proxy for foreigner-readiness) and state filters transparently rather than
- * fabricate unverified badges. A curated foreign-card overlay can be layered later.
- */
-
-const NEEDS = ["noReservationNeeded", "acceptsForeignCard", "hasMultilingualMenu", "walkInOk"] as const;
-
-const NEED_LABEL: Record<string, string> = {
-  noReservationNeeded: "no reservation needed",
-  acceptsForeignCard: "accepts foreign cards",
-  hasMultilingualMenu: "multilingual menu",
-  walkInOk: "walk-in OK",
+const ESSENTIALS: Record<Need, Essential> = {
+  currencyExchange: {
+    label: "Currency exchange",
+    emoji: "💱",
+    short: "best rates at banks & licensed booths (Myeongdong/Itaewon)",
+    tip: "Banks (KB, Woori, Shinhan, Hana) and **licensed exchange booths** give the best rates — Myeongdong and Itaewon have many no-commission booths. Bring your **passport**. Airport counters work but rates are worse, so change just enough there.",
+    query: "환전",
+  },
+  atm: {
+    label: "Foreign-card ATM",
+    emoji: "🏧",
+    short: "look for 'Global ATM' — convenience stores, banks, airports",
+    tip: "Look for **“Global ATM”** or a card-network logo (Visa/Mastercard/Plus/Cirrus). ATMs inside **CU, GS25, 7-Eleven**, major banks, and airports take foreign cards; **Citibank** and **Standard Chartered** are the most reliable. Withdraw in KRW, and decline the machine's currency-conversion offer for a better rate.",
+    query: "ATM",
+  },
+  pharmacy: {
+    label: "Pharmacy",
+    emoji: "💊",
+    short: "green '약' sign; convenience stores sell basic meds after hours",
+    tip: "A pharmacy is **약국 (yakguk)** — look for a green **약** sign. Pharmacists in tourist areas often speak some English; show symptoms on your phone if needed. Hours are ~09:00–18:00 (some 24h near hospitals). After hours, **convenience stores** sell basic painkillers and digestives.",
+    query: "약국",
+  },
+  convenience: {
+    label: "Convenience store",
+    emoji: "🏪",
+    short: "24h lifeline: foreign cards, T-money reload, ATM, SIM",
+    tip: "**CU, GS25, 7-Eleven, emart24** are everywhere and **24h**. They take **foreign cards**, **sell & reload T-money** transit cards, have **ATMs**, stock **SIM/eSIM**, and offer English self-checkout — your one-stop foreigner lifeline.",
+    query: "편의점",
+  },
+  touristInfo: {
+    label: "Tourist information center",
+    emoji: "ℹ️",
+    short: "free multilingual help; dial 1330 (24h) anywhere",
+    tip: "Official **“i” Tourist Information Centers** give free English/Japanese/Chinese help, maps, and transit tips. Big ones: **Myeongdong, Gwanghwamun, Seoul Station, Incheon Airport**. Anywhere, anytime you can call the **1330 Korea Travel Hotline** (24h, multilingual) — just dial **1330**.",
+    query: "관광안내소",
+  },
+  foreignCardDining: {
+    label: "Foreign-card-friendly food",
+    emoji: "💳",
+    short: "franchises & department-store food halls take foreign cards",
+    tip: "**Franchises and department-store food courts** reliably take foreign cards: **Olive Young, Starbucks, Paris Baguette, Lotte/Shinsegae food halls**, and most chain restaurants. Small old eateries and street stalls are often **cash-only** — carry some KRW and ask “카드 되나요?” (kadeu doynayo? = do you take card?).",
+    query: "맛집",
+  },
 };
 
-/**
- * Honest, actionable guidance per requested need. We can't verify per-store
- * flags from the data, so instead of fabricating badges we tell the visitor what
- * to expect and how to check — which genuinely answers the need.
- */
-const NEED_GUIDANCE: Record<string, string> = {
-  noReservationNeeded: "🚶 Most casual spots here are walk-in; only fine-dining usually needs a booking.",
-  walkInOk: "🚶 Cafés and casual eateries are typically walk-in — no app or phone needed.",
-  acceptsForeignCard:
-    "💳 Franchises, department stores and larger restaurants usually take foreign cards — just ask “카드 되나요?”. Small/old shops can be cash-only, so carry some cash.",
-  hasMultilingualMenu:
-    "🗣️ Tourist-area and English-listed places often have English or picture menus; smaller local spots may be Korean-only.",
+const NEED_BY_ALIAS: Record<string, Need> = {
+  currencyexchange: "currencyExchange",
+  exchange: "currencyExchange",
+  currency: "currencyExchange",
+  atm: "atm",
+  pharmacy: "pharmacy",
+  convenience: "convenience",
+  conveniencestore: "convenience",
+  touristinfo: "touristInfo",
+  tourist: "touristInfo",
+  foreigncarddining: "foreignCardDining",
+  dining: "foreignCardDining",
+  food: "foreignCardDining",
+  restaurant: "foreignCardDining",
 };
+
+function resolveNeed(input?: string): Need | undefined {
+  if (!input) return undefined;
+  const k = input.toLowerCase().replace(/[^a-z]/g, "");
+  return NEED_BY_ALIAS[k];
+}
 
 const CHOICES: Choice[] = [
   { emoji: "💳", cmdEn: "How do I pay here as a foreigner?", cmdKo: "결제 방법", descEn: "payment options guide" },
-  { emoji: "🍽️", cmdEn: "Explain a dish from the menu", descEn: "menu context + allergens" },
   { emoji: "🚇", cmdEn: "How do I get there?", descEn: "public-transit route" },
+  { emoji: "🧭", cmdEn: "What other essentials are nearby?", descEn: "exchange, ATM, pharmacy, info" },
 ];
 
 const RETRY: Choice[] = [
@@ -60,113 +115,102 @@ const RETRY: Choice[] = [
   { emoji: "🗺️", cmdEn: "Guide me around this area", descEn: "neighborhood overview instead" },
 ];
 
-function render(area: string, needs: string[], items: StoreItem[]): string {
-  const filterLine = needs.length
-    ? `Filters requested: ${needs.map((n) => `**${NEED_LABEL[n] ?? n}**`).join(", ")}`
-    : "No filters — showing foreigner-oriented spots.";
-  if (items.length === 0) {
-    return `🍜 **No stores found in** _"${area}"_.\n\n${filterLine}\n\nTry a nearby, larger area name.`;
-  }
-  const lines = items.map((p, i) => {
+function renderNearby(places: PoiPlace[]): string[] {
+  if (!places.length) return [];
+  const lines = places.map((p, i) => {
     const tel = p.tel ? ` · ☎ ${p.tel}` : "";
-    return `**${i + 1}. ${p.name}**\n   📍 ${p.address}${tel}\n   🌐 _${p.note}_`;
+    return `**${i + 1}. ${p.name}**\n   📍 ${p.address}${tel}`;
   });
-  // Honest, need-specific guidance (②) instead of fabricated per-store badges.
-  const guidance = needs.map((n) => NEED_GUIDANCE[n]).filter(Boolean);
-  const guidanceBlock = guidance.length ? ["", "**For what you asked:**", ...guidance.map((g) => `- ${g}`)] : [];
+  return ["", "**Nearby:**", ...lines];
+}
+
+/** Overview when no specific need is given — a menu of essentials to pick from. */
+function renderOverview(area: string): string {
+  const items = NEEDS.map((n) => {
+    const e = ESSENTIALS[n];
+    return `- ${e.emoji} **${e.label}** — ${e.short}`;
+  });
   return [
-    `🍜 **Foreigner-friendly spots in ${area}**`,
+    `🧭 **Foreigner essentials in ${area}**`,
     "",
-    filterLine,
+    "The things visitors get stuck on here — pick what you need:",
     "",
-    ...lines,
-    ...guidanceBlock,
+    ...items,
     "",
-    "_Tip: ask \"How do I pay here?\" to check foreign-card acceptance for your situation._",
+    "_Tap a need below (or ask, e.g. “foreign-card ATM near Myeongdong”)._",
   ].join("\n");
 }
+
+// Overview footer: let the visitor jump straight to a specific essential.
+const OVERVIEW_CHOICES: Choice[] = [
+  { emoji: "🏧", cmdEn: "Find a foreign-card ATM here", descEn: "ATMs that take foreign cards" },
+  { emoji: "💱", cmdEn: "Where can I exchange money?", descEn: "best-rate currency exchange" },
+  { emoji: "💊", cmdEn: "Find a pharmacy here", descEn: "약국 + after-hours options" },
+  { emoji: "🏪", cmdEn: "Find a convenience store", descEn: "24h card/T-money/ATM" },
+];
 
 export const findForeignerFriendlyStore: ToolDef = {
   name: "findForeignerFriendlyStore",
   description:
-    "Filters nearby stores/restaurants that need no Korean phone verification, accept foreign cards, offer " +
-    "multilingual menus, or allow walk-in — the gaps that block foreign visitors. " +
-    `Part of ${SERVICE_NAME}.`,
+    "Finds the foreigner essentials a visitor gets stuck on in a Korean neighborhood — currency exchange, " +
+    "foreign-card ATMs, pharmacies, 24h convenience stores, tourist-information centers, and foreign-card-" +
+    "friendly food — with curated tips on which chains and options actually work for foreigners, plus real " +
+    `nearby places. Part of ${SERVICE_NAME}.`,
   inputSchema: {
-    area: z.string().describe("Area/neighborhood to search, e.g. 'Seongsu' or '성수동'."),
-    needs: z
-      .array(z.enum(NEEDS))
+    area: z.string().describe("Neighborhood/area, e.g. 'Myeongdong' or '명동'."),
+    need: z
+      .enum(NEEDS)
       .optional()
-      .describe("Filters to require: noReservationNeeded, acceptsForeignCard, hasMultilingualMenu, walkInOk."),
-    category: z.string().optional().describe("Optional category: food, cafe, shopping."),
-    language: z
-      .enum(["en", "ja", "zh", "ko"])
-      .optional()
-      .describe("Result language: en (default), ja, zh (Chinese Simplified), ko. Match the visitor's language."),
+      .describe(
+        "What you need: currencyExchange, atm (foreign-card), pharmacy, convenience, touristInfo, or " +
+          "foreignCardDining. Omit for an overview of all essentials in the area.",
+      ),
   },
   annotations: {
-    title: "Find Foreigner-Friendly Stores",
+    title: "Find Foreigner Essentials",
     readOnlyHint: true,
     destructiveHint: false,
     idempotentHint: false,
     openWorldHint: true,
   },
   handler: async (args) => {
-    const area = String(args.area ?? "");
-    const needs = Array.isArray(args.needs) ? (args.needs as string[]) : [];
-    const category = args.category ? String(args.category) : "food";
-    const language = normalizeLang(args.language as string | undefined);
+    const area = String(args.area ?? "").trim();
+    const need = resolveNeed(args.need as string | undefined);
 
-    if (!hasKey("TOUR_API_KEY") && !hasPoiProvider()) {
-      return notConnected(
-        "Find Foreigner-Friendly Stores",
-        `Sources: **comprehensive POI (Naver/Foursquare) + TourAPI English**. Area: **${area}**, filters: ${needs.join(", ") || "none"}.`,
-        CHOICES,
-      );
-    }
-
-    try {
-      const coord = resolvePlaceCoord(area);
-      let items: StoreItem[] = [];
-
-      // 1) Prefer comprehensive POI providers (Naver/Foursquare) when configured.
-      if (hasPoiProvider()) {
-        const pois = await searchForeignerPois({
-          area,
-          query: category,
-          coord: coord ? { lat: coord.lat, lng: coord.lng } : undefined,
-          limit: 5,
-        });
-        items = pois.map((p) => ({
-          name: p.name,
-          address: p.address,
-          tel: p.tel,
-          note: `${p.category ? `${p.category} · ` : ""}via ${p.source === "naver" ? "Naver" : "Foursquare"} local search`,
-        }));
-      }
-
-      // 2) Fall back to TourAPI English data (radius search, then keyword) (C).
-      if (items.length === 0 && hasKey("TOUR_API_KEY")) {
-        let places = coord
-          ? await searchPlacesNearby({ lat: coord.lat, lng: coord.lng, category, limit: 5, language })
-          : [];
-        if (places.length === 0) {
-          places = await searchPlaces({ keyword: area, category, limit: 5, language });
-        }
-        items = places.map((p) => ({
-          name: p.title,
-          address: p.address,
-          tel: p.tel,
-          note: "Listed in Korea Tourism's English dataset (foreigner-oriented)",
-        }));
-      }
-      return ok(render(area, needs, items), CHOICES);
-    } catch {
+    if (!area) {
       return fail(
-        "Couldn't reach the store-data service",
-        "The Korea Tourism data source didn't respond in time. Please try again in a moment.",
+        "Which area?",
+        "Tell me a neighborhood (e.g. Myeongdong, Hongdae, Itaewon) and what you need — a foreign-card ATM, pharmacy, currency exchange, convenience store, or tourist info.",
         RETRY,
       );
     }
+
+    // No specific need → overview menu (curated, always works).
+    if (!need) {
+      return ok(renderOverview(area), OVERVIEW_CHOICES);
+    }
+
+    const e = ESSENTIALS[need];
+    const head = [`${e.emoji} **${e.label} in ${area}**`, "", e.tip];
+
+    // Curated guidance always renders; add live nearby spots when a POI key exists.
+    let nearby: string[] = [];
+    if (hasPoiProvider()) {
+      try {
+        const coord = resolvePlaceCoord(area);
+        const places = await searchForeignerPois({
+          area,
+          query: e.query,
+          coord: coord ? { lat: coord.lat, lng: coord.lng } : undefined,
+          limit: 5,
+        });
+        nearby = renderNearby(places);
+      } catch {
+        // Live lookup is best-effort; the curated tip already answered the need.
+        nearby = ["", "_(Couldn't load nearby spots right now — tap “How do I get there?” or try again.)_"];
+      }
+    }
+
+    return ok([...head, ...nearby].join("\n"), CHOICES);
   },
 };
