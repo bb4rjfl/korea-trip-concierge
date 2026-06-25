@@ -109,7 +109,13 @@ function renderGuide(a: Area, interest?: string): string {
   ];
   if (interest) {
     const note = a.interests[interest as keyof Area["interests"]];
-    if (note) lines.push("", `**For ${interest}:** ${note}`);
+    if (note) {
+      lines.push("", `**For ${interest}:** ${note}`);
+    } else {
+      // Acknowledge rather than silently dropping the interest the user asked for.
+      const has = Object.keys(a.interests).join(", ");
+      lines.push("", `_${a.name.split(" ")[0]} isn't especially known for **${interest}** — it's stronger for ${has || "general sightseeing"}._`);
+    }
   }
   return lines.join("\n");
 }

@@ -73,7 +73,12 @@ function romanizeAddress(ko: string): string {
     .replace(/(지하\s*)?\d+층|지하\s*\d+|[BbＢ]\d+/g, "") // floor / basement
     .replace(/\s{2,}/g, " ")
     .trim();
-  return romanizeHangul(cleaned).replace(/\s{2,}/g, " ").trim();
+  let out = romanizeHangul(cleaned).replace(/\s{2,}/g, " ").trim();
+  // Balance parens — source strings sometimes get cut mid-"(…)" leaving a dangling "(".
+  const opens = (out.match(/\(/g) ?? []).length;
+  const closes = (out.match(/\)/g) ?? []).length;
+  if (opens > closes) out = out.replace(/\s*\([^)]*$/, "").trim(); // drop the dangling fragment
+  return out;
 }
 
 export function parseNaver(json: NaverResponse): PoiPlace[] {

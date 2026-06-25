@@ -115,9 +115,17 @@ const RETRY: Choice[] = [
   { emoji: "🗺️", cmdEn: "Guide me around this area", descEn: "neighborhood overview instead" },
 ];
 
-function renderNearby(places: PoiPlace[]): string[] {
-  if (!places.length) return [];
-  const lines = places.map((p, i) => {
+function renderNearby(places: PoiPlace[], query: string): string[] {
+  // Guard against junk rows: empty address, or a name that's just the bare search
+  // keyword echoed back (e.g. a "맛집" row with no address).
+  const q = query.trim();
+  const clean = places.filter((p) => {
+    const name = (p.name ?? "").trim();
+    const addr = (p.address ?? "").trim();
+    return name && addr && name !== q && !name.startsWith(`${q} (`);
+  });
+  if (!clean.length) return [];
+  const lines = clean.map((p, i) => {
     const tel = p.tel ? ` · ☎ ${p.tel}` : "";
     return `**${i + 1}. ${p.name}**\n   📍 ${p.address}${tel}`;
   });
@@ -204,7 +212,7 @@ export const findForeignerFriendlyStore: ToolDef = {
           coord: coord ? { lat: coord.lat, lng: coord.lng } : undefined,
           limit: 5,
         });
-        nearby = renderNearby(places);
+        nearby = renderNearby(places, e.query);
       } catch {
         // Live lookup is best-effort; the curated tip already answered the need.
         nearby = ["", "_(Couldn't load nearby spots right now — tap “How do I get there?” or try again.)_"];

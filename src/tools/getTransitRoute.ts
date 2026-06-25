@@ -124,10 +124,16 @@ export const getTransitRoute: ToolDef = {
     // U3: a transit route needs a starting point. If the user only gave a
     // destination (common from chips), ask for the origin instead of failing.
     if (!from) {
+      const dest = to || "your destination";
+      // Offer common origins so the user can tap instead of re-typing (C9).
       return fail(
         "Where are you starting from?",
-        `I can route you to **${to || "your destination"}** — just tell me your starting point (a station, landmark, or address).`,
-        CHOICES,
+        `I can route you to **${dest}** — tap a common starting point, or tell me a station/landmark/address.`,
+        [
+          { emoji: "🚉", cmdEn: `From Seoul Station to ${dest}`, descEn: "route from Seoul Station" },
+          { emoji: "✈️", cmdEn: `From Incheon Airport to ${dest}`, descEn: "route from the airport" },
+          { emoji: "🏨", cmdEn: `From my area to ${dest}`, descEn: "tell me your neighborhood" },
+        ],
       );
     }
 
