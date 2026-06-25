@@ -6,6 +6,7 @@ import { searchTopPlace } from "../lib/sources/tourapi.js";
 import { routesBetween, type TransitRoute } from "../lib/sources/odsay.js";
 import { romanizeText } from "../lib/romanize.js";
 import { resolvePlaceCoord } from "../lib/places.js";
+import { detectIntercity, renderIntercity } from "../lib/intercity.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -128,6 +129,18 @@ export const getTransitRoute: ToolDef = {
         `I can route you to **${to || "your destination"}** — just tell me your starting point (a station, landmark, or address).`,
         CHOICES,
       );
+    }
+
+    // Intercity (e.g. Seoul→Busan) is beyond city subway/bus — ground it with
+    // KTX/SRT/express-bus/flight guidance + booking links instead of a bogus walk.
+    const ic = detectIntercity(from, to);
+    if (ic) {
+      const far = (ic.dest ?? ic.origin)!.label;
+      return ok(renderIntercity(from, to, ic), [
+        { emoji: "💳", cmdEn: "How do I pay for KTX or the bus?", descEn: "intercity ticket payment" },
+        { emoji: "🌤️", cmdEn: `Weather in ${far}`, descEn: "forecast + air quality" },
+        { emoji: "🗺️", cmdEn: `What's worth seeing in ${far}?`, descEn: "things to do there" },
+      ]);
     }
 
     if (!hasKey("TRANSIT_API_KEY") || !hasKey("TOUR_API_KEY")) {
