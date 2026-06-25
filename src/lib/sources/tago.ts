@@ -118,6 +118,18 @@ async function cityList(): Promise<RawCity[]> {
 }
 
 /**
+ * Fire-and-forget warm-up of the city-code directory at server startup, so the
+ * first user's bus query doesn't pay the slow (~6s) cold getCtyCodeList. Safe to
+ * call without a key (it just no-ops/errors quietly). Cached 24h afterwards.
+ */
+export function warmCityList(): void {
+  if (!ENV.BUS_API_KEY.trim()) return;
+  void cityList().catch(() => {
+    /* warm-up is best-effort; a failure just means the first real call pays it */
+  });
+}
+
+/**
  * Resolve a city name (English or Korean) to a TAGO cityCode. Returns undefined
  * for unknown cities and for Seoul (not in TAGO — handled by the tool layer).
  */

@@ -35,6 +35,20 @@ const NEED_LABEL: Record<string, string> = {
   walkInOk: "walk-in OK",
 };
 
+/**
+ * Honest, actionable guidance per requested need. We can't verify per-store
+ * flags from the data, so instead of fabricating badges we tell the visitor what
+ * to expect and how to check — which genuinely answers the need.
+ */
+const NEED_GUIDANCE: Record<string, string> = {
+  noReservationNeeded: "🚶 Most casual spots here are walk-in; only fine-dining usually needs a booking.",
+  walkInOk: "🚶 Cafés and casual eateries are typically walk-in — no app or phone needed.",
+  acceptsForeignCard:
+    "💳 Franchises, department stores and larger restaurants usually take foreign cards — just ask “카드 되나요?”. Small/old shops can be cash-only, so carry some cash.",
+  hasMultilingualMenu:
+    "🗣️ Tourist-area and English-listed places often have English or picture menus; smaller local spots may be Korean-only.",
+};
+
 const CHOICES: Choice[] = [
   { emoji: "💳", cmdEn: "How do I pay here as a foreigner?", cmdKo: "결제 방법", descEn: "payment options guide" },
   { emoji: "🍽️", cmdEn: "Explain a dish from the menu", descEn: "menu context + allergens" },
@@ -57,12 +71,16 @@ function render(area: string, needs: string[], items: StoreItem[]): string {
     const tel = p.tel ? ` · ☎ ${p.tel}` : "";
     return `**${i + 1}. ${p.name}**\n   📍 ${p.address}${tel}\n   🌐 _${p.note}_`;
   });
+  // Honest, need-specific guidance (②) instead of fabricated per-store badges.
+  const guidance = needs.map((n) => NEED_GUIDANCE[n]).filter(Boolean);
+  const guidanceBlock = guidance.length ? ["", "**For what you asked:**", ...guidance.map((g) => `- ${g}`)] : [];
   return [
     `🍜 **Foreigner-friendly spots in ${area}**`,
     "",
     filterLine,
     "",
     ...lines,
+    ...guidanceBlock,
     "",
     "_Tip: ask \"How do I pay here?\" to check foreign-card acceptance for your situation._",
   ].join("\n");

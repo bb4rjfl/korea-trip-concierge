@@ -6,6 +6,7 @@ import { SERVER_NAME, SERVER_VERSION } from "./lib/constants.js";
 import { assertNamingOk } from "./lib/naming.js";
 import { ENV, hasKey } from "./lib/env.js";
 import { ALL_TOOLS, TOOL_NAMES } from "./tools/index.js";
+import { warmCityList } from "./lib/sources/tago.js";
 
 // Fail fast at startup if any name breaks Kakao rules (kakao token, charset,
 // duplicates, count) — a non-compliant build never serves traffic.
@@ -106,4 +107,5 @@ const port = Number(ENV.PORT);
 app.listen(port, () => {
   console.log(`${SERVER_NAME} v${SERVER_VERSION} — Streamable HTTP (stateless) on :${port}`);
   console.log(`Tools (${TOOL_NAMES.length}): ${TOOL_NAMES.join(", ")}`);
+  warmCityList(); // pre-warm slow TAGO city directory off the user's critical path
 });
