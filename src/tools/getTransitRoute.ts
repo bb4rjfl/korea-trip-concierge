@@ -5,8 +5,17 @@ import { hasKey } from "../lib/env.js";
 import { searchTopPlace } from "../lib/sources/tourapi.js";
 import { routesBetween, type TransitRoute } from "../lib/sources/odsay.js";
 import { romanizeText } from "../lib/romanize.js";
+import { resolvePlaceCoord } from "../lib/places.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
+
+/** Geocode a place: curated index first (instant + accurate), then TourAPI. */
+async function geocode(name: string): Promise<{ lng: number; lat: number } | undefined> {
+  const curated = resolvePlaceCoord(name);
+  if (curated) return { lng: curated.lng, lat: curated.lat };
+  const p = await searchTopPlace(name);
+  return p?.mapx != null && p?.mapy != null ? { lng: p.mapx, lat: p.mapy } : undefined;
+}
 
 /**
  * getTransitRoute — subway/bus directions with fares, transfers, and time,
@@ -86,18 +95,15 @@ export const getTransitRoute: ToolDef = {
     }
 
     try {
-      const [a, b] = await Promise.all([searchTopPlace(from), searchTopPlace(to)]);
-      if (!a?.mapx || !a?.mapy || !b?.mapx || !b?.mapy) {
+      const [a, b] = await Promise.all([geocode(from), geocode(to)]);
+      if (!a || !b) {
         return fail(
           "Couldn't locate one of the places",
-          `I couldn't pin coordinates for ${!a?.mapx ? `**${from}**` : `**${to}**`}. Try a well-known landmark or station name.`,
+          `I couldn't pin coordinates for ${!a ? `**${from}**` : `**${to}**`}. Try a well-known landmark or station name.`,
           RETRY,
         );
       }
-      const routes = await routesBetween(
-        { lng: a.mapx, lat: a.mapy },
-        { lng: b.mapx, lat: b.mapy },
-      );
+      const routes = await routesBetween(a, b);
       if (routes.length === 0) {
         return fail("No transit route found", `No public-transit path from **${from}** to **${to}** was returned.`, RETRY);
       }

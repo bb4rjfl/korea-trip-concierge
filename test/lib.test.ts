@@ -9,6 +9,7 @@ import {
   romanizeText,
   formatSubwayDirection,
 } from "../src/lib/romanize.js";
+import { resolvePlaceCoord } from "../src/lib/places.js";
 
 describe("buildChoiceFooter", () => {
   it("renders 2–4 chips with command + description", () => {
@@ -83,6 +84,16 @@ describe("romanize (U1)", () => {
     expect(formatSubwayDirection("인천공항2터미널행 - 디지털미디어시티방면(급행)")).toBe(
       "to Incheon Airport T2 (via Digital Media City) (express)",
     );
+  });
+});
+
+describe("places coord index (B)", () => {
+  it("resolves EN/alias/KO landmarks and stations, strips station suffix", () => {
+    expect(resolvePlaceCoord("Gangnam")?.label).toBe("Gangnam Station");
+    expect(resolvePlaceCoord("강남역")?.label).toBe("Gangnam Station");
+    expect(resolvePlaceCoord("Hongdae")?.label).toBe("Hongik Univ. Station");
+    expect(resolvePlaceCoord("Gyeongbokgung")?.lat).toBeCloseTo(37.5796, 2);
+    expect(resolvePlaceCoord("Atlantis")).toBeUndefined();
   });
 });
 
