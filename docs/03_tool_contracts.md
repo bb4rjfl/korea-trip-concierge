@@ -84,17 +84,18 @@
 - **output**: 기온·하늘·강수확률 + PM10/PM2.5 등급 + 마스크 권고(영문). 끝에 선택지(옷차림/실내장소/경로).
 - annotations: readOnly true / idempotent false (시간 변동) / openWorld true
 
-## 11. `trackSubwayArrival`  (서울 지하철 실시간, 조회형 — 2모드 D-012)
+## 11. `trackSubwayArrival`  (서울 지하철 실시간, 조회형 — 3모드 D-012)
 - **title**: "Track Subway Arrival"
-- **description(영문)**: "Real-time Seoul subway info in English for foreign visitors. By station: the next-train arrivals (line, direction, destination, minutes away). By line: the live position of every train (current station, direction, status). Query-based (refresh to update). Part of Korea Trip Concierge(코리아 트립 컨시어지)."
-- **inputSchema**: `{ station?: string (영문/한글), line?: string ("Line 2"/"2"/"Sinbundang") }` — **station 또는 line 중 하나 필수**(둘 다 없으면 무엇을 볼지 되묻는 칩).
-- **데이터**: 서울 TOPIS swopenAPI(`SUBWAY_API_KEY`, 키는 path 세그먼트), 2 오퍼레이션:
-  - **station 모드** → `realtimeStationArrival`: 영문 역명→한글 매핑 후 조회.
-  - **line 모드** → `realtimePosition`(OA-12601): 영문 노선명→한글("2호선") 매핑 후 노선 전체 열차 위치(현재역·종착·진입/도착 상태·급행·막차). **라이브 검증 완료**(2호선 39~42열차).
-  - ⚠️ 운행 05:30~01:00, 운행外/데이터없음은 top-level `{code:"INFO-200"}` → 빈 목록 처리.
-- **output**: station=방면별 다음 열차(노선·N분·현재위치)·상태 → [🔄 Refresh][🗺️ Route][🏙️ Around]. line=종착지별 열차 위치(현재역·상태, 방면당 8대 cap+"…N more") → [🔄 Refresh][🚉 Arrivals][🗺️ Route]. **푸시 아님 — 조회**.
+- **description(영문)**: "Real-time Seoul subway info in English for foreign visitors. By station: next-train arrivals (line, direction, destination, minutes away). By station + destination: how many stops are left until you get off (countdown as you ride). By line: the live position of every train. Query-based (refresh to update). Part of Korea Trip Concierge(코리아 트립 컨시어지)."
+- **inputSchema**: `{ station?: string, to?: string, line?: string }` — **station / (station+to) / line 중 하나**(없으면 무엇을 볼지 되묻는 칩). 우선순위: station+to(여정) → line(위치) → station(도착).
+- **데이터**: 서울 TOPIS swopenAPI(`SUBWAY_API_KEY`, path 세그먼트), 3 모드:
+  - **station** → `realtimeStationArrival`: 방면별 다음 열차.
+  - **station+to (여정/하차안내, Phase 2)** → 두 역의 `statnId`(realtimeStationArrival, **노선상 순차증가** 검증됨)로 **정거장 수 = |statnId 차| (같은 노선일 때)**. 다른 노선이면 환승 필요 → getTransitRoute 유도. 현재역 도착열차도 함께 표시.
+  - **line** → `realtimePosition`(OA-12601): 노선 전체 열차 위치(현재역·종착·상태·급행·막차). 라이브 검증(2호선 39~42열차).
+  - ⚠️ 운행 05:30~01:00, 데이터없음 `{code:"INFO-200"}` → 빈 목록.
+- **output**: station→[🔄][🗺️][🏙️] / 여정→정거장수+"~까지 N stops"+다음열차 [🔄 Where am I now][🏁 Arrivals at dest][🗺️ Route] / line→종착지별 위치(방면당 8대 cap) [🔄][🚉][🗺️]. **푸시 아님 — 조회**(타며 재조회로 카운트다운).
 - annotations: readOnly true / idempotent false (실시간) / openWorld true
-- 검증: parseArrivals/parsePositions/resolveStationName/resolveLineName 테스트 락. (로마자 흠: 서울대입구/지선 등 사전 보강 후보)
+- 검증: parseArrivals/parsePositions/parseStationIds/resolveStationName/resolveLineName 테스트 락(103). **알려진 한계**: 순환 2호선은 statnId 차가 짧은쪽/긴쪽 구분 약함, 방면 칩에 dest 방향 필터 미적용(MVP). 역사전 갭(교대=Gyodae 등)·로마자(서울대입구/지선)는 사전 보강 단계.
 
 ---
 

@@ -8,6 +8,7 @@ import {
   parseArrivals,
   resolveStationName,
   parsePositions,
+  parseStationIds,
   resolveLineName,
 } from "../src/lib/sources/seoulSubway.js";
 
@@ -539,5 +540,19 @@ describe("Seoul subway", () => {
   it("parsePositions returns [] when no list", () => {
     expect(parsePositions({ errorMessage: { code: "INFO-200" } })).toEqual([]);
     expect(parsePositions({})).toEqual([]);
+  });
+
+  it("parseStationIds dedupes per line, drops records without statnId", () => {
+    const ids = parseStationIds({
+      realtimeArrivalList: [
+        { subwayId: "1004", statnId: "1004000423", trainLineNm: "불암산행" },
+        { subwayId: "1004", statnId: "1004000423", trainLineNm: "오이도행" }, // dup line
+        { subwayId: "1003", statnId: "1003000331", trainLineNm: "대화행" }, // transfer
+        { subwayId: "1002", trainLineNm: "성수행" }, // no statnId → dropped
+      ],
+    });
+    expect(ids).toHaveLength(2);
+    expect(ids.find((i) => i.subwayId === "1004")).toMatchObject({ line: "Line 4", statnId: 1004000423 });
+    expect(ids.find((i) => i.subwayId === "1003")).toMatchObject({ line: "Line 3", statnId: 1003000331 });
   });
 });

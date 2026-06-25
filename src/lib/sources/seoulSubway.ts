@@ -70,6 +70,7 @@ export interface SubwayArrival {
 
 interface RawArrival {
   subwayId?: string;
+  statnId?: string; // queried station's id on this line — sequential along the line
   trainLineNm?: string;
   bstatnNm?: string;
   barvlDt?: string | number; // seconds
@@ -100,17 +101,68 @@ export function parseArrivals(json: ArrivalResponse): SubwayArrival[] {
   });
 }
 
-const arrivalCache = new TtlCache<SubwayArrival[]>(10_000);
+/** A station's id on one line. statnId is sequential along the line (verified
+ *  live), so |statnId(A) − statnId(B)| on the same line = stops between them. */
+export interface StationLineId {
+  subwayId: string; // "1002"
+  line: string; // "Line 2"
+  statnId: number; // e.g. 1004000423
+}
+
+/** Extract the queried station's per-line ids (deduped by line) from arrivals. */
+export function parseStationIds(json: ArrivalResponse): StationLineId[] {
+  const list = json.realtimeArrivalList;
+  if (!Array.isArray(list)) return [];
+  const byLine = new Map<string, StationLineId>();
+  for (const a of list) {
+    const sid = String(a.subwayId ?? "");
+    const statn = Number(a.statnId ?? 0);
+    if (!sid || !statn || byLine.has(sid)) continue;
+    byLine.set(sid, { subwayId: sid, line: LINE_LABEL[sid] ?? `Line ${sid}`, statnId: statn });
+  }
+  return [...byLine.values()];
+}
+
+// One raw fetch per station, shared by arrivals + id extraction (cached ~10s).
+const rawCache = new TtlCache<ArrivalResponse>(10_000);
+
+function fetchStation(stationKo: string): Promise<ArrivalResponse> {
+  return rawCache.getOrLoad(`raw:${stationKo}`, async () => {
+    // 0/20: busy interchanges (e.g. 홍대입구) return ~14 arrivals across lines.
+    const url = `${BASE}/${ENV.SUBWAY_API_KEY}/json/realtimeStationArrival/0/20/${encodeURIComponent(stationKo)}`;
+    return fetchJson<ArrivalResponse>(url);
+  });
+}
 
 /** Real-time arrivals at a station (Korean name). Cached ~10s. */
 export async function getStationArrivals(stationKo: string): Promise<SubwayArrival[]> {
-  return arrivalCache.getOrLoad(`sub:${stationKo}`, async () => {
-    // 0/20: busy interchanges (e.g. 홍대입구) return ~14 arrivals across lines;
-    // 10 would truncate them.
-    const url = `${BASE}/${ENV.SUBWAY_API_KEY}/json/realtimeStationArrival/0/20/${encodeURIComponent(stationKo)}`;
-    const json = await fetchJson<ArrivalResponse>(url);
-    return parseArrivals(json);
-  });
+  return parseArrivals(await fetchStation(stationKo));
+}
+
+/** The station's per-line ids (Korean name). Cached ~10s. */
+export async function getStationLineIds(stationKo: string): Promise<StationLineId[]> {
+  return parseStationIds(await fetchStation(stationKo));
+}
+
+export interface StopsInfo {
+  line: string;
+  subwayId: string;
+  stops: number;
+  forward: boolean; // destination has a higher statnId (toward statnFid direction)
+}
+
+/** Stops between two stations IF they share a line. undefined = no shared line
+ *  (a transfer is needed → use getTransitRoute) or a station wasn't found. */
+export async function stopsBetween(fromKo: string, toKo: string): Promise<StopsInfo | undefined> {
+  const [a, b] = await Promise.all([getStationLineIds(fromKo), getStationLineIds(toKo)]);
+  for (const x of a) {
+    const y = b.find((bb) => bb.subwayId === x.subwayId);
+    if (y) {
+      const diff = y.statnId - x.statnId;
+      return { line: x.line, subwayId: x.subwayId, stops: Math.abs(diff), forward: diff > 0 };
+    }
+  }
+  return undefined;
 }
 
 // ── Line mode: realtimePosition (OA-12601) ──────────────────────────────────

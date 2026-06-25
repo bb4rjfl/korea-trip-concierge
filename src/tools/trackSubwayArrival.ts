@@ -5,6 +5,7 @@ import { hasKey } from "../lib/env.js";
 import {
   getStationArrivals,
   getLinePositions,
+  stopsBetween,
   resolveStationName,
   resolveLineName,
   type SubwayArrival,
@@ -92,18 +93,58 @@ function renderPositions(lineLabel: string, trains: TrainPosition[]): string {
   return lines.join("\n");
 }
 
+// Journey-mode footer: re-query as you ride, or check the destination.
+const JOURNEY_CHOICES: Choice[] = [
+  { emoji: "🔄", cmdEn: "Where am I now", cmdKo: "지금 어디", descEn: "re-check stops from your current stop" },
+  { emoji: "🏁", cmdEn: "Arrivals at my destination", descEn: "when trains reach your stop" },
+  { emoji: "🗺️", cmdEn: "Show the full route again", descEn: "subway/bus directions" },
+];
+
+function renderJourney(
+  fromLabel: string,
+  toLabel: string,
+  line: string,
+  stops: number,
+  arrivals: SubwayArrival[],
+): string {
+  const lines = [`🚇 **On ${line} — heading to ${toLabel}**`, ""];
+  if (stops === 0) {
+    lines.push(`📍 **You're already at ${toLabel}.** Time to get off!`);
+  } else {
+    const word = stops === 1 ? "stop" : "stops";
+    lines.push(`📍 **${stops} ${word} to go** from ${fromLabel}. Stay on until **${toLabel}**, then get off.`);
+  }
+  // Show next trains on this line so they know which one to board / how long to wait.
+  const onLine = arrivals.filter((a) => a.line === line).slice(0, 4);
+  if (onLine.length) {
+    lines.push("", `**Next trains from ${fromLabel}:**`);
+    for (const a of onLine) {
+      const eta = a.etaMinutes != null ? `**${a.etaMinutes} min**` : `_${a.status}_`;
+      const dir = a.towards ? ` · ${formatSubwayDirection(a.towards)}` : "";
+      lines.push(`- ${eta}${dir}`);
+    }
+    lines.push("", `_Board the train heading toward **${toLabel}**'s side._`);
+  }
+  lines.push("", "_Tap “Where am I now” at each stop to count down._");
+  return lines.join("\n");
+}
+
 export const trackSubwayArrival: ToolDef = {
   name: "trackSubwayArrival",
   description:
-    "Real-time Seoul subway info in English for foreign visitors. By station: the next-train arrivals " +
-    "(line, direction, destination, minutes away). By line: the live position of every train (current " +
-    "station, direction, status). Query-based (refresh to update). " +
-    `Part of ${SERVICE_NAME}.`,
+    "Real-time Seoul subway info in English for foreign visitors. By station: next-train arrivals (line, " +
+    "direction, destination, minutes away). By station + destination: how many stops are left until you " +
+    "get off (countdown as you ride). By line: the live position of every train. Query-based (refresh to " +
+    `update). Part of ${SERVICE_NAME}.`,
   inputSchema: {
     station: z
       .string()
       .optional()
-      .describe("Station name (English or Korean) for next-train arrivals, e.g. 'Hongik University' or '강남'."),
+      .describe("Your current/boarding station (English or Korean), e.g. 'Hongik University' or '강남'."),
+    to: z
+      .string()
+      .optional()
+      .describe("Destination station — with `station`, returns stops remaining until you get off."),
     line: z
       .string()
       .optional()
@@ -118,6 +159,7 @@ export const trackSubwayArrival: ToolDef = {
   },
   handler: async (args) => {
     const station = String(args.station ?? "").trim();
+    const to = String(args.to ?? "").trim();
     const line = String(args.line ?? "").trim();
 
     if (!hasKey("SUBWAY_API_KEY")) {
@@ -126,6 +168,37 @@ export const trackSubwayArrival: ToolDef = {
         `Source: **Seoul TOPIS real-time subway Open API**. ${line ? `Line: **${line}**` : `Station: **${station}**`}.`,
         CHOICES,
       );
+    }
+
+    // Journey mode (D-012 Phase 2): station + destination → stops remaining.
+    if (station && to) {
+      const fromKo = resolveStationName(station);
+      const toKo = resolveStationName(to);
+      if (!fromKo || !toKo) {
+        const bad = !fromKo ? station : to;
+        return fail(
+          `I don't recognize the station "${bad}" yet`,
+          "Try major Seoul stations (e.g. Gangnam, Hongik University, Myeongdong, Seoul Station) or the Korean name.",
+          RETRY,
+        );
+      }
+      try {
+        const [info, arrivals] = await Promise.all([stopsBetween(fromKo, toKo), getStationArrivals(fromKo)]);
+        if (!info) {
+          return fail(
+            `${station} and ${to} aren't on the same line`,
+            `You'll need a transfer. Ask me to **plan a route** from ${station} to ${to} and I'll pick the lines and stops.`,
+            RETRY,
+          );
+        }
+        return ok(renderJourney(station, to, info.line, info.stops, arrivals), JOURNEY_CHOICES);
+      } catch {
+        return fail(
+          "Couldn't reach the live subway service",
+          "The real-time subway source didn't respond in time. Tap Refresh to try again.",
+          RETRY,
+        );
+      }
     }
 
     // Line mode (D-012): live position of every train on a line.
