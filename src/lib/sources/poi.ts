@@ -71,7 +71,7 @@ async function naverSearch(query: string): Promise<PoiPlace[]> {
 interface FsqResult {
   name?: string;
   tel?: string;
-  location?: { formatted_address?: string };
+  location?: { address?: string; locality?: string; formatted_address?: string };
   categories?: { name?: string }[];
 }
 interface FsqResponse {
@@ -80,21 +80,35 @@ interface FsqResponse {
 
 export function parseFoursquare(json: FsqResponse): PoiPlace[] {
   const results = Array.isArray(json.results) ? json.results : [];
-  return results.map((r) => ({
-    name: (r.name ?? "").trim(),
-    address: (r.location?.formatted_address ?? "").trim(),
-    category: r.categories?.[0]?.name?.trim() || undefined,
-    tel: r.tel?.trim() || undefined,
-    source: "foursquare" as const,
-  }));
+  return results.map((r) => {
+    const loc = r.location ?? {};
+    const address =
+      [loc.address, loc.locality].filter(Boolean).join(", ").trim() ||
+      (loc.formatted_address ?? "").trim();
+    return {
+      name: (r.name ?? "").trim(),
+      address,
+      category: r.categories?.[0]?.name?.trim() || undefined,
+      tel: r.tel?.trim() || undefined,
+      source: "foursquare" as const,
+    };
+  });
 }
+
+// Foursquare Places API (2025): English place names + categories — ideal for
+// foreign visitors. Service Key via Bearer, dated version header.
+const FSQ_API_VERSION = "2025-06-17";
 
 async function foursquareSearch(lat: number, lng: number, query: string): Promise<PoiPlace[]> {
   const url =
-    `https://api.foursquare.com/v3/places/search?ll=${lat},${lng}` +
-    `&radius=1500&query=${encodeURIComponent(query)}&limit=8&sort=DISTANCE`;
+    `https://places-api.foursquare.com/places/search?ll=${lat},${lng}` +
+    `&radius=1500&query=${encodeURIComponent(query)}&limit=8`;
   const json = await fetchJson<FsqResponse>(url, {
-    headers: { Authorization: ENV.FOURSQUARE_API_KEY, accept: "application/json" },
+    headers: {
+      Authorization: `Bearer ${ENV.FOURSQUARE_API_KEY}`,
+      "X-Places-Api-Version": FSQ_API_VERSION,
+      accept: "application/json",
+    },
   });
   return parseFoursquare(json);
 }
@@ -118,12 +132,15 @@ export async function searchForeignerPois(opts: PoiSearchOptions): Promise<PoiPl
   const key = `poi:${opts.area}:${what}`;
 
   const places = await cache.getOrLoad(key, async () => {
-    if (hasKey("NAVER_CLIENT_ID") && hasKey("NAVER_CLIENT_SECRET")) {
-      const r = await naverSearch(`${opts.area} ${what}`.trim());
+    // Prefer Foursquare when we have coordinates — English names + categories,
+    // which is what foreign visitors need.
+    if (hasKey("FOURSQUARE_API_KEY") && opts.coord) {
+      const r = await foursquareSearch(opts.coord.lat, opts.coord.lng, what);
       if (r.length) return r;
     }
-    if (hasKey("FOURSQUARE_API_KEY") && opts.coord) {
-      return foursquareSearch(opts.coord.lat, opts.coord.lng, what);
+    // Naver: deep Korean coverage, keyword-based (works without coordinates).
+    if (hasKey("NAVER_CLIENT_ID") && hasKey("NAVER_CLIENT_SECRET")) {
+      return naverSearch(`${opts.area} ${what}`.trim());
     }
     return [];
   });

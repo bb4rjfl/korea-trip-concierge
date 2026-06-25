@@ -103,15 +103,17 @@ describe("POI providers (Naver / Foursquare parsers)", () => {
     const out = parseFoursquare({
       results: [
         {
-          name: "Linus' Bama Style BBQ",
-          location: { formatted_address: "Itaewon, Seoul" },
-          categories: [{ name: "BBQ Joint" }],
+          name: "Maple Tree House (단풍나무집)",
+          location: { address: "용산구 이태원로27가길 26", locality: "서울특별시", formatted_address: "용산구 …, 서울특별시" },
+          categories: [{ name: "Korean BBQ Restaurant" }],
+          tel: "02-790-7977",
         },
       ],
     });
-    expect(out[0].name).toBe("Linus' Bama Style BBQ");
-    expect(out[0].address).toBe("Itaewon, Seoul");
-    expect(out[0].category).toBe("BBQ Joint");
+    expect(out[0].name).toBe("Maple Tree House (단풍나무집)");
+    expect(out[0].address).toBe("용산구 이태원로27가길 26, 서울특별시"); // address + locality, not the verbose formatted
+    expect(out[0].category).toBe("Korean BBQ Restaurant");
+    expect(out[0].tel).toBe("02-790-7977");
     expect(out[0].source).toBe("foursquare");
   });
 });
