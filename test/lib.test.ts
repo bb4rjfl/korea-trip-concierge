@@ -78,6 +78,12 @@ describe("romanize (U1)", () => {
     expect(romanizeStation("광운대")).toBe("Gwangun-dae");
     expect(romanizeStation("문산")).toBe("Munsan");
   });
+
+  it("parses a direction with a trailing express marker", () => {
+    expect(formatSubwayDirection("인천공항2터미널행 - 디지털미디어시티방면(급행)")).toBe(
+      "to Incheon Airport T2 (via Digital Media City) (express)",
+    );
+  });
 });
 
 describe("naming rules", () => {

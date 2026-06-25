@@ -1,7 +1,8 @@
 /**
  * Seoul subway real-time — TOPIS swopenAPI. Powers trackSubwayArrival.
- *  - realtimeStationArrival (OA-12764): next trains at a station  ← primary
- *  - realtimePosition       (OA-12601): live train positions on a line
+ *  - realtimeStationArrival: next trains at a station  ← primary
+ *    (OA-15799 "일괄" backend — the Line-2 outage is fixed; verified live that a
+ *     per-station query for 강남/홍대입구 now returns subwayId 1002.)
  *
  * The API path param is the Korean station name, but our users type English, so
  * we resolve EN→KO for high-traffic / tourist stations (resolveStationName).
@@ -101,7 +102,9 @@ const arrivalCache = new TtlCache<SubwayArrival[]>(10_000);
 /** Real-time arrivals at a station (Korean name). Cached ~10s. */
 export async function getStationArrivals(stationKo: string): Promise<SubwayArrival[]> {
   return arrivalCache.getOrLoad(`sub:${stationKo}`, async () => {
-    const url = `${BASE}/${ENV.SUBWAY_API_KEY}/json/realtimeStationArrival/0/10/${encodeURIComponent(stationKo)}`;
+    // 0/20: busy interchanges (e.g. 홍대입구) return ~14 arrivals across lines;
+    // 10 would truncate them.
+    const url = `${BASE}/${ENV.SUBWAY_API_KEY}/json/realtimeStationArrival/0/20/${encodeURIComponent(stationKo)}`;
     const json = await fetchJson<ArrivalResponse>(url);
     return parseArrivals(json);
   });

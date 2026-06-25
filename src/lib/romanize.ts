@@ -126,6 +126,33 @@ const STATIONS: StationPair[] = [
   { ko: "공항화물청사", en: "Airport Cargo Terminal" },
   { ko: "검암", en: "Geomam" },
   { ko: "계양", en: "Gyeyang" },
+  // more frequently-seen current-location / terminus stations
+  { ko: "아현", en: "Ahyeon" },
+  { ko: "한남", en: "Hannam" },
+  { ko: "마곡나루", en: "Magongnaru" },
+  { ko: "운서", en: "Unseo" },
+  { ko: "야당", en: "Yadang" },
+  { ko: "가좌", en: "Gajwa" },
+  { ko: "일산", en: "Ilsan" },
+  { ko: "덕소", en: "Deokso" },
+  { ko: "영등포구청", en: "Yeongdeungpo-gu Office" },
+  { ko: "곡산", en: "Goksan" },
+  { ko: "대곡", en: "Daegok" },
+  { ko: "행신", en: "Haengsin" },
+  { ko: "능곡", en: "Neunggok" },
+  { ko: "백석", en: "Baekseok" },
+  { ko: "지축", en: "Jichuk" },
+  { ko: "구반포", en: "Gubanpo" },
+  { ko: "동작", en: "Dongjak" },
+  { ko: "이촌", en: "Ichon" },
+  { ko: "옥수", en: "Oksu" },
+  { ko: "응봉", en: "Eungbong" },
+  { ko: "중랑", en: "Jungnang" },
+  { ko: "상봉", en: "Sangbong" },
+  { ko: "망우", en: "Mangu" },
+  { ko: "양원", en: "Yangwon" },
+  { ko: "구리", en: "Guri" },
+  { ko: "도농", en: "Donong" },
 ];
 
 const KO_TO_EN = new Map<string, string>();
@@ -192,12 +219,15 @@ export function romanizeText(text: string): string {
  * "to Seongsu (via Sinseol-dong)". Falls back to romanizing the whole string.
  */
 export function formatSubwayDirection(trainLineNm: string): string {
-  const s = (trainLineNm ?? "").trim();
+  let s = (trainLineNm ?? "").trim();
+  // Pull off an express/local marker first so it can't break the 행/방면 parse.
+  const speed = /급행/.test(s) ? " (express)" : /완행/.test(s) ? " (local)" : "";
+  s = s.replace(/\s*[(]?\s*(급행|완행)\s*[)]?\s*/g, " ").trim();
   const m = s.match(/^(.+?)행(?:\s*-\s*(.+?)방면)?$/);
   if (m) {
     // romanizeText (substring replace) handles compound names like "신촌(경의중앙선)".
     const dest = romanizeText(m[1]);
-    return m[2] ? `to ${dest} (via ${romanizeText(m[2])})` : `to ${dest}`;
+    return (m[2] ? `to ${dest} (via ${romanizeText(m[2])})` : `to ${dest}`) + speed;
   }
-  return romanizeText(s);
+  return romanizeText(s) + speed;
 }
