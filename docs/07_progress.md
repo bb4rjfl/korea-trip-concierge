@@ -52,6 +52,13 @@
 - ⬜ **MCP Inspector 정식 통과**(배포 URL 대상) — 여전히 미실시(로컬 curl만).
 - (보안 결정 기록) 카카오 Admin 키는 계정전체 권한이라 **저장·사용 거부**, REST 키만 사용.
 
+## 🆕 데이터 소스 확장 (사용자 지시 2026-06-26, 첨부 매뉴얼 기반)
+- [x] **#3 기상특보 (KMA WthrWrnInfoService/getPwnStatus)** ✅ — 현재 활성 특보(태풍/호우/폭염/강풍/풍랑/대설/한파/황사…) 영문 매핑(고정어휘, 번역 아님)해 getWeatherAndAir에 🚨 배너. BUS_API_KEY. parseAlerts 테스트.
+- [x] **#2 TourAPI 국문 커버리지** ✅ — 영문 15,696 vs **국문 50,701**(서울 음식점 71 vs 1,130=16배) 확인. searchPlaceForeigner가 영어 thin 시 좌표기반 KorService2 결과를 **로마자화**해 보강. parsePlaces ko 로마자.
+- [x] **#4 지하철 API** ✅ — realtimeStationArrival(도착)+realtimePosition(위치) 이미 사용·검증 중(D-012). 첨부 xls 필드와 파서 일치.
+- [ ] **#1 VisitSeoul** — 키 발급 후 서울 콘텐츠 대폭 강화(D-010 로컬 다국어 인덱스). 대기.
+- 첨부 문서 추출본: `C:\Users\user\Downloads\_ktc_docs\` (기상특보·관광공사 매뉴얼 국/영·관광코스). 관광코스별 날씨(기상청27)는 COULD 후보.
+
 ## 🗺️ 여정 UX 강화 로드맵 (사용자 지시 2026-06-25) — 순서대로
 > 목적지 추천 → "어떻게 가?" → **버스+지하철 동시 제시·선택** → 선택 시 어디서 타고·언제 와·지금 어디 → **탔으면 지금 어디·언제 내려**. (stateless = 탭/Refresh 조회 모델, D-002)
 - [x] **Phase 1 ✅**: getTransitRoute에 모드 라벨(🚇 Subway/🚌 Bus) + **동적 추적 칩**("Track the subway at {역}"/"Track bus {번호}") → 탭하면 추적 직결. 라이브 검증.
