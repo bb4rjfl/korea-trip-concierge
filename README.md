@@ -35,6 +35,8 @@ API 키는 `.env.example`를 복사해 `.env`에 설정 (발급법: `docs/08_api
 | `docs/07_progress.md` | 진행 상황(SSOT) |
 | `docs/08_api_key_issuance.md` | 외부 API 키 발급 가이드 (단계별) |
 | `docs/09_demo_conversations.md` | 제출용 대화 예시 3개 |
+| `docs/10_handoff.md` | 세션 간 핸드오프 |
+| `docs/11_deployment.md` | 배포 실행 런북 (KC→PlayMCP→심사요청) |
 
 ## Claude Code 슬래시 커맨드
 - `/sync` 세션 시작(컨텍스트 로드 + 다음 할 일)
