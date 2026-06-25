@@ -15,7 +15,7 @@ import type { ToolDef } from "./types.js";
  */
 
 const CHOICES: Choice[] = [
-  { emoji: "🍜", cmdEn: "Only show foreign-card-friendly spots", descEn: "filter to foreigner-friendly stores" },
+  { emoji: "💳", cmdEn: "Where do foreign cards work to eat here?", descEn: "foreign-card-friendly food spots" },
   { emoji: "🗺️", cmdEn: "Guide me around this area", cmdKo: "동네 가이드", descEn: "neighborhood overview" },
   { emoji: "🚇", cmdEn: "How do I get there?", descEn: "public-transit route" },
 ];
