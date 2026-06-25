@@ -10,28 +10,24 @@
 
 ---
 
-## 1. ⭐⭐ 지금 당장 이어서 할 일 (배포 마무리) — 최우선
+## 1. ⭐⭐ 배포+키주입 완료(B2 DONE) — 다음 = PlayMCP 등록
 
-### 현재 배포 상태
-- KC(PlayMCP in KC, https://playmcp.kakaocloud.io)에 **Git 소스 빌드로 이미 등록·Active**.
-- Endpoint: `https://korea-trip-concierge.playmcp-endpoint.kakaocloud.io/mcp` (namespace `kbm-u-4961514721`, ID 636)
-- **11툴 전부 인식·동작 확인**(공개 인터넷 curl로 initialize/tools.list/tools.call 검증함).
-- ❌ **단 키가 안 들어감** → 헬스체크 `/`의 `sources`가 전부 false → 실시간 API 툴은 "일시 불가"로 응답(지식툴 3종만 실동작).
+### ✅ 현재 배포 상태 (2026-06-25 갱신)
+- KC에 **컨테이너 이미지(ghcr 비공개)로 재등록·Active**. **ID 638**, namespace `kbm-u-4961514721`.
+- Endpoint: `https://korea-trip-concierge.playmcp-endpoint.kakaocloud.io/mcp`
+- **키 주입 성공** → 헬스체크 `/`의 `sources` **전부 true**(tour/bus/transit/subway/jeju/naver/foursquare). 라이브 검증: searchPlaceForeigner(TourAPI 경복궁 실데이터)·getWeatherAndAir(Seoul 21°C/PM10 12 실데이터) ✅.
+- B2 경로 완료: GitHub Secrets → `deploy-image.yml` → 비공개 ghcr `ghcr.io/bb4rjfl/korea-trip-concierge:latest` → KC가 PAT(read:packages, `ghp_s0fb…`)로 pull.
+- **재배포 방법**: 로컬 수정 → push → Actions `deploy-image` Run → KC 상세 중지→시작(또는 재등록). 운영(KC)/로컬 개발 독립.
 
-### 키 주입 방법 = **B2** (확정, 안전)
-KC PlayMCP는 **Git빌드·컨테이너이미지 둘 다 "환경변수 입력란이 없다"**(공식 가이드 확인). 그래서 키는 **이미지 빌드 때 주입**해야 한다. **키를 repo에 커밋하는 B1은 금지/차단됨**(아래 §2). 대신:
-- **키 → GitHub Secrets(암호화) → GitHub Actions가 비공개 ghcr 이미지로 빌드 → KC가 컨테이너 이미지로 등록.**
-- ✅ **GitHub Secrets 9개 이미 설정 완료**(`gh secret set`로): TOUR/BUS/TRANSIT/SUBWAY/SEOUL/JEJU/NAVER_CLIENT_ID/NAVER_CLIENT_SECRET/FOURSQUARE.
-- ✅ `.github/workflows/deploy-image.yml` 작성·동작 검증(키 없는 첫 빌드 성공, ghcr push OK). Dockerfile에 11키 ARG→ENV 추가됨(빈 기본값).
+### 👉 다음 단계 = PlayMCP 등록 (docs/14 §3)
+1. PlayMCP 콘솔(`playmcp.kakao.com`) → 새 MCP 서버 등록 → MCP Endpoint에 위 URL 입력 → **"정보 불러오기"**(성공해야 함).
+2. 정보 입력 → **"임시 등록"**(아직 심사요청 X) → **"MCP 상세 미리보기" → "도구함에 추가"**.
+3. **AI채팅**(또는 Claude 커넥터)으로 테스트 + 대화예시 3개(docs/09) 확인.
+4. 테스트 OK → **"심사 요청"**(≤7/7) → 승인 → **"전체 공개"** → 상세 URL → 비즈폼 응모(≤7/14).
 
-### 남은 단계 (대부분 사용자 콘솔 작업)
-1. **(사용자) ghcr 패키지 Private 확인** — github.com → 프로필 → Packages → `korea-trip-concierge` → Package settings → Visibility = **Private** 필수(키 든 이미지라 public이면 유출). "Make public" 버튼 보이면 현재 Private=정상.
-2. **(사용자) 키 포함 이미지 빌드** — repo → Actions → "deploy-image" → **Run workflow**(main). 2~3분 성공 대기. *(주의: 새 세션이 `gh workflow run`을 직접 트리거하면 안전 분류기에 막힐 수 있음 — 사용자가 직접 누르게 안내.)*
-3. **(사용자) PAT 발급** — Settings→Developer settings→Personal access tokens(classic)→scope **`read:packages`**.
-4. **(사용자) KC 재등록** — 기존 Git빌드 서버 **삭제** → `+새 MCP 서버 등록 → 이미지 등록`:
-   - 이름 `korea-trip-concierge` / Registry 호스트 `ghcr.io` / Registry 사용자 `bb4rjfl` / Registry 비밀번호 = PAT / image_name `bb4rjfl/korea-trip-concierge` / image_tag `latest`
-5. **(새 세션) 검증** — 새 Endpoint URL에 `curl <endpoint>/` → `sources` 전부 true 확인 + 툴 호출 라이브 검증.
-6. 이후: PlayMCP 등록(임시등록→정보불러오기→도구함→AI채팅 테스트→대화예시3개[docs/09]→심사요청 ≤7/7) — `docs/11_deployment.md` §4~5.
+### (완료됨) 이전 키 주입 단계
+ghcr Private 확인 ✅ / Run workflow(키 포함 빌드 #2) ✅ / PAT read:packages 발급 ✅ / KC 컨테이너 재등록 ✅ / sources=true·라이브 검증 ✅.
+🔴 노출키(NAVER_SECRET·FOURSQUARE·SEOUL계열)+PAT는 전체공개/심사 전 재발급 권장.
 
 ### ⚠️ 배포 후 ODsay IP
 ODsay(TRANSIT) 키는 등록 IP 제한이 있을 수 있음. 현재 로컬(개발PC IP)에서만 검증됨. KC 배포 후 `getTransitRoute`가 ApiKeyAuthFailed면 **lab.odsay.com → 내 애플리케이션 → 등록 IP를 KC outbound IP로** 갱신.

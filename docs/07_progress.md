@@ -30,9 +30,17 @@
 - [ ] /check 통과 → 심사요청(≤7/7) → 전체공개 → 비즈폼 응모(≤7/14)
 
 ## 🚀 배포 상태 (2026-06-25) — 새 세션은 docs/13_handoff.md 먼저
-- ✅ **KC Active 배포됨**(Git소스빌드): `https://korea-trip-concierge.playmcp-endpoint.kakaocloud.io/mcp`, 11툴 인식·라이브검증. 단 **키 미주입(sources 전부 false)**.
-- 키 주입 = **B2**(GitHub Secrets→비공개 ghcr 이미지→KC 컨테이너 등록). Secrets 9개 설정·워크플로 동작 검증 완료. **남음**: (사용자) ghcr Private확인 → Run workflow(키포함 빌드) → PAT(read:packages) → KC 컨테이너 이미지로 재등록 → 헬스 sources=true 검증. 상세 docs/13 §1.
-- 🔴 키 커밋 금지(B1 차단됨). 노출키 재발급 권장.
+- ✅✅ **KC Active + 키 주입 완료(B2)** — 컨테이너 이미지 등록(ghcr 비공개), **ID 638**, namespace `kbm-u-4961514721`, Endpoint `https://korea-trip-concierge.playmcp-endpoint.kakaocloud.io/mcp`.
+  - 헬스체크 `/` → **`sources` 전부 true**(tour/bus/transit/subway/jeju/naver/foursquare). 라이브 툴 호출 검증: searchPlaceForeigner(TourAPI 경복궁 실데이터)·getWeatherAndAir(Seoul 21°C/PM10 12 실데이터) ✅.
+  - B2 경로: 키 → GitHub Secrets → `.github/workflows/deploy-image.yml` 빌드 → 비공개 ghcr `ghcr.io/bb4rjfl/korea-trip-concierge:latest` → KC가 PAT(read:packages)로 pull해 컨테이너 등록.
+  - 재배포: 코드 수정 → push → Actions `deploy-image` Run → KC 상세에서 중지→시작(또는 재등록). 운영(KC)과 로컬 개발 독립.
+- 🔴 키 커밋 금지(B1 차단됨). 채팅 노출키(NAVER_SECRET·FOURSQUARE·SEOUL계열) + PAT(`ghp_s0fb…`)는 전체공개/심사 전 재발급 권장.
+- **다음**: PlayMCP 등록(Endpoint 입력→정보불러오기→**임시등록**→도구함→AI채팅/Claude커넥터 테스트→대화예시 docs/09)→**심사요청 ≤7/7**→전체공개→비즈폼 ≤7/14. (docs/14 §3)
+
+### 🧪 KC 라이브 전수 점검 (2026-06-25, 키 주입 후) — 10/11 정상
+- ✅ **10툴 실데이터 동작**: searchPlaceForeigner(Naver)·findForeignerFriendlyStore(Foursquare 명동)·trackBusArrival(TAGO 부산 서면 실시간)·trackSubwayArrival(서울 지하철)·explainPayment·getAreaGuide·translateMenuContext·getNowInfo·getJejuInfo(VisitJeju)·getWeatherAndAir. (한글 인자는 UTF-8 파일로 검증 — 셸 직접입력은 mojibake 주의)
+- 🔴 **getTransitRoute(ODsay) = KC에서 2회 연속 타임아웃**(일시현상 아님, 신규 블로커). 원인 후보: (a) ODsay 등록 IP 제한(KC outbound IP 미등록, docs/13 §36 예측) / (b) 외부 3연쇄(TourAPI 지오코딩×2+ODsay)로 2.5s 초과. **조치안**: ① odsay/지오코딩 타임아웃 상향(TAGO처럼 ~6s) 후 재배포·재시험 → 여전히 실패면 ② lab.odsay.com 내 애플리케이션에 KC outbound IP 등록.
+- 🟡 translateMenuContext 사전에 `부대찌개`(army stew) 미등록 = 콘텐츠 보강 후보.
 
 ## 지금 바로 다음 할 일 (Next)
 1. **API 키 발급** (사용자 액션) — docs/08 가이드 따라 data.go.kr(버스 TAGO + TourAPI 영문) + ODsay. `.env`에 보관 후 `npm run dev`로 실응답 확인.

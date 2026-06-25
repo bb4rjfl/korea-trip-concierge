@@ -87,9 +87,8 @@
 - [x] **public GitHub repo**: https://github.com/bb4rjfl/korea-trip-concierge
 - [x] 대화 예시 3개(docs/09) + API 키 발급 가이드(docs/08) + 핸드오프(docs/10) 작성
 - [x] **API 키 발급·저장**(.env)+실연동 검증 — TourAPI다국어/TAGO/ODsay/VisitJeju/날씨/지하철/**POI(네이버+Foursquare 영문변환)**. 99 tests.
-- [x] **KC 배포 Active** — `https://korea-trip-concierge.playmcp-endpoint.kakaocloud.io/mcp`, 11툴 라이브검증 ✅ (단 키 미주입=sources false)
-- [ ] **🔥 진행중: 배포 이미지에 키 주입(B2)** — GitHub Secrets→비공개 ghcr 이미지→KC 컨테이너 재등록. 상세 **docs/13_handoff.md §1**
-- [ ] PlayMCP 임시등록→도구함 테스트→심사요청(≤7/7)→전체공개→비즈폼(≤7/14)
+- [x] **KC 배포 Active + 키 주입 완료(B2)** — 컨테이너 이미지(ghcr 비공개) 재등록, ID 638, `https://korea-trip-concierge.playmcp-endpoint.kakaocloud.io/mcp`. 헬스 **sources 전부 true**, 11툴 라이브검증 ✅ (searchPlaceForeigner·getWeatherAndAir 실데이터)
+- [ ] **🔥 다음: PlayMCP 등록** — Endpoint 입력→정보불러오기→임시등록→도구함 테스트(AI채팅/Claude커넥터)→대화예시3개(docs/09)→심사요청(≤7/7)→전체공개→비즈폼(≤7/14). 상세 **docs/13 §1 / docs/14 §3**
 - [ ] 대기: 서울버스 전파 / VisitSeoul·카카오Local 승인
 
 > 상세 진행은 `docs/07_progress.md`(SSOT). **새 세션 진입점: `docs/13_handoff.md`**.

@@ -60,6 +60,22 @@ app.get("/", (_req: Request, res: Response) => {
   });
 });
 
+// TEMP DIAGNOSTIC (remove after ODsay IP allowlisting): report this server's
+// outbound/egress IP so it can be registered in ODsay's Server-IP allowlist.
+// Read-only; calls a public echo service. See docs/07 (getTransitRoute blocker).
+app.get("/egress-ip", async (_req: Request, res: Response) => {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 4000);
+    const r = await fetch("https://api.ipify.org?format=json", { signal: ctrl.signal });
+    clearTimeout(t);
+    const body = (await r.json()) as { ip?: string };
+    res.json({ egressIp: body.ip ?? null, via: "api.ipify.org" });
+  } catch (err) {
+    res.status(502).json({ egressIp: null, error: String(err) });
+  }
+});
+
 // Streamable HTTP, stateless: new server + transport per request, no sessions.
 app.post("/mcp", async (req: Request, res: Response) => {
   const server = buildServer();
