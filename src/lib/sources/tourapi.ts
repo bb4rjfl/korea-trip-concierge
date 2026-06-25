@@ -166,6 +166,34 @@ export interface SearchOptions {
   language?: Lang;
 }
 
+/** Attraction-ish content types (sights/culture/festival) for both numberings. */
+const ATTRACTION_TYPES = new Set(["76", "78", "85", "12", "14", "15"]);
+
+/**
+ * Re-rank results so the place the user likely means floats to the top:
+ * exact title match > prefix > contains > attraction-type > original order
+ * (e.g. "Gyeongbokgung" → the palace, not a nearby flagship store). Pure,
+ * deterministic — no external grounding (A).
+ */
+export function rankPlaces(places: Place[], keyword: string): Place[] {
+  const q = keyword.trim().toLowerCase();
+  if (!q) return places;
+  const score = (p: Place): number => {
+    const t = p.title.toLowerCase();
+    let s = 0;
+    if (t === q) s += 100;
+    else if (t.startsWith(q)) s += 50;
+    else if (t.includes(q)) s += 20;
+    if (p.contentTypeId && ATTRACTION_TYPES.has(p.contentTypeId)) s += 10;
+    return s;
+  };
+  // Stable sort: equal scores keep TourAPI's original order.
+  return places
+    .map((p, i) => ({ p, i, s: score(p) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .map((x) => x.p);
+}
+
 /** Keyword search (searchKeyword2) in the requested language. Cached + time-bounded. */
 export async function searchPlaces(opts: SearchOptions): Promise<Place[]> {
   const lang = opts.language ?? "en";
@@ -178,7 +206,8 @@ export async function searchPlaces(opts: SearchOptions): Promise<Place[]> {
     const json = await fetchJson<TourApiResponse>(buildUrl("searchKeyword2", params, lang));
     return parsePlaces(json, lang);
   });
-  return typeof opts.limit === "number" ? places.slice(0, opts.limit) : places;
+  const ranked = rankPlaces(places, opts.keyword);
+  return typeof opts.limit === "number" ? ranked.slice(0, opts.limit) : ranked;
 }
 
 /**

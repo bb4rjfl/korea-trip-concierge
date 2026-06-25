@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { parsePlaces, searchPlaces, cleanTitle, normalizeLang } from "../src/lib/sources/tourapi.js";
+import { parsePlaces, searchPlaces, cleanTitle, normalizeLang, rankPlaces } from "../src/lib/sources/tourapi.js";
 import { trackBus, resolveCityCode } from "../src/lib/sources/tago.js";
 import { parseRoutes } from "../src/lib/sources/odsay.js";
 import { parseJeju } from "../src/lib/sources/jeju.js";
@@ -75,6 +75,22 @@ describe("TourAPI multilingual (U4)", () => {
   it("cleanTitle keeps a Korean parenthetical for ko output, strips it otherwise", () => {
     expect(cleanTitle("서울특별시 (한국)", "ko")).toBe("서울특별시 (한국)"); // ko keeps Hangul paren
     expect(cleanTitle("Gyeongbokgung(경복궁)", "en")).toBe("Gyeongbokgung"); // en strips it
+  });
+});
+
+describe("rankPlaces (A — relevance ranking)", () => {
+  const shop = { title: "Andersson Bell Gyeongbokgung Flagship Store", address: "", contentTypeId: "79" };
+  const palace = { title: "Gyeongbokgung Palace", address: "", contentTypeId: "76" };
+  const cafe = { title: "Some Cafe", address: "", contentTypeId: "82" };
+
+  it("floats the attraction/prefix match above a flagship store", () => {
+    const ranked = rankPlaces([shop, cafe, palace], "Gyeongbokgung");
+    expect(ranked[0].title).toBe("Gyeongbokgung Palace");
+  });
+
+  it("keeps original order for equal (zero) scores", () => {
+    const ranked = rankPlaces([cafe, shop], "nomatch");
+    expect(ranked.map((p) => p.title)).toEqual(["Some Cafe", "Andersson Bell Gyeongbokgung Flagship Store"]);
   });
 });
 
