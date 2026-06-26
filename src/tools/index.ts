@@ -4,6 +4,7 @@ import { findForeignerFriendlyStore } from "./findForeignerFriendlyStore.js";
 import { getTransitRoute } from "./getTransitRoute.js";
 import { trackBusArrival } from "./trackBusArrival.js";
 import { explainPayment } from "./explainPayment.js";
+import { explainKoreanService } from "./explainKoreanService.js";
 import { getAreaGuide } from "./getAreaGuide.js";
 import { translateMenuContext } from "./translateMenuContext.js";
 import { getNowInfo } from "./getNowInfo.js";
@@ -19,6 +20,7 @@ export const ALL_TOOLS: ToolDef[] = [
   trackBusArrival,
   trackSubwayArrival,
   explainPayment,
+  explainKoreanService,
   getAreaGuide,
   translateMenuContext,
   getNowInfo,

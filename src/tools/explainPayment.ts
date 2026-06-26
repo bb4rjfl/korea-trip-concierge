@@ -60,28 +60,32 @@ const GUIDES: PaymentGuide[] = [
     tip: "Treat mobile pay as a nice bonus, not your main method. Always carry a physical foreign card **and** some cash.",
   },
   {
-    match: /(bus|subway|metro|transit|transport|t-?money|tmoney|교통|버스|지하철)/i,
-    label: "Public transit (bus / subway)",
+    match: /(bus|subway|metro|transit|transport|t-?money|tmoney|cashbee|climate card|k-?pass|교통|버스|지하철|기후동행)/i,
+    label: "Public transit (T-money, transfers, passes)",
     works: [
-      "**T-money / Cashbee card** (buy + cash-charge at any convenience store, ~₩2,500 card). Works everywhere.",
-      "Some lines accept **contactless foreign Visa/Mastercard** via open-loop gates, but coverage is partial — don't rely on it.",
+      "**T-money / Cashbee card** — buy + **cash-charge** at any convenience store (~₩2,500 card). Works on all buses, subways, and most taxis.",
+      "Some subway lines accept **contactless foreign Visa/Mastercard** at open-loop gates, but coverage is partial — don't rely on it.",
     ],
     avoid: [
       "Inserting a foreign card into the bus reader — most do **not** take foreign cards directly.",
-      "Mobile pay (Samsung/Apple Pay registered to a foreign card) — acceptance at gates is inconsistent.",
+      "Forgetting to **tap OUT** — on buses and transfers you must tap when leaving, or you lose the **free 30-minute transfer discount** and can be overcharged.",
+      "Sharing one card for two people — each rider needs their **own** card.",
     ],
-    tip: "Buy a T-money card on arrival and charge it with cash. It's the single most reliable transit payment for foreigners.",
+    tip: "Tap IN and OUT every ride. Heavy travel for a few days? Look at the **Climate Card** (Seoul unlimited, ~₩65,000/30 days) or **K-Pass** (spend rebate). Refund a T-money balance (≤₩20,000, ₩500 fee) at convenience stores; the card deposit isn't refundable.",
   },
   {
-    match: /(taxi|cab|택시)/i,
-    label: "Taxi",
+    match: /(taxi|cab|kakao ?t|uber|택시)/i,
+    label: "Taxi (and avoiding overcharges)",
     works: [
-      "**Cash** (always).",
-      "**Foreign credit cards** in most metered taxis with a card terminal — say \"card, please / 카드요\".",
-      "**Kakao T / Uber** apps let you pre-register a foreign card (app-based, not a Korea card).",
+      "**Metered taxis** — pay **cash** or a **foreign card** at the terminal; say \"card, please / 카드요\".",
+      "**Kakao T** — hail with an email/overseas number, then choose **\"Pay to the driver\"** (registering a foreign card in-app often fails). **Uber** and **k.ride** take foreign cards in-app.",
     ],
-    avoid: ["Assuming every taxi has a working terminal late at night — carry some cash as backup."],
-    tip: "For airport or long rides, app-hailing avoids cash and language friction.",
+    avoid: [
+      "Drivers who **turn the meter off** and quote a flat fare — insist on the meter (\"미터기 켜주세요\").",
+      "Unmarked **\"call van\"** touts at Incheon Airport — they massively overcharge; use the official taxi queue, AREX, or an airport bus.",
+      "Assuming every taxi has a working card terminal late at night — carry some cash.",
+    ],
+    tip: "Insist on the meter. A typical Incheon Airport → central Seoul ride is ~₩60,000–100,000 (+tolls). Overcharged or refused? Note the plate and call **1330** (24h, English) — they help you report it.",
   },
   {
     match: /(market|street|vendor|pojangmacha|시장|포장마차|노점)/i,
@@ -159,6 +163,60 @@ const GUIDES: PaymentGuide[] = [
     avoid: ["Assuming a small temple or rural attraction takes cards — many gates are **cash-only**."],
     tip: "Carry ₩10,000–₩20,000 cash for admission. Many palaces are ~₩3,000 (some free) and close one day a week (often Mon/Tue).",
   },
+  {
+    match: /(ktx|srt|train|rail|korail|기차|열차|기차표|승차권)/i,
+    label: "Train tickets (KTX / SRT)",
+    works: [
+      "**Foreign cards** in the **Korail / Let's Korail** app and **SRT** app (switch to English), and at staffed counters.",
+      "Cash or card at the **station ticket counter**.",
+    ],
+    avoid: [
+      "Self-service station **kiosks** — many post **\"Only Domestic Cards Accepted\"** and reject foreign cards.",
+      "Last-minute booking around **Seollal / Chuseok** — trains sell out; book early in the app.",
+    ],
+    tip: "Buy in the Korail or SRT app with your foreign card, or use the counter — skip the domestic-only kiosks.",
+  },
+  {
+    match: /(tax.?refund|vat|refund|tax.?free|텍스|환급|부가세)/i,
+    label: "Tax refund (VAT) for tourists",
+    works: [
+      "Spend **≥₩15,000** at a **\"Tax Free\"** store and show your **passport**.",
+      "**Immediate refund** at the store counter for smaller buys, or take the refund **slip** to claim at the airport.",
+    ],
+    avoid: [
+      "Forgetting your **passport** — it's required to issue the refund.",
+      "Packing refund goods deep in checked luggage — you may need to **show them** at airport customs.",
+      "Leaving too little time at the airport — the customs-validation + refund-counter steps take a while.",
+    ],
+    tip: "At the airport: scan the slip at a **customs/refund kiosk** (after check-in, before security; keep goods accessible), then collect the refund. Eligible on stays ≤6 months; you get back ≈5–7% of the price.",
+  },
+  {
+    match: /(online|website|app payment|e.?commerce|coupang|gmarket|booking site|결제\s*오류|온라인|쇼핑몰)/i,
+    label: "Online & in-app payments",
+    works: [
+      "**International booking sites** (Klook, Trazy, Agoda, airline/hotel sites) take foreign cards.",
+      "**Global versions** of Korean shops (Coupang Global, Gmarket Global) where offered.",
+    ],
+    avoid: [
+      "Most Korean checkout pages route through **domestic gateways + identity verification (본인인증)** — foreign cards often fail, sometimes only after the first order.",
+      "Apps needing a **Korean phone number / Korean bank account** (KakaoPay, Naver Pay, Toss).",
+    ],
+    tip: "Prefer the **global/English** version or an international reseller (Klook/Trazy) for tickets. Stuck on a Korean-only flow? Call **1330** (24h, English).",
+  },
+  {
+    match: /(atm|withdraw|cash machine|cashpoint|현금인출|에이티엠|인출)/i,
+    label: "ATMs & withdrawing cash",
+    works: [
+      "**\"Global ATM\"** machines (in CU/GS25/7-Eleven, banks, airports) take foreign cards — look for **Visa/Plus/Cirrus/Mastercard** logos.",
+      "Set your PIN to **4 digits** before you travel — Korean ATMs expect 4.",
+    ],
+    avoid: [
+      "Ordinary domestic-only ATMs — they reject foreign cards.",
+      "The ATM's **\"convert to your home currency\" (DCC)** offer — always choose **KRW** for a better rate.",
+      "Three wrong PIN tries — it can **lock** your card.",
+    ],
+    tip: "Withdraw at Global ATMs in convenience stores (24h). Citibank / Standard Chartered and major banks (KB, Woori, Hana, Shinhan) are the most reliable.",
+  },
 ];
 
 const GENERIC: PaymentGuide = {
@@ -202,18 +260,19 @@ function render(situation: string, cardType?: string): string {
 // Location-free chips: keep the user in explainPayment (which needs no area) and
 // surface the high-value new topics, instead of a "find stores nearby" dead-end.
 const CHOICES: Choice[] = [
-  { emoji: "🚌", cmdEn: "How do I pay on the bus or subway?", cmdKo: "교통 결제", descEn: "T-money + transit cards" },
-  { emoji: "📱", cmdEn: "Can I use Apple Pay or Samsung Pay?", descEn: "mobile-pay reality in Korea" },
-  { emoji: "💵", cmdEn: "Do I tip, and how do we split the bill?", descEn: "tipping + splitting etiquette" },
+  { emoji: "🚌", cmdEn: "How do I pay on the bus or subway?", cmdKo: "교통 결제", descEn: "T-money, tap-out, transfers, passes" },
+  { emoji: "🚕", cmdEn: "How do I avoid getting overcharged by taxis?", descEn: "meter, fair fare, 1330" },
+  { emoji: "🧾", cmdEn: "How does the tourist tax refund work?", descEn: "VAT refund steps at the airport" },
 ];
 
 export const explainPayment: ToolDef = {
   name: "explainPayment",
   description:
-    "Explains which payment methods a foreign visitor can actually use in a given Korean situation — transit, " +
-    "taxi, market, kiosk, restaurant, hotel, admission — plus tipping etiquette, bill-splitting, and Apple/" +
-    "Samsung Pay reality, including foreign-card and contactless caveats and cash alternatives. " +
-    `Part of ${SERVICE_NAME}.`,
+    "Explains which payment methods a foreign visitor can actually use in a given Korean situation — transit " +
+    "(T-money, tap-out transfers, Climate Card/K-Pass), taxis (meter + overcharge avoidance), KTX/SRT trains, " +
+    "ATMs (Global ATM, DCC), the tourist VAT tax refund, online/app checkout, markets, kiosks, restaurants, " +
+    "hotels, admission — plus tipping, bill-splitting, and Apple/Samsung Pay reality, with foreign-card caveats " +
+    `and cash alternatives. Part of ${SERVICE_NAME}.`,
   inputSchema: {
     situation: z.string().describe("The situation, e.g. 'paying for the subway' or 'street food market'."),
     cardType: z.string().optional().describe("Optional card brand/type, e.g. 'Visa credit'."),

@@ -7,6 +7,7 @@ import { CITIES, resolveCity, getWeather, getAir } from "../lib/sources/weathera
 import { resolveLandmark, landmarkVerdict } from "../lib/landmarks.js";
 import { searchSeoulContent, getSeoulDetail, pickConfidentMatch, seoulHoursVerdict, clip, type SeoulDetail } from "../lib/sources/visitseoul.js";
 import { matchAreaName } from "./getAreaGuide.js";
+import { koreanHolidayToday, holidayBanner } from "../lib/holidays.js";
 import { similarity, normalizeName } from "../lib/fuzzy.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
@@ -129,12 +130,13 @@ function koreaNow(): { label: string; hour: number; minute: number; dow: number 
 }
 
 // ── VisitSeoul (Seoul) ──────────────────────────────────────────────────────
-function renderSeoulNow(d: SeoulDetail, now: ReturnType<typeof koreaNow>, weather?: string): string {
+function renderSeoulNow(d: SeoulDetail, now: ReturnType<typeof koreaNow>, weather?: string, banner?: string): string {
   // Compute the go/no-go verdict from VisitSeoul's free-text hours — the tool's
   // headline promise, previously missing on the VisitSeoul path (R2).
   const verdict = seoulHoursVerdict(d.hours, d.closedDays, now.dow, now.hour * 60 + now.minute);
   const lines = [`🕒 **${d.title} — right now**`, ""];
   if (verdict) lines.push(verdict.headline, "");
+  if (banner) lines.push(banner, "");
   if (d.address) lines.push(`📍 ${d.address}`);
   lines.push(`⏰ Current Korea time: **${now.label} KST**`);
   if (d.hours) lines.push(`🏛️ Opening hours: ${clip(d.hours, 160)}`);
@@ -174,6 +176,9 @@ export const getNowInfo: ToolDef = {
   handler: async (args) => {
     const place = String(args.place ?? "");
     const language = normalizeLang(args.language as string | undefined);
+    // Korean public-holiday awareness — Chuseok/Seollal close many places that
+    // English "open now" apps still show as open (docs/18 #5). Shown on every path.
+    const hbanner = holidayBanner(koreanHolidayToday());
 
     // Curated landmark overlay (C7): the iconic attractions visitors ask about
     // most are exactly the ones TourAPI indexes poorly ("Han River" → a hotel)
@@ -188,6 +193,7 @@ export const getNowInfo: ToolDef = {
         `🕒 **${landmark.name} — right now**`,
         "",
         verdict.headline,
+        ...(hbanner ? ["", hbanner] : []),
         "",
         `⏰ Current Korea time: **${now.label} KST**`,
         `🏛️ Hours: ${landmark.hoursLabel}`,
@@ -213,6 +219,7 @@ export const getNowInfo: ToolDef = {
         `**${short}** is a neighbourhood, so it doesn't "open" or "close" — it's always there to wander.`,
         `⏰ Current Korea time: **${now.label} KST**`,
       ];
+      if (hbanner) lines.push("", hbanner);
       if (now.hour >= 21 || now.hour < 6) {
         lines.push("", "🌙 It's late — most shops are shut, but nightlife spots and convenience stores stay open.");
       }
@@ -241,7 +248,7 @@ export const getNowInfo: ToolDef = {
           const detail = await getSeoulDetail(hit.cid, language);
           if (detail && (detail.hours || detail.address || detail.subway)) {
             const weather = await weatherLine("Seoul");
-            return ok(renderSeoulNow(detail, koreaNow(), weather), CHOICES);
+            return ok(renderSeoulNow(detail, koreaNow(), weather, hbanner), CHOICES);
           }
         }
       } catch {
@@ -309,6 +316,7 @@ export const getNowInfo: ToolDef = {
       const lines = [
         `🕒 **${top.title} — right now**`,
         "",
+        ...(hbanner ? [hbanner, ""] : []),
         `📍 ${top.address}`,
         `⏰ Current Korea time: **${now.label} KST**`,
       ];

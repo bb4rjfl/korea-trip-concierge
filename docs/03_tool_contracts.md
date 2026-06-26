@@ -48,7 +48,16 @@
 - **description(영문)**: "Explains which payment methods a foreign visitor can actually use in a given Korean situation (transit, market, taxi, kiosk), including foreign-card and contactless caveats. Korea Trip Concierge(코리아 트립 컨시어지)."
 - **inputSchema**: `{ situation: string (required), cardType?: string }`
 - **output**: 가능/불가 방법 + 대안(현금/충전 등) 영문 정리. 끝에 선택지(관련 상황 더보기).
+- **확장(D-016)**: 상황 매트릭스에 **KTX/SRT(국내카드전용 키오스크), 세금환급(VAT), ATM(Global ATM·DCC·4자리PIN), 온라인/앱결제(본인인증 차단)** 추가 + 택시 안티스캠(미터·1330)·T-money 심화(태그아웃·환승·환불·Climate Card/K-Pass).
 - annotations: readOnly true / idempotent true / openWorld false (큐레이션 지식 중심) — 단 실시간 요소 있으면 openWorld true
+
+## 5b. `explainKoreanService`  (한국 시스템 장벽 내비 — D-016, 12번째 툴)
+- **title**: "Get Past Korean Apps & Systems"
+- **description(영문)**: 한국 본인인증/현지인 가정 서비스 우회 — 택시앱·배달·예약·온라인결제·카톡가입·SIM·세금환급·입국서류·응급·키오스크. `Part of Korea Trip Concierge(코리아 트립 컨시어지).`
+- **inputSchema**: `{ service: string (required), detail?: string }` — service는 z.string(enum 미사용, R7 일관성), 핸들러에서 정규식 매칭+GENERIC 폴백.
+- **데이터/로직**: 순수 큐레이션(D-009 안전·PII無·API無). 출력형: ⛔blocker→✅workaround→🔁**twin앱**(k.ride/Shuttle Delivery/CatchTable Global/Gmarket Global/Klook)→🆘fallback→☎️**1330 상시**. 휘발성 항목 날짜표기. **entryDocs 연도가드**: `todayKST() >= "2027-01-01"`이면 "K-ETA 재필요"로 자동 전환 + 공식링크(k-eta.go.kr).
+- **유지보수**: evergreen(응급·키오스크·blocker설명) / quarterly(twin앱 생존·커버리지) / yearly(세금환급 수치·entryDocs). 상세 docs/18.
+- annotations: readOnly true / destructive false / idempotent true / openWorld false
 
 ## 6. `getAreaGuide`
 - **title**: "Get Neighborhood Guide"

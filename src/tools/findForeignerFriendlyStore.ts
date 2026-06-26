@@ -26,6 +26,7 @@ const NEEDS = [
   "convenience",
   "touristInfo",
   "foreignCardDining",
+  "emergency",
 ] as const;
 type Need = (typeof NEEDS)[number];
 
@@ -49,7 +50,7 @@ const ESSENTIALS: Record<Need, Essential> = {
     label: "Foreign-card ATM",
     emoji: "🏧",
     short: "look for 'Global ATM' — convenience stores, banks, airports",
-    tip: "Look for **“Global ATM”** or a card-network logo (Visa/Mastercard/Plus/Cirrus). ATMs inside **CU, GS25, 7-Eleven**, major banks, and airports take foreign cards; **Citibank** and **Standard Chartered** are the most reliable. Withdraw in KRW, and decline the machine's currency-conversion offer for a better rate.",
+    tip: "Look for **“Global ATM”** or a card-network logo (Visa/Mastercard/Plus/Cirrus). ATMs inside **CU, GS25, 7-Eleven**, major banks, and airports take foreign cards; **Citibank** and **Standard Chartered** are the most reliable. Set your PIN to **4 digits** before you travel (3 wrong tries can lock the card), withdraw in **KRW**, and **decline** the machine's currency-conversion (DCC) offer for a better rate.",
     query: "ATM",
   },
   pharmacy: {
@@ -80,6 +81,13 @@ const ESSENTIALS: Record<Need, Essential> = {
     tip: "**Franchises and department-store food courts** reliably take foreign cards: **Olive Young, Starbucks, Paris Baguette, Lotte/Shinsegae food halls**, and most chain restaurants. Small old eateries and street stalls are often **cash-only** — carry some KRW and ask “카드 되나요?” (kadeu doynayo? = do you take card?).",
     query: "맛집",
   },
+  emergency: {
+    label: "Emergency & medical help",
+    emoji: "🆘",
+    short: "119 ambulance · 1339 medical · 1330 (24h English) · 약국 till ~9pm",
+    tip: "**119** = ambulance/fire (free; has interpretation). **112** = police. **1339** = medical advice / nearest ER. **1330** = the 24h multilingual **Korea Travel Hotline** — they do **3-way medical interpretation** and route you. Pharmacies (**약국**, green sign) close ~20:00–21:00; after hours use a **24h pharmacy** or a hospital **ER** (foreign cards accepted). Bring your medicines' **generic names**.",
+    query: "응급실",
+  },
 };
 
 const NEED_BY_ALIAS: Record<string, Need> = {
@@ -96,6 +104,13 @@ const NEED_BY_ALIAS: Record<string, Need> = {
   dining: "foreignCardDining",
   food: "foreignCardDining",
   restaurant: "foreignCardDining",
+  emergency: "emergency",
+  medical: "emergency",
+  hospital: "emergency",
+  ambulance: "emergency",
+  doctor: "emergency",
+  clinic: "emergency",
+  sick: "emergency",
 };
 
 function resolveNeed(input?: string): Need | undefined {
@@ -167,17 +182,17 @@ export const findForeignerFriendlyStore: ToolDef = {
   name: "findForeignerFriendlyStore",
   description:
     "Finds the foreigner essentials a visitor gets stuck on in a Korean neighborhood — currency exchange, " +
-    "foreign-card ATMs, pharmacies, 24h convenience stores, tourist-information centers, and foreign-card-" +
-    "friendly food — with curated tips on which chains and options actually work for foreigners, plus real " +
-    `nearby places. Part of ${SERVICE_NAME}.`,
+    "foreign-card ATMs, pharmacies, 24h convenience stores, tourist-information centers, foreign-card-" +
+    "friendly food, and emergency/medical help (119/1339/1330) — with curated tips on which chains and " +
+    `options actually work for foreigners, plus real nearby places. Part of ${SERVICE_NAME}.`,
   inputSchema: {
     area: z.string().describe("Neighborhood/area, e.g. 'Myeongdong' or '명동'."),
     need: z
       .string()
       .optional()
       .describe(
-        "What you need: currencyExchange, atm (foreign-card), pharmacy, convenience, touristInfo, or " +
-          "foreignCardDining (synonyms understood). Omit for an overview of all essentials in the area.",
+        "What you need: currencyExchange, atm (foreign-card), pharmacy, convenience, touristInfo, " +
+          "foreignCardDining, or emergency (medical/119/1330) — synonyms understood. Omit for an overview.",
       ),
   },
   annotations: {

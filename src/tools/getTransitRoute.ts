@@ -205,7 +205,13 @@ export const getTransitRoute: ToolDef = {
       const top = routes.slice(0, 2).map(renderRoute).join("\n\n");
       // Use the user's own place wording in the header (geocoding may resolve to a
       // nearby shop with an ugly name; the route itself is correct).
-      const body = [`🚇🚌 **${from} → ${to}** — pick how you want to go`, "", top].join("\n");
+      const body = [
+        `🚇🚌 **${from} → ${to}** — pick how you want to go`,
+        "",
+        top,
+        "",
+        `📋 _For the walk to/from the stop, search **${to}** in **Naver Map** — Google Maps walking/driving directions don't work in Korea._`,
+      ].join("\n");
       // Dynamic chips: tap a mode to jump into live tracking (journey UX, Phase 1).
       return ok(body, trackChips(routes.slice(0, 2)));
     } catch {

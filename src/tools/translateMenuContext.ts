@@ -72,13 +72,34 @@ const SPICE_LABEL = ["🌶️ none", "🌶️ mild", "🌶️🌶️ medium", "�
 // concern we can't check (e.g. dairy), which would be dangerous false reassurance.
 const SUPPORTED_ALLERGENS = new Set(DISHES.flatMap((d) => d.allergens));
 
-function renderDish(d: Dish, supportedConcerns: string[], noPork: boolean): string {
+const ANIMAL = ["pork", "fish", "shellfish"];
+
+function renderDish(d: Dish, supportedConcerns: string[], noPork: boolean, veg: boolean): string {
   const hits = d.allergens.filter((a) => supportedConcerns.includes(a));
   const allergenLine = d.allergens.length ? `Allergens: ${d.allergens.join(", ")}` : "No common allergens";
   let warn = hits.length ? `\n  - ⚠️ **Contains ${hits.join(", ")}** (you flagged this)` : "";
   // Hard per-dish flag for halal/pork-free diners (Y12) — the soft broth note isn't enough.
   if (noPork && d.allergens.includes("pork")) warn += `\n  - ⚠️ **Contains pork — not halal/pork-free**`;
+  // Per-dish veg/vegan flag — most Korean dishes hide meat/fish/seafood (docs/18 #7).
+  if (veg) {
+    const animal = d.allergens.filter((a) => ANIMAL.includes(a));
+    if (animal.length) warn += `\n  - ⚠️ **Contains ${animal.join("/")} — not vegetarian/vegan**`;
+  }
   return `- **${d.en}** — ${d.desc}\n  - Spice: ${SPICE_LABEL[d.spice]} · ${allergenLine}${warn}`;
+}
+
+/** A "show this to staff" card of Korean phrases for diet/allergy needs (docs/18 #7). */
+function phraseCard(concerns: string[], veg: boolean, noPork: boolean): string[] {
+  const rows: string[] = [];
+  if (veg)
+    rows.push('- No meat/fish: **"저는 고기와 생선을 안 먹어요"** (_jeo-neun gogi-wa saengseon-eul an meogeoyo_ — "I don\'t eat meat or fish")');
+  if (noPork)
+    rows.push('- No pork: **"돼지고기 빼주세요"** (_dwaeji-gogi ppae-juseyo_ — "please leave out the pork")');
+  const allergyWords = concerns.filter((c) => !/veg|vegan|meat|pork.?free|halal|beef/.test(c));
+  if (allergyWords.length)
+    rows.push(`- Allergy: **"저는 ${allergyWords.join("/")} 알레르기가 있어요"** (_…allergy…_ — say it / show this).`);
+  rows.push('- Ask: **"이거 안에 뭐 들어가요?"** (_i-geo ane mwo deureoga-yo?_ — "what\'s in this?")');
+  return rows.length ? ["", "🪧 **Show this to the staff (Korean):**", ...rows] : [];
 }
 
 function render(menuText: string, concerns: string[]): string {
@@ -104,7 +125,7 @@ function render(menuText: string, concerns: string[]): string {
 
   const lines = [head];
   if (supported.length) lines.push("", `_Checking against: **${supported.join(", ")}** (⚠️ marks dishes that contain these)_`);
-  lines.push("", ...found.map((d) => renderDish(d, supported, noPork)));
+  lines.push("", ...found.map((d) => renderDish(d, supported, noPork, veg)));
 
   const notes: string[] = [];
   // Y13: dish-like tokens we couldn't identify — surface them instead of dropping silently.
@@ -130,6 +151,8 @@ function render(menuText: string, concerns: string[]): string {
     );
   }
   if (notes.length) lines.push("", ...notes.map((n) => `> ${n}`));
+  // Korean phrases to show staff for diet/allergy needs.
+  lines.push(...phraseCard(concerns, veg, noPork));
   // A ready-to-use ordering phrase, in-line — so a non-Korean speaker gets real
   // value instead of a chip that re-runs the same explanation (R4).
   lines.push(

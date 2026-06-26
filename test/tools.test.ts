@@ -48,6 +48,7 @@ describe("handlers return guarded text content", () => {
     trackBusArrival: { busNumber: "143", dropOffStop: "Seomyeon", city: "Busan" },
     trackSubwayArrival: { station: "Gangnam" },
     explainPayment: { situation: "paying for the subway" },
+    explainKoreanService: { service: "taxi app" },
     getAreaGuide: { area: "Myeongdong" },
     translateMenuContext: { menuText: "tteokbokki" },
     getNowInfo: { place: "Gyeongbokgung Palace" },
