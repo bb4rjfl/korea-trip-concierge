@@ -137,8 +137,8 @@ function renderSeoulNow(d: SeoulDetail, now: ReturnType<typeof koreaNow>, weathe
   if (verdict) lines.push(verdict.headline, "");
   if (d.address) lines.push(`📍 ${d.address}`);
   lines.push(`⏰ Current Korea time: **${now.label} KST**`);
-  if (d.hours) lines.push(`🏛️ Opening hours: ${d.hours}`);
-  if (d.closedDays) lines.push(`🚫 Closed: ${d.closedDays}`);
+  if (d.hours) lines.push(`🏛️ Opening hours: ${clip(d.hours, 160)}`);
+  if (d.closedDays) lines.push(`🚫 Closed: ${clip(d.closedDays, 120)}`);
   if (!d.hours && !d.closedDays) {
     lines.push("", "_No published hours found — check on arrival. Most attractions run ~09:00–18:00._");
   }
@@ -231,7 +231,11 @@ export const getNowInfo: ToolDef = {
     // TourAPI. Confident title match only; otherwise fall through to TourAPI.
     if (hasKey("VISITSEOUL_API_KEY")) {
       try {
-        const cand = await searchSeoulContent({ keyword: place, language, limit: 6 });
+        // Exclude utility listings ("… Luggage Storage", lockers, info centers) so a
+        // bare brand token doesn't resolve to one of them (Y7).
+        const cand = (await searchSeoulContent({ keyword: place, language, limit: 8 })).filter(
+          (c) => !/luggage storage|locker|information center|info center|cargo terminal|보관/i.test(c.title),
+        );
         const hit = pickConfidentMatch(place, cand);
         if (hit) {
           const detail = await getSeoulDetail(hit.cid, language);

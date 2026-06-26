@@ -115,14 +115,20 @@ const RETRY: Choice[] = [
   { emoji: "🗺️", cmdEn: "Guide me around this area", descEn: "neighborhood overview instead" },
 ];
 
-function renderNearby(places: PoiPlace[], query: string): string[] {
+function renderNearby(places: PoiPlace[], query: string, need: Need): string[] {
   // Guard against junk rows: empty address, or a name that's just the bare search
   // keyword echoed back (e.g. a "맛집" row with no address).
   const q = query.trim();
+  // For non-dining needs, drop café/restaurant/bar results the keyword search drags
+  // in (an "ATM" search returning a pizzeria) — keeps the list on-need (Y11).
+  const foodNeed = need === "foreignCardDining";
+  const FOOD_RE = /caf[eé]|restaurant|bar\b|pub|bakery|dessert|bistro|커피|카페|맛집|식당|레스토랑/i;
   const clean = places.filter((p) => {
     const name = (p.name ?? "").trim();
     const addr = (p.address ?? "").trim();
-    return name && addr && name !== q && !name.startsWith(`${q} (`);
+    if (!name || !addr || name === q || name.startsWith(`${q} (`)) return false;
+    if (!foodNeed && FOOD_RE.test(`${name} ${p.category ?? ""}`)) return false;
+    return true;
   });
   if (!clean.length) return [];
   const lines = clean.map((p, i) => {
@@ -167,11 +173,11 @@ export const findForeignerFriendlyStore: ToolDef = {
   inputSchema: {
     area: z.string().describe("Neighborhood/area, e.g. 'Myeongdong' or '명동'."),
     need: z
-      .enum(NEEDS)
+      .string()
       .optional()
       .describe(
         "What you need: currencyExchange, atm (foreign-card), pharmacy, convenience, touristInfo, or " +
-          "foreignCardDining. Omit for an overview of all essentials in the area.",
+          "foreignCardDining (synonyms understood). Omit for an overview of all essentials in the area.",
       ),
   },
   annotations: {
@@ -212,7 +218,7 @@ export const findForeignerFriendlyStore: ToolDef = {
           coord: coord ? { lat: coord.lat, lng: coord.lng } : undefined,
           limit: 5,
         });
-        nearby = renderNearby(places, e.query);
+        nearby = renderNearby(places, e.query, need);
       } catch {
         // Live lookup is best-effort; the curated tip already answered the need.
         nearby = ["", "_(Couldn't load nearby spots right now — tap “How do I get there?” or try again.)_"];

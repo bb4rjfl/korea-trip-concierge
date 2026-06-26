@@ -48,6 +48,8 @@ export interface Landmark {
   note: string;
   /** Hours are seasonal/variable — verdict is a best estimate. */
   approx?: boolean;
+  /** Mountain with strict summit-trail entry cutoffs — warn in the afternoon (Y20). */
+  trailCutoff?: boolean;
   /** City for the live weather line (defaults to Seoul). */
   city?: string;
   lat?: number;
@@ -346,6 +348,7 @@ export const LANDMARKS: Landmark[] = [
     hoursLabel: "Daylight — trail entry cutoffs vary by season & trail; start early",
     note: "Korea's highest peak. Summit trails (Seongpanak/Gwaneumsa) have strict entry-cutoff times and may need a reservation — check before you set out.",
     approx: true,
+    trailCutoff: true,
     city: "Jeju",
     lat: 33.3617,
     lng: 126.5292,
@@ -403,6 +406,13 @@ export function landmarkVerdict(l: Landmark, dow: number, minutes: number): Land
   }
 
   if (l.hours === "daylight") {
+    // Mountains: the summit is off-limits if you start too late (Y20).
+    if (l.trailCutoff && minutes >= hm(13)) {
+      return {
+        status: "info",
+        headline: "🟠 Too late for the summit — trails have strict early-afternoon entry cutoffs. Lower trails / visitor center only now; start at dawn for the top.",
+      };
+    }
     if (minutes >= hm(7) && minutes < hm(18)) {
       return { status: "open", headline: "🟢 Good to go now — open-air area, best by day." };
     }

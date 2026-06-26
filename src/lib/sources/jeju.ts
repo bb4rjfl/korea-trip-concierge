@@ -81,14 +81,18 @@ const cache = new TtlCache<JejuPlace[]>(30 * 60_000); // Jeju catalog is static
 // VisitJeju's multilingual catalog occasionally leaks a non-English (e.g.
 // Vietnamese) entry into the English feed — drop those for an English tool.
 const NON_ENGLISH = /[ạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹđĐ぀-ヿ一-鿿]/;
-// Past-dated festival titles ("2019 …") shouldn't show as current.
-const STALE_YEAR = /\b20(0\d|1\d|2[0-4])\b/;
+// Past-dated festival titles/intros ("2019 …") shouldn't show as current (Y1).
+const STALE_YEAR = /\b20(0\d|1\d|2[0-5])\b/;
 
 function isFresh(p: JejuPlace, category?: string): boolean {
   if (NON_ENGLISH.test(p.title)) return false;
-  if (category === "festival" && STALE_YEAR.test(p.title)) return false;
+  // The year often lives in the intro, not the title — check both.
+  if (category === "festival" && (STALE_YEAR.test(p.title) || STALE_YEAR.test(p.intro ?? ""))) return false;
   return true;
 }
+
+// Jeju's must-see sights — floated above niche operators in attraction results (Y19).
+const ICONIC = /(seongsan|ilchulbong|sunrise peak|manjang|hallasan|cheonjiyeon|jeongbang|jusangjeolli|hyeopjae|udo|yongduam|dragon head|seopjikoji|osulloc|o'sulloc|loveland|sangumburi|camellia)/i;
 
 export interface JejuOptions {
   category?: string;
@@ -109,7 +113,16 @@ export async function searchJeju(opts: JejuOptions = {}): Promise<JejuPlace[]> {
     });
     if (ccode) sp.set("category", ccode);
     const json = await fetchJson<SearchResponse>(`${BASE}?${sp.toString()}`);
-    return parseJeju(json).filter((p) => isFresh(p, opts.category?.toLowerCase()));
+    const cat = opts.category?.toLowerCase();
+    const fresh = parseJeju(json).filter((p) => isFresh(p, cat));
+    // Float must-see sights for attraction queries (Y19); stable otherwise.
+    if (cat === "attraction") {
+      return fresh
+        .map((p, i) => ({ p, i, iconic: ICONIC.test(p.title) ? 1 : 0 }))
+        .sort((a, b) => b.iconic - a.iconic || a.i - b.i)
+        .map((x) => x.p);
+    }
+    return fresh;
   });
   return typeof opts.limit === "number" ? places.slice(0, opts.limit) : places;
 }

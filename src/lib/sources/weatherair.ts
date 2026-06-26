@@ -58,6 +58,16 @@ export function resolveCity(name?: string): CityGeo {
   return hit ?? CITIES.seoul;
 }
 
+/** Whether a given name actually resolves to a known city (vs the Seoul default).
+ *  Lets the tool warn instead of silently showing Seoul for a typo/unknown (Y8). */
+export function recognizesCity(name?: string): boolean {
+  const raw = (name ?? "").trim().toLowerCase();
+  if (!raw) return true; // no city given → Seoul default is intentional
+  if (CITIES[raw]) return true;
+  if (KO_ALIAS[(name ?? "").trim()]) return true;
+  return Object.values(CITIES).some((c) => c.label.toLowerCase() === raw);
+}
+
 // ---------- Weather ----------
 
 export interface Weather {

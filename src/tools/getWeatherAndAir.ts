@@ -2,7 +2,7 @@ import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
-import { resolveCity, getWeather, getAir, getWeatherAlerts } from "../lib/sources/weatherair.js";
+import { resolveCity, recognizesCity, getWeather, getAir, getWeatherAlerts } from "../lib/sources/weatherair.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -73,6 +73,14 @@ export const getWeatherAndAir: ToolDef = {
     }
 
     const lines = [`🌤️ **${city.label} — weather & air**`, ""];
+
+    // Don't silently pass off Seoul as a typo'd/unknown city (Y8).
+    if (cityArg && !recognizesCity(cityArg)) {
+      lines.push(
+        `_I don't have data for "${cityArg}" — showing **Seoul**. I cover Busan, Incheon, Daegu, Daejeon, Gwangju, Ulsan, Jeju, Suwon, Gangneung, Jeonju, Gyeongju._`,
+        "",
+      );
+    }
 
     // Safety first: surface any active nationwide weather warnings (typhoon, etc.).
     if (alerts.length) {

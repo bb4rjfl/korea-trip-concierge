@@ -7,6 +7,7 @@ import { routesBetween, type TransitRoute } from "../lib/sources/odsay.js";
 import { romanizeText } from "../lib/romanize.js";
 import { resolvePlaceCoord } from "../lib/places.js";
 import { detectIntercity, renderIntercity } from "../lib/intercity.js";
+import { normalizeName } from "../lib/fuzzy.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -62,8 +63,10 @@ function renderRoute(r: TransitRoute, idx: number): string {
       const icon = MODE_ICON[l.mode] ?? "•";
       // Romanize Korean line/station names from ODsay for English-first readers (U1).
       const line = l.line ? ` **${romanizeText(l.line)}**` : "";
+      // Flag N-prefixed night buses so they're not mistaken for a daytime option (Y21).
+      const night = l.mode === "bus" && /^N\d/i.test(l.line ?? "") ? " 🌙_(night bus, ~23:30–06:00)_" : "";
       const seg = l.from && l.to ? ` ${romanizeText(l.from)} → ${romanizeText(l.to)}` : "";
-      return `   ${icon}${line}${seg}`;
+      return `   ${icon}${line}${seg}${night}`;
     })
     .join("\n");
   return `**Option ${idx + 1} · ${MODE_LABEL[primaryMode(r)]} — ${r.totalMinutes} min${fare}**\n${legs}`;
@@ -76,17 +79,19 @@ function renderRoute(r: TransitRoute, idx: number): string {
  */
 function trackChips(routes: TransitRoute[]): Choice[] {
   const legs = routes.flatMap((r) => r.legs);
-  const subLeg = legs.find((l) => l.mode === "subway" && l.from);
+  const subLegs = legs.filter((l) => l.mode === "subway" && l.from);
   const busLeg = legs.find((l) => l.mode === "bus" && l.line);
+  const board = subLegs[0];
+  // The transfer station (a later subway boarding point) is where timing matters most —
+  // offer it alongside the origin so riders can track the connection (Y15).
+  const transfer = subLegs.slice(1).find((l) => l.from && l.from !== board?.from);
   const chips: Choice[] = [];
-  if (subLeg?.from) {
-    chips.push({
-      emoji: "🚇",
-      cmdEn: `Track the subway at ${romanizeText(subLeg.from)}`,
-      descEn: "live arrivals + train position",
-    });
+  if (board?.from) {
+    chips.push({ emoji: "🚇", cmdEn: `Track the subway at ${romanizeText(board.from)}`, descEn: "live arrivals + train position" });
   }
-  if (busLeg?.line) {
+  if (transfer?.from) {
+    chips.push({ emoji: "🔀", cmdEn: `Track the subway at ${romanizeText(transfer.from)}`, descEn: "your transfer station" });
+  } else if (busLeg?.line) {
     chips.push({ emoji: "🚌", cmdEn: `Track bus ${romanizeText(busLeg.line)}`, descEn: "where the bus is + when it arrives" });
   }
   chips.push({ emoji: "💳", cmdEn: "How do I pay for this?", descEn: "transit payment guide" });
@@ -153,6 +158,15 @@ export const getTransitRoute: ToolDef = {
           { emoji: "🗼", cmdEn: `Route from ${origin} to N Seoul Tower`, descEn: "to N Seoul Tower" },
         ],
       );
+    }
+
+    // Same origin & destination → no route needed; avoid a misleading "timeout" (Y9).
+    if (normalizeName(from) && normalizeName(from) === normalizeName(to)) {
+      return ok(`📍 You're already at **${to}** — no transit route needed.`, [
+        { emoji: "🗺️", cmdEn: `Guide me around ${to}`, descEn: "neighborhood overview" },
+        { emoji: "🕒", cmdEn: `Is ${to} good to go now?`, descEn: "live hours + weather" },
+        { emoji: "🔎", cmdEn: `Find places in ${to}`, descEn: "things to do nearby" },
+      ]);
     }
 
     // Intercity (e.g. Seoul→Busan) is beyond city subway/bus — ground it with

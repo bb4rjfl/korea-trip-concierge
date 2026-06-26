@@ -52,7 +52,7 @@ const AREAS: Area[] = [
     name: "Insadong (인사동)",
     blurb:
       "Traditional-culture street — hanok teahouses, calligraphy and craft shops, galleries. The easiest place to feel 'old Korea' on foot.",
-    spots: ["Ssamziegil shopping maze", "traditional teahouses", "antique & craft shops", "Jogyesa Temple (nearby)"],
+    spots: ["Ssamzigil shopping maze", "traditional teahouses", "antique & craft shops", "Jogyesa Temple (nearby)"],
     getThere: "Anguk Stn (Line 3) Exit 6.",
     interests: { history: "Pair with Gyeongbokgung & Bukchon Hanok Village, both a short walk away.", shopping: "Crafts, hanji paper, souvenirs." },
   },
@@ -232,12 +232,25 @@ function normalizeInterest(raw?: string): string | undefined {
   return q;
 }
 
-/** The display name of a curated area if `text` names one, else undefined.
- *  Used by getNowInfo to recognise a neighbourhood (which has no single "open"
- *  verdict) vs a specific venue. */
+/** The display name of a curated area if `text` is essentially *just* that area,
+ *  else undefined. Used by getNowInfo to recognise a neighbourhood (no single
+ *  "open" verdict) — but NOT a specific venue that merely contains an area name
+ *  ("Bongchu Jjimdak Myeongdong" is a restaurant, not "Myeongdong"). */
 export function matchAreaName(text: string): string | undefined {
-  const a = AREAS.find((x) => x.keys.test((text ?? "").trim()));
-  return a?.name;
+  const t = (text ?? "").trim();
+  if (!t) return undefined;
+  for (const a of AREAS) {
+    if (!a.keys.test(t)) continue;
+    // Whatever's left after removing the area token (and generic area words) must
+    // be trivial — otherwise it's a specific place, not a bare neighbourhood.
+    const remainder = t
+      .replace(a.keys, " ")
+      .replace(/\b(area|district|neighbou?rhood|map|guide|동|구|역|station|stn)\b/gi, " ")
+      .replace(/[^a-z0-9가-힣]/gi, "")
+      .trim();
+    if (remainder.length <= 2) return a.name;
+  }
+  return undefined;
 }
 
 function renderGuide(a: Area, interest?: string): string {
@@ -282,6 +295,18 @@ const CHOICES: Choice[] = [
   { emoji: "🌤️", cmdEn: "Weather & fine dust today", descEn: "forecast + air quality" },
 ];
 
+/** Footer for a matched guide; foodies get a direct "eat here" chip (Y10). */
+function guideChoices(areaShort: string, interest?: string): Choice[] {
+  if (interest === "food") {
+    return [
+      { emoji: "🍽️", cmdEn: `Find foreigner-friendly places to eat in ${areaShort}`, descEn: "restaurants that take foreign cards" },
+      { emoji: "🚇", cmdEn: "How do I get here?", cmdKo: "가는 길", descEn: "public-transit route" },
+      { emoji: "🧭", cmdEn: "Find foreigner essentials here", descEn: "ATM, pharmacy, exchange" },
+    ];
+  }
+  return CHOICES;
+}
+
 /** Footer when the area isn't in our curated set — steer to a real search of
  *  that same area instead of dead-end "here" chips. */
 function unknownChoices(areaQuery: string): Choice[] {
@@ -317,6 +342,6 @@ export const getAreaGuide: ToolDef = {
     const interest = normalizeInterest(args.interest ? String(args.interest) : undefined);
     const a = AREAS.find((x) => x.keys.test(area));
     if (!a) return ok(renderUnknown(area), unknownChoices(area));
-    return ok(renderGuide(a, interest), CHOICES);
+    return ok(renderGuide(a, interest), guideChoices(a.name.split(" ")[0], interest));
   },
 };

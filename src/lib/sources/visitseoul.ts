@@ -283,6 +283,30 @@ export function stripHtml(html?: string): string {
     .trim();
 }
 
+/** Neutralize stray angle-bracket markup in a summary so it renders as text, not
+ *  a broken HTML tag (Y4): "become a <Running Man> member" → "…‘Running Man’…". */
+export function cleanSummary(s?: string): string | undefined {
+  if (!s) return undefined;
+  const out = s
+    .replace(/<([^<>]{1,60})>/g, "‘$1’")
+    .replace(/[<>]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return out || undefined;
+}
+
+/** Current year in KST (server runtime; not used by pure parsers). */
+export function currentYearKST(): number {
+  return Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", year: "numeric" }).format(new Date()));
+}
+
+/** A title carrying only past years ("2020 Insadong Culture Festival") is a stale
+ *  event we shouldn't surface as current (Y1). Time-injected for testability. */
+export function isStalePastEvent(title: string, currentYear: number): boolean {
+  const years = [...(title ?? "").matchAll(/\b(?:19|20)\d{2}\b/g)].map((m) => Number(m[0]));
+  return years.length > 0 && years.every((y) => y < currentYear);
+}
+
 function catPath(cate_depth: unknown): string | undefined {
   if (Array.isArray(cate_depth)) return cate_depth.filter(Boolean).join(" > ") || undefined;
   if (typeof cate_depth === "string") return cate_depth.trim() || undefined;
@@ -298,7 +322,7 @@ export function parseList(json: VsListResponse): SeoulContent[] {
     .map((it) => ({
       cid: String(it.cid),
       title: cleanTitle(it.post_sj),
-      summary: it.sumry?.replace(/\s+/g, " ").trim() || undefined,
+      summary: cleanSummary(it.sumry),
       image: it.main_img?.trim() || undefined,
       categoryPath: catPath(it.cate_depth),
     }));
@@ -318,7 +342,7 @@ export function parseDetail(json: VsDetailResponse): SeoulDetail | undefined {
   return {
     cid: String(d.cid),
     title: cleanTitle(d.post_sj),
-    summary: d.sumry?.replace(/\s+/g, " ").trim() || undefined,
+    summary: cleanSummary(d.sumry),
     image: d.main_img?.trim() || undefined,
     categoryPath: catPath(d.cate_depth),
     hours: stripHtml(e.cmmn_use_time) || undefined,

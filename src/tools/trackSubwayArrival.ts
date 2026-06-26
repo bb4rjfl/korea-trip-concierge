@@ -57,15 +57,24 @@ function render(station: string, arrivals: SubwayArrival[]): string {
   }
 
   const lines = [`🚇 **${station} — next trains**`, ""];
+  // Cap directions so mega-interchanges (Seoul Station = 17 groups) don't wall-of-text (Y17).
+  const MAX_DIRS = 6;
+  let shown = 0;
   for (const [, arr] of byDir) {
-    // Romanize the Korean direction string for English-first readers (U1).
-    lines.push(`**→ ${formatSubwayDirection(arr[0].towards || arr[0].destination)}**`);
+    if (shown >= MAX_DIRS) {
+      lines.push(`_…and ${byDir.size - shown} more direction(s) — name a line (e.g. "Line 1") to narrow it down._`);
+      break;
+    }
+    // Romanize the Korean direction; drop a self-referential "(via X)" == destination.
+    const dir = formatSubwayDirection(arr[0].towards || arr[0].destination).replace(/^to (.+?) \(via \1\)$/, "to $1");
+    lines.push(`**→ ${dir}**`);
     for (const a of arr) {
       const eta = a.etaMinutes != null ? `**${a.etaMinutes} min**` : `_${a.status}_`;
       const loc = a.currentLocation ? ` · near ${romanizeText(a.currentLocation)}` : "";
       lines.push(`- ${a.line}: ${eta}${loc}`);
     }
     lines.push("");
+    shown++;
   }
   lines.push("_Tap Refresh on the platform to keep it live._");
   return lines.join("\n");
@@ -128,7 +137,16 @@ function renderJourney(
       const dir = a.towards ? ` · ${formatSubwayDirection(a.towards)}` : "";
       lines.push(`- ${eta}${dir}`);
     }
-    lines.push("", `_Board the train heading toward **${toLabel}**'s side._`);
+    // Honest boarding guidance (R8): name the direction by the train's terminus,
+    // and don't pretend a loop has one obvious side.
+    if (/\bLine 2\b/.test(line)) {
+      lines.push(
+        "",
+        `_⟳ Line 2 is a loop — **both directions reach ${toLabel}**, but the short way is ${stops} ${stops === 1 ? "stop" : "stops"}. Take the platform whose next stops head toward ${toLabel}; if the count climbs past ${stops}, you're going the long way — cross to the other platform._`,
+      );
+    } else {
+      lines.push("", `_Board a train whose final stop is **beyond ${toLabel}** (check the direction shown above)._`);
+    }
   }
   lines.push("", "_Tap “Where am I now” at each stop to count down._");
   return lines.join("\n");

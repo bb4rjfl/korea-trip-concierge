@@ -32,7 +32,7 @@ const DISHES: Dish[] = [
   { match: /삼계탕|samgyetang/i, en: "Ginseng chicken soup", desc: "Whole young chicken stuffed with rice, ginseng, and garlic in a mild broth — a summer health dish.", spice: 0, allergens: [] },
   { match: /잡채|japchae/i, en: "Glass noodle stir-fry", desc: "Sweet-savory sweet-potato glass noodles with vegetables and beef.", spice: 0, allergens: ["soy", "sesame", "egg"] },
   { match: /해장국|haejangguk/i, en: "Hangover soup", desc: "Hearty soup (often with ox-blood, pork spine, or cabbage) eaten to recover from drinking.", spice: 1, allergens: ["soy"] },
-  { match: /순대|sundae/i, en: "Korean blood sausage", desc: "Steamed pig-intestine sausage filled with noodles and barley — savory, often with offal.", spice: 0, allergens: ["pork", "soy"] },
+  { match: /순대|sundae/i, en: "Korean blood sausage", desc: "Steamed pig-intestine sausage filled with noodles and barley — savory, often with offal.", spice: 0, allergens: ["pork", "soy", "gluten"] },
   { match: /파전|해물전|pajeon|\bjeon\b/i, en: "Savory pancake", desc: "Pan-fried scallion (and often seafood) pancake; crispy edges, soft center.", spice: 0, allergens: ["gluten", "egg", "shellfish", "soy"] },
   { match: /부대찌개|budae|army stew/i, en: "Army stew", desc: "Spicy hot-pot of kimchi, sausage, Spam, tofu, and instant noodles — a post-war fusion classic, shared at the table.", spice: 2, allergens: ["gluten", "pork", "soy"] },
   { match: /갈비찜|galbi.?jjim/i, en: "Braised short ribs", desc: "Beef short ribs braised until tender in a sweet soy sauce with vegetables.", spice: 0, allergens: ["soy", "sesame", "gluten"] },
@@ -72,10 +72,12 @@ const SPICE_LABEL = ["🌶️ none", "🌶️ mild", "🌶️🌶️ medium", "�
 // concern we can't check (e.g. dairy), which would be dangerous false reassurance.
 const SUPPORTED_ALLERGENS = new Set(DISHES.flatMap((d) => d.allergens));
 
-function renderDish(d: Dish, supportedConcerns: string[]): string {
+function renderDish(d: Dish, supportedConcerns: string[], noPork: boolean): string {
   const hits = d.allergens.filter((a) => supportedConcerns.includes(a));
   const allergenLine = d.allergens.length ? `Allergens: ${d.allergens.join(", ")}` : "No common allergens";
-  const warn = hits.length ? `\n  - ⚠️ **Contains ${hits.join(", ")}** (you flagged this)` : "";
+  let warn = hits.length ? `\n  - ⚠️ **Contains ${hits.join(", ")}** (you flagged this)` : "";
+  // Hard per-dish flag for halal/pork-free diners (Y12) — the soft broth note isn't enough.
+  if (noPork && d.allergens.includes("pork")) warn += `\n  - ⚠️ **Contains pork — not halal/pork-free**`;
   return `- **${d.en}** — ${d.desc}\n  - Spice: ${SPICE_LABEL[d.spice]} · ${allergenLine}${warn}`;
 }
 
@@ -98,12 +100,25 @@ function render(menuText: string, concerns: string[]): string {
   const supported = concerns.filter((c) => SUPPORTED_ALLERGENS.has(c));
   const unsupported = concerns.filter((c) => !SUPPORTED_ALLERGENS.has(c));
   const veg = concerns.some((c) => /veg|vegan|meat|pork.?free|halal|beef/.test(c));
+  const noPork = concerns.some((c) => /halal|pork.?free|no.?pork/.test(c));
 
   const lines = [head];
   if (supported.length) lines.push("", `_Checking against: **${supported.join(", ")}** (⚠️ marks dishes that contain these)_`);
-  lines.push("", ...found.map((d) => renderDish(d, supported)));
+  lines.push("", ...found.map((d) => renderDish(d, supported, noPork)));
 
   const notes: string[] = [];
+  // Y13: dish-like tokens we couldn't identify — surface them instead of dropping silently.
+  const unmatched = [
+    ...new Set(
+      menuText
+        .split(/[\s,/·]+/)
+        .map((t) => t.trim())
+        .filter((t) => t.length >= 2 && /[가-힣]/.test(t) && !found.some((d) => d.match.test(t))),
+    ),
+  ];
+  if (unmatched.length) {
+    notes.push(`❓ Couldn't identify **${unmatched.slice(0, 6).join(", ")}** — ask the restaurant or send the exact text.`);
+  }
   // Honesty: don't pretend to verify allergens/diets we don't track.
   const cantCheck = unsupported.filter((c) => !/veg|vegan|meat|pork.?free|halal|beef/.test(c));
   if (cantCheck.length) {

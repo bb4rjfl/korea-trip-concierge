@@ -28,6 +28,22 @@ export function hasPoiProvider(): boolean {
   return (hasKey("NAVER_CLIENT_ID") && hasKey("NAVER_CLIENT_SECRET")) || hasKey("FOURSQUARE_API_KEY");
 }
 
+/** Drop SEO-spam titles ("name | keyword | keyword …") and overly long names, and
+ *  dedupe by name+address — keeps POI lists clean for the tools (Y11). */
+function denoise(places: PoiPlace[]): PoiPlace[] {
+  const seen = new Set<string>();
+  const out: PoiPlace[] = [];
+  for (const p of places) {
+    const name = (p.name ?? "").trim();
+    if (!name || name.includes("|") || name.length > 70) continue;
+    const key = `${name.toLowerCase()}|${(p.address ?? "").toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(p);
+  }
+  return out;
+}
+
 const cache = new TtlCache<PoiPlace[]>(5 * 60_000);
 
 // ---------- Naver Local Search ----------
@@ -196,5 +212,5 @@ export async function searchForeignerPois(opts: PoiSearchOptions): Promise<PoiPl
     // TODO(visitseoul): when VISITSEOUL_API_KEY is live, merge its (natively
     // multilingual) results here and dedupe for richer combined output (D-010).
   });
-  return places.slice(0, limit);
+  return denoise(places).slice(0, limit);
 }

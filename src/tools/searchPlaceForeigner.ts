@@ -8,11 +8,14 @@ import {
   searchSeoulContent,
   isSeoulText,
   inferSeoulCategory,
+  isStalePastEvent,
+  currentYearKST,
   clip,
   VS_CATEGORY,
   type SeoulContent,
 } from "../lib/sources/visitseoul.js";
 import { resolvePlaceCoord } from "../lib/places.js";
+import { similarity } from "../lib/fuzzy.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -75,9 +78,19 @@ const FOOD_TERMS: [RegExp, string][] = [
   [/cafe|coffee|카페|커피/i, "cafe"],
 ];
 
-/** Pick a concrete food keyword from the query for the POI search (else "restaurant"). */
+// Diet/style qualifiers we keep alongside the dish so "vegan ramen" searches
+// "vegan ramen", not generic ramen (Y2).
+const DIET_QUALIFIER = /\b(vegan|vegetarian|halal|kosher)\b/i;
+
+/** Pick a concrete food keyword from the query for the POI search (else
+ *  "restaurant"), preserving a diet qualifier when present (Y2). */
 function foodKeyword(query: string): string {
-  for (const [re, kw] of FOOD_TERMS) if (re.test(query)) return kw;
+  for (const [re, kw] of FOOD_TERMS) {
+    if (!re.test(query)) continue;
+    const m = query.match(DIET_QUALIFIER);
+    const q = m?.[1]?.toLowerCase();
+    return q && q !== kw ? `${q} ${kw}` : kw;
+  }
   return "restaurant";
 }
 
@@ -109,7 +122,12 @@ function renderPois(query: string, pois: PoiPlace[]): string {
     const cat = p.category ? ` · _${p.category}_` : "";
     return `**${i + 1}. ${p.name}**${cat}\n   📍 ${p.address}${tel}`;
   });
-  return [`🔎 **Places for** _"${query}"_ — _live local search_`, "", ...lines].join("\n");
+  const out = [`🔎 **Places for** _"${query}"_ — _live local search_`, "", ...lines];
+  // Diet honesty: search can't verify vegan/halal — tell the visitor to confirm (Y2).
+  if (/\b(vegan|vegetarian|halal|kosher)\b/i.test(query)) {
+    out.push("", "> ⚠️ I can't verify dietary options remotely — confirm vegan/halal etc. with the restaurant.");
+  }
+  return out.join("\n");
 }
 
 function renderPlaces(query: string, places: Place[]): string {
@@ -181,6 +199,43 @@ function renderSeoul(query: string, items: SeoulContent[]): string {
   ].join("\n");
 }
 
+/** Float results matching a specific noun in the query (museum/palace/gallery)
+ *  above tangential exhibitions/events the "latest" sort surfaces first (Y3). */
+function rankByIntent(items: SeoulContent[], query: string): SeoulContent[] {
+  const q = query.toLowerCase();
+  const want = /museum|박물관/.test(q)
+    ? /museum/i
+    : /palace|궁/.test(q)
+      ? /palace|궁/i
+      : /gallery|미술관/.test(q)
+        ? /galler|미술/i
+        : null;
+  if (!want) return items;
+  const score = (c: SeoulContent): number =>
+    (want.test(c.title) ? 2 : 0) + (c.categoryPath && want.test(c.categoryPath) ? 1 : 0);
+  return items
+    .map((c, i) => ({ c, i, s: score(c) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .map((x) => x.c);
+}
+
+/** Fuzzy-correct a typo'd Seoul area to a known name ("Seongsoo"→"Seongsu") so it
+ *  resolves instead of returning "no places" (Y6). Leaves known/unknown as-is. */
+function correctArea(area: string): string {
+  const a = area.trim();
+  if (!a || resolvePlaceCoord(a)) return a;
+  let best = "";
+  let bestS = 0;
+  for (const name of SEOUL_AREAS) {
+    const s = similarity(a, name);
+    if (s > bestS) {
+      bestS = s;
+      best = name;
+    }
+  }
+  return bestS >= 0.7 ? best : a;
+}
+
 /**
  * VisitSeoul (Seoul, non-dining) — official curated discovery. Returns rendered
  * Markdown when it has picks, else "" so the caller grounds the gap with the
@@ -198,12 +253,18 @@ async function trySeoul(
   const kw = seoulKeyword(area, query);
   try {
     // 1) area-narrowed within category; broaden if thin so we still lead with VS.
-    let vs = await searchSeoulContent({ category: vsCat, keyword: kw, language, limit: 6 });
+    let vs = await searchSeoulContent({ category: vsCat, keyword: kw, language, limit: 8 });
     if (vs.length < 3) {
       const broaden = vsCat ?? VS_CATEGORY.culture; // generic discovery → things to see
-      const more = await searchSeoulContent({ category: broaden, keyword: kw, language, limit: 6 });
-      vs = dedupeByTitle([...vs, ...more], 6);
+      const more = await searchSeoulContent({ category: broaden, keyword: kw, language, limit: 8 });
+      vs = dedupeByTitle([...vs, ...more], 8);
     }
+    // Drop stale past-dated events (Y1) and float intent-matching picks (Y3).
+    const year = currentYearKST();
+    vs = rankByIntent(
+      vs.filter((c) => !isStalePastEvent(c.title, year)),
+      query,
+    ).slice(0, 6);
     return vs.length ? renderSeoul(query, vs) : undefined;
   } catch {
     return undefined; // fall through to national grounding
@@ -234,7 +295,7 @@ export const searchPlaceForeigner: ToolDef = {
   },
   handler: async (args) => {
     const query = String(args.query ?? "");
-    const area = args.area ? String(args.area) : "";
+    const area = correctArea(args.area ? String(args.area) : ""); // typo → known area (Y6)
     const category = args.category ? String(args.category) : undefined;
     const cat = inferCategory(query, category);
     const language = normalizeLang(args.language as string | undefined);

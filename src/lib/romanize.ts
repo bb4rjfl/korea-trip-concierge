@@ -248,7 +248,16 @@ export function romanizeHangul(text: string): string {
       runStart = true;
     }
   }
-  return out;
+  // Y5: addresses transliterate to run-together strings ("Wausanro35Gil") — the
+  // one string a visitor pastes into Maps. Space the embedded numbers and hyphenate
+  // the number+suffix units so it's legible ("Wausanro 35-gil"). Only split at
+  // lowercase→digit and digit→Uppercase boundaries so pre-romanized English like
+  // "T2" / "B1" is left intact.
+  return out
+    .replace(/([a-z])(\d)/g, "$1 $2")
+    .replace(/(\d)([A-Z])/g, "$1 $2")
+    .replace(/\b(\d+) (Gil|Ga|Ro)\b/g, (_m, n: string, suf: string) => `${n}-${suf.toLowerCase()}`)
+    .replace(/\s{2,}/g, " ");
 }
 
 /** Romanize a single Korean station name. Falls back to the original Korean. */

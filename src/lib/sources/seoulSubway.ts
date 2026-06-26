@@ -154,14 +154,19 @@ export type StopsResult =
  *  - no-data: a station returned no live ids — Seoul subway runs ~05:30–01:00,
  *    so off-hours there are no arrivals to read statnId from (don't mislabel
  *    this as "different lines").
- *  Note (MVP): for the Line-2 loop the raw statnId gap can be the long way; a
- *  short-way/direction refinement is deferred (docs/03 §11). */
+ *  Line 2 is a loop (43 main-loop stations): a raw statnId gap over half the loop
+ *  is the long way round, so we take the short arc (R8). */
 export async function stopsBetween(fromKo: string, toKo: string): Promise<StopsResult> {
   const [a, b] = await Promise.all([getStationLineIds(fromKo), getStationLineIds(toKo)]);
   if (!a.length || !b.length) return { ok: false, reason: "no-data" };
   for (const x of a) {
     const y = b.find((bb) => bb.subwayId === x.subwayId);
-    if (y) return { ok: true, line: x.line, stops: Math.abs(y.statnId - x.statnId) };
+    if (!y) continue;
+    let stops = Math.abs(y.statnId - x.statnId);
+    // Line 2 loop: 22..42 stops one way = 21..1 the short way (leave branch-range
+    // gaps ≥43 alone — those usually need a transfer anyway).
+    if (x.subwayId === "1002" && stops > 21 && stops < 43) stops = 43 - stops;
+    return { ok: true, line: x.line, stops };
   }
   return { ok: false, reason: "different-lines" };
 }
