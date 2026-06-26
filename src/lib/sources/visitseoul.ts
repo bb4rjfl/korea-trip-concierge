@@ -58,6 +58,7 @@ export const VS_CATEGORY = {
   market: "Cn7z1h7", // Shopping > Traditional Markets
   museum: "Cg1x6l1", // Culture > Cultural Facilities (museums & galleries)
   templestay: "Cq9d5v0", // Experience Programs > Temple Stays
+  themepark: "Cy5h2x9", // Culture > Theme Parks (kid/family-friendly)
 } as const;
 
 /** Keyword → VisitSeoul category, richer than TourAPI's inferCategory so Seoul
@@ -67,16 +68,21 @@ export const VS_CATEGORY = {
 export function inferSeoulCategory(text: string): string | undefined {
   const q = (text ?? "").toLowerCase();
   if (/temple\s*stay|템플스테이/.test(q)) return VS_CATEGORY.templestay;
+  // Kid/family/theme-park intent (incl. ja/zh) → theme parks, before generic culture.
+  if (/kid|child|family|toddler|아이|어린이|가족|子供|親子|亲子|theme\s*park|amusement\s*park|놀이공원|에버랜드|롯데월드/.test(q))
+    return VS_CATEGORY.themepark;
   if (/hanbok|한복|craft|공방|workshop|체험|experience|wellness|temple\s*food/.test(q))
     return VS_CATEGORY.experience;
-  if (/museum|박물관|gallery|미술관|exhibit|전시/.test(q)) return VS_CATEGORY.museum;
+  if (/mus[eu]+ms?|museam|박물관|gallery|galleries|미술관|exhibit|전시/.test(q)) return VS_CATEGORY.museum;
   if (/market|시장|재래/.test(q)) return VS_CATEGORY.market;
   if (/palace|궁|temple|historic|heritage|유적|역사|shrine|fortress|성곽/.test(q)) return VS_CATEGORY.history;
   if (/park|mountain|river|han\s*river|nature|산|강|공원|hiking|trail|숲/.test(q)) return VS_CATEGORY.nature;
   if (/shop|shopping|mall|outlet|duty.?free|백화점|쇼핑|면세/.test(q)) return VS_CATEGORY.shopping;
   if (/hotel|hostel|stay|guesthouse|숙소|호텔/.test(q)) return VS_CATEGORY.accommodation;
   if (/festival|축제|event|행사|performance|공연|concert/.test(q)) return VS_CATEGORY.festival;
-  if (/landmark|attraction|sight|tower|관광|명소|구경|view|spot/.test(q)) return VS_CATEGORY.culture;
+  // Generic sightseeing intent, incl. ja/zh and "things to see / worth visiting".
+  if (/landmark|attraction|sight|tower|관광|명소|구경|view|spot|볼거리|가\s*볼|things?\s*to\s*(see|do)|worth\s*(see|visit)|観光|名所|スポット|景点|景區|景区|打卡/.test(q))
+    return VS_CATEGORY.culture;
   return undefined;
 }
 
@@ -175,6 +181,88 @@ export function clip(s: string, n: number): string {
   return (sp > n * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + "…";
 }
 
+const DOW_FULL = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const DOW_ABBR = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+const cap = (s: string): string => (s ? s[0].toUpperCase() + s.slice(1) : s);
+const hhmm = (min: number): string => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+
+export interface HoursVerdict {
+  status: "open" | "closed";
+  headline: string;
+}
+
+/**
+ * Best-effort open/closed verdict from VisitSeoul's free-text hours/closed fields
+ * (R2 — getNowInfo's whole promise). Handles the common shapes seen live:
+ * "Tuesday~Sunday 09:00~18:00 (Last Admission 17:30)", "Closed every Monday",
+ * "Normal hours 10:30–20:00 / Extended 10:30–20:30", midnight-crossing ranges.
+ * Returns undefined when nothing parseable is present (caller then shows hours
+ * without a verdict rather than guessing). `dow` 0=Sun…6=Sat, `minutes` KST.
+ */
+export function seoulHoursVerdict(
+  hours: string | undefined,
+  closed: string | undefined,
+  dow: number,
+  minutes: number,
+): HoursVerdict | undefined {
+  const h = (hours ?? "").toLowerCase();
+  const c = (closed ?? "").toLowerCase();
+  const today = DOW_FULL[dow];
+
+  // 1) Explicit closed-days text naming today (e.g. "closed every monday").
+  if (today && c.includes(today)) {
+    return { status: "closed", headline: `🔴 Closed today (${cap(today)}).` };
+  }
+  // 2) Operating day-range in the hours text (e.g. "Tuesday~Sunday 09:00~18:00").
+  const dr = h.match(/(sun|mon|tue|wed|thu|fri|sat)[a-z]*\s*[~\-–—]\s*(sun|mon|tue|wed|thu|fri|sat)[a-z]*/);
+  if (dr) {
+    const start = DOW_ABBR.indexOf(dr[1]);
+    const end = DOW_ABBR.indexOf(dr[2]);
+    if (start >= 0 && end >= 0) {
+      const days = new Set<number>();
+      for (let i = 0; i < 7; i++) {
+        const d = (start + i) % 7;
+        days.add(d);
+        if (d === end) break;
+      }
+      if (!days.has(dow)) {
+        return { status: "closed", headline: `🔴 Closed today — open ${cap(DOW_ABBR[start])}–${cap(DOW_ABBR[end])}.` };
+      }
+    }
+  }
+  // 3) Widest [open, close] across all HH:MM–HH:MM ranges (handles multi-part hours).
+  const ranges = [...h.matchAll(/(\d{1,2}):(\d{2})\s*[~\-–—]\s*(\d{1,2}):(\d{2})/g)];
+  if (ranges.length === 0) return undefined; // nothing parseable → no verdict
+  let minOpen = Infinity;
+  let maxClose = -Infinity;
+  for (const m of ranges) {
+    const o = Number(m[1]) * 60 + Number(m[2]);
+    let cl = Number(m[3]) * 60 + Number(m[4]);
+    if (cl <= o) cl += 24 * 60; // crosses midnight
+    minOpen = Math.min(minOpen, o);
+    maxClose = Math.max(maxClose, cl);
+  }
+  const inWindow = (t: number): boolean => t >= minOpen && t < maxClose;
+  if (inWindow(minutes) || (maxClose > 24 * 60 && inWindow(minutes + 24 * 60))) {
+    return { status: "open", headline: `🟢 Open now (until ${hhmm(maxClose % (24 * 60))}).` };
+  }
+  if (minutes < minOpen) return { status: "closed", headline: `🔴 Closed now — opens ${hhmm(minOpen)}.` };
+  // Extended-hours hedge: a later time than the main close appears in the text
+  // ("Extended Hours: Every Friday until 21:00") — don't confidently say "closed"
+  // inside that window, since some days run later. Only for same-day ranges.
+  if (maxClose <= 24 * 60) {
+    const allTimes = [...h.matchAll(/(\d{1,2}):(\d{2})/g)].map((m) => Number(m[1]) * 60 + Number(m[2]));
+    const latest = allTimes.length ? Math.max(...allTimes) : maxClose;
+    if (latest > maxClose && minutes >= maxClose && minutes < latest) {
+      return {
+        status: "open",
+        headline: `🟡 Possibly open — some days have extended hours (until ${hhmm(latest)}); check before you go.`,
+      };
+    }
+  }
+  return { status: "closed", headline: "🔴 Closed now — closed for the day." };
+}
+
 /** Best-effort plain text from VisitSeoul's HTML body (Naver SmartEditor markup
  *  with inline CSS). Drops style/script, tags, leftover CSS rules, decodes the
  *  common entities, and collapses whitespace. */
@@ -259,8 +347,11 @@ export function pickConfidentMatch<T extends { title: string }>(place: string, i
   for (const it of items) {
     const t = normalizeName(it.title);
     let s: number;
+    // A bare area token ("hongdae") must NOT win as a mere prefix of a long
+    // business name ("hongdaesoysaucemarinatedcrab") — require the query to be a
+    // meaningful share of the title for prefix/substring matches (R1).
     if (t === q) s = 3;
-    else if (t.startsWith(q)) s = 2.4;
+    else if (t.startsWith(q) && q.length >= Math.ceil(t.length * 0.5)) s = 2.4;
     else if (t.includes(q) && q.length >= Math.ceil(t.length * 0.5)) s = 2;
     else s = similarity(place, it.title);
     if (!best || s > best.s) best = { it, s };

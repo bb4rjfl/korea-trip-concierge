@@ -48,7 +48,10 @@ export function similarity(a: string, b: string): number {
   if (!A || !B) return 0;
   if (A === B) return 1;
   // One fully containing the other (e.g. "incheonairport" ⊂ "incheonairportt1").
-  if (A.includes(B) || B.includes(A)) return 0.9;
+  // Require the contained side to be ≥2 chars: a single-letter overlap is noise
+  // (e.g. a katakana alias normalizing to a lone "n" must not match any word
+  // containing "n").
+  if (Math.min(A.length, B.length) >= 2 && (A.includes(B) || B.includes(A))) return 0.9;
   const dist = levenshtein(A, B);
   return 1 - dist / Math.max(A.length, B.length);
 }

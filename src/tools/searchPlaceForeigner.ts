@@ -52,6 +52,25 @@ const FOOD_TERMS: [RegExp, string][] = [
   [/bakery|베이커리|빵|bread/i, "bakery"],
   [/bar|pub|호프|술집|이자카야|izakaya/i, "bar"],
   [/noodle|국수|면요리/i, "noodles"],
+  // Specific Korean dishes — so a dish query routes to coordinate POI (real
+  // restaurants) instead of VisitSeoul area-browse (R3). More specific first.
+  [/tteokbokki|떡볶이/i, "tteokbokki"],
+  [/bibimbap|비빔밥/i, "bibimbap"],
+  [/dak.?galbi|닭갈비|jjimdak|찜닭/i, "dakgalbi"],
+  [/bulgogi|불고기/i, "bulgogi"],
+  [/galbi|갈비|kalbi|short ?rib/i, "galbi"],
+  [/samgyeopsal|삼겹살|pork belly/i, "samgyeopsal"],
+  [/naengmyeon|냉면|cold noodle/i, "naengmyeon"],
+  [/gimbap|kimbap|김밥/i, "gimbap"],
+  [/jjajang|짜장|jajang/i, "jjajangmyeon"],
+  [/tonkatsu|donkatsu|돈까스|돈카츠/i, "pork cutlet"],
+  [/jokbal|족발|bossam|보쌈/i, "jokbal"],
+  [/gopchang|곱창/i, "gopchang"],
+  [/sundae|순대/i, "sundae"],
+  [/samgyetang|삼계탕|ginseng chicken/i, "samgyetang"],
+  [/gukbap|국밥|해장국|haejangguk/i, "gukbap"],
+  [/jjigae|찌개|stew/i, "jjigae"],
+  [/korean (food|cuisine|bbq|barbecue)|한식|local food/i, "korean restaurant"],
   [/brunch|브런치/i, "brunch"],
   [/cafe|coffee|카페|커피/i, "cafe"],
 ];
@@ -72,7 +91,14 @@ function inferCategory(query: string, explicit?: string): string | undefined {
   )
     return "food";
   if (/shop|shopping|mall|store|market|boutique|outlet|쇼핑|상점|쇼핑몰/.test(q)) return "shopping";
-  if (/museum|palace|temple|park|attraction|sight|landmark|tour|view|관광|명소|구경/.test(q)) return "attraction";
+  // Sightseeing intent — incl. typos, "things to see", kid/family, and ja/zh terms
+  // — so these route to discovery, never default into restaurants (R3).
+  if (
+    /mus[eu]+ms?|museam|palace|temple|park|attraction|sight|landmark|tour|view|things?\s*to\s*(see|do)|worth\s*(see|visit)|관광|명소|구경|볼거리|가\s*볼|観光|名所|スポット|景点|景區|景区|kid|child|family|아이|어린이|가족|子供|親子/.test(
+      q,
+    )
+  )
+    return "attraction";
   if (/hotel|stay|guesthouse|hostel|accommodation|숙소|호텔/.test(q)) return "accommodation";
   return undefined;
 }

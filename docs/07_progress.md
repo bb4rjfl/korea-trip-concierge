@@ -121,6 +121,15 @@ Dockerfile               linux/amd64, 루트
 ```
 
 ## 세션 로그
+- 2026-06-26: **UI/UX 240시나리오 테스트 → 🔴 수정 패스**. 분기 세션이 240개(단발 ~140 + 멀티턴 칩여정 ~100, 페르소나 12~15, 9 병렬 서브에이전트, 7차원 루브릭) 라이브 테스트 → 리포트 `docs/17_uiux_scenario_report.md`. **8개 🔴 중 R1~R7 수정 완료**(라이브 7/7 재검증, +19 tests=**148 green**):
+  - **R1** getNowInfo{동네명}→엉뚱한 업소 → `matchAreaName` 동네 리다이렉트 + `pickConfidentMatch` 접두 길이가드.
+  - **R2** VisitSeoul 경로 go/no-go 판정 누락 → `seoulHoursVerdict`(자유텍스트 영업시간 파서, 요일범위·시간창·자정넘김·연장영업 🟡 헤지) → renderSeoulNow에 🟢/🔴/🟡.
+  - **R3** dish/모호/CJK/kid 질의가 식당으로 오라우팅 → FOOD_TERMS dish 사전 +18, inferCategory/inferSeoulCategory 관광·아이·CJK·오타 인식(+VS_CATEGORY.themepark).
+  - **R4** translateMenuContext "주문 문장" 막다른 칩 → 주문표현 본문 인라인 + 칩 교체(결제).
+  - **R5** getTransitRoute{from만}→raw -32602 크래시 → `to` optional + "어디로?" 우아한 프롬프트.
+  - **R6** CJK 명소명 미인식 → landmarks 16곳에 번체/간체/일본어 별칭(景福宮·南山タワー 등). **부수: fuzzy.ts 1글자 부분일치 가드**(가타카나 별칭이 "n"으로 줄어 오매칭하던 버그 근본수정).
+  - **R7** enum 미스(getAreaGuide interest "drinks"/getJejuInfo category) raw -32602 → z.string + 동의어 정규화.
+  - **잔여**: R8(2호선 순환 방면 필터 — count는 정확, 방향 라벨링만) + 🟡 클러스터(stale 이벤트·로마자 띄어쓰기·식음 qualifier 등 docs/17 §4). ⏳ KC 재배포 필요.
 - 2026-06-26: **VisitSeoul 통합 (D-015)** — 키 발급(`0ad0…526c45`, .env+대장). 라이브 전수 파악(8대분류 61카테고리, 7개언어, contents/list·info POST, 영업시간/지하철/좌표/HTML본문, 레이트리밋). 새 소스 `src/lib/sources/visitseoul.ts`(category 매핑·inferSeoulCategory·isSeoulText 바운딩박스·pickConfidentMatch·clip·stripHtml·TTL캐시). **searchPlaceForeigner**: 서울+비식음 → VisitSeoul 공식 큐레이션 메인, 식음(cat=food)은 좌표 POI 유지, VisitSeoul 빈 곳/서울 외는 TourAPI·POI 그라운딩. **getNowInfo**: 큐레이션 랜드마크 다음 서울 임의장소를 VisitSeoul 상세(영업시간/휴무/영문지하철/주소)로 판정(C7 확장). +12 tests(**129 green**), tsc 클린, **라이브 e2e 7/7**(Insadong 발견·museums·temple stay 그라운딩·vegan ramen→POI·Busan→TourAPI·Seoul City Wall Museum 시간·Gyeongbokgung 큐레이션). docs 03/06/07 + CLAUDE.md 갱신. ⏳ KC 재배포 필요. ❎ 미적용(SHOULD): getAreaGuide VisitSeoul 하이라이트, 식음 VisitSeoul 보강픽.
 - 2026-06-26 (서브에이전트): **getNowInfo 랜드마크 오버레이 + getAreaGuide 확장 (D-014)**. `src/lib/landmarks.ts` 신설(~27 외국인 인기명소, 정확 영업시간·closedDays·24h/daylight/sunrise 4유형 + `resolveLandmark` 퍼지 + `landmarkVerdict` 순수함수). getNowInfo 핸들러가 TourAPI 검색 **전에** 신뢰매칭 시 현재 KST로 🟢/🔴 즉시 판정(키 불필요·API콜 0, C7 오매칭 해소). getAreaGuide 동네 8→21(부산5·제주2·서울+6, 기존 `Area` 형태). 테스트 +9(lib 랜드마크 resolve/verdict, tools 동네/getNowInfo 큐레이션) → **build+117 tests green**. docs 03/06/07 갱신. ⏳ **KC 재배포해야 라이브 반영**.
 - 2026-06-24 (1): 프로젝트 문서 세트 생성(CLAUDE.md + docs 01~07 + 슬래시 커맨드).

@@ -115,13 +115,19 @@ function render(menuText: string, concerns: string[]): string {
     );
   }
   if (notes.length) lines.push("", ...notes.map((n) => `> ${n}`));
+  // A ready-to-use ordering phrase, in-line — so a non-Korean speaker gets real
+  // value instead of a chip that re-runs the same explanation (R4).
+  lines.push(
+    "",
+    '🗣️ **To order:** point and say **"이거 주세요"** (_i-geo ju-se-yo_ — "this one, please"); for two, **"두 개 주세요"** (_du-gae ju-se-yo_).',
+  );
   return lines.join("\n");
 }
 
 const CHOICES: Choice[] = [
-  { emoji: "🗣️", cmdEn: "Make an ordering sentence", cmdKo: "주문 문장 만들기", descEn: "a phrase to order this" },
-  { emoji: "🌶️", cmdEn: "Show only non-spicy options", descEn: "filter out spicy dishes" },
   { emoji: "🍜", cmdEn: "Find a place that serves this", descEn: "foreigner-friendly restaurants" },
+  { emoji: "💳", cmdEn: "How do I pay at restaurants?", descEn: "card, cash, and tipping" },
+  { emoji: "🌶️", cmdEn: "Show only non-spicy options", descEn: "filter out spicy dishes" },
 ];
 
 export const translateMenuContext: ToolDef = {

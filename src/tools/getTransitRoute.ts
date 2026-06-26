@@ -103,7 +103,10 @@ export const getTransitRoute: ToolDef = {
     "explained in English for foreign visitors. " +
     `Part of ${SERVICE_NAME}.`,
   inputSchema: {
-    to: z.string().describe("Destination: place name, station, or address."),
+    to: z
+      .string()
+      .optional()
+      .describe("Destination: place name, station, or address. If the user hasn't said where to, ask first."),
     from: z
       .string()
       .optional()
@@ -133,6 +136,21 @@ export const getTransitRoute: ToolDef = {
           { emoji: "🚉", cmdEn: `From Seoul Station to ${dest}`, descEn: "route from Seoul Station" },
           { emoji: "✈️", cmdEn: `From Incheon Airport to ${dest}`, descEn: "route from the airport" },
           { emoji: "🏨", cmdEn: `From my area to ${dest}`, descEn: "tell me your neighborhood" },
+        ],
+      );
+    }
+
+    // Symmetric to the above: a chip like "Plan a route from here" carries only an
+    // origin. Ask where to instead of throwing a raw schema error (R5).
+    if (!to) {
+      const origin = from || "your starting point";
+      return fail(
+        "Where do you want to go?",
+        `I can route you from **${origin}** — tap a popular destination, or tell me a station/landmark/address.`,
+        [
+          { emoji: "🛍️", cmdEn: `Route from ${origin} to Myeongdong`, descEn: "to Myeongdong" },
+          { emoji: "🏛️", cmdEn: `Route from ${origin} to Gyeongbokgung`, descEn: "to Gyeongbokgung Palace" },
+          { emoji: "🗼", cmdEn: `Route from ${origin} to N Seoul Tower`, descEn: "to N Seoul Tower" },
         ],
       );
     }

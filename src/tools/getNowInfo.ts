@@ -5,7 +5,8 @@ import { hasKey } from "../lib/env.js";
 import { searchPlaces, getPlaceIntro, normalizeLang, type Place } from "../lib/sources/tourapi.js";
 import { CITIES, resolveCity, getWeather, getAir } from "../lib/sources/weatherair.js";
 import { resolveLandmark, landmarkVerdict } from "../lib/landmarks.js";
-import { searchSeoulContent, getSeoulDetail, pickConfidentMatch, clip, type SeoulDetail } from "../lib/sources/visitseoul.js";
+import { searchSeoulContent, getSeoulDetail, pickConfidentMatch, seoulHoursVerdict, clip, type SeoulDetail } from "../lib/sources/visitseoul.js";
+import { matchAreaName } from "./getAreaGuide.js";
 import { similarity, normalizeName } from "../lib/fuzzy.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
@@ -129,7 +130,11 @@ function koreaNow(): { label: string; hour: number; minute: number; dow: number 
 
 // ── VisitSeoul (Seoul) ──────────────────────────────────────────────────────
 function renderSeoulNow(d: SeoulDetail, now: ReturnType<typeof koreaNow>, weather?: string): string {
+  // Compute the go/no-go verdict from VisitSeoul's free-text hours — the tool's
+  // headline promise, previously missing on the VisitSeoul path (R2).
+  const verdict = seoulHoursVerdict(d.hours, d.closedDays, now.dow, now.hour * 60 + now.minute);
   const lines = [`🕒 **${d.title} — right now**`, ""];
+  if (verdict) lines.push(verdict.headline, "");
   if (d.address) lines.push(`📍 ${d.address}`);
   lines.push(`⏰ Current Korea time: **${now.label} KST**`);
   if (d.hours) lines.push(`🏛️ Opening hours: ${d.hours}`);
@@ -193,6 +198,32 @@ export const getNowInfo: ToolDef = {
       const weather = await weatherLine(landmark.city ?? "Seoul");
       if (weather) lines.push("", weather);
       return ok(lines.join("\n"), CHOICES);
+    }
+
+    // A bare neighbourhood ("Hongdae", "Seongsu") has no single open/closed verdict
+    // — matching it to a VisitSeoul business gave a confidently-wrong answer (R1).
+    // Recognise the area and steer to the right tool instead.
+    const areaName = matchAreaName(place);
+    if (areaName) {
+      const now = koreaNow();
+      const short = areaName.split(" ")[0];
+      const lines = [
+        `🗺️ **${areaName} — right now**`,
+        "",
+        `**${short}** is a neighbourhood, so it doesn't "open" or "close" — it's always there to wander.`,
+        `⏰ Current Korea time: **${now.label} KST**`,
+      ];
+      if (now.hour >= 21 || now.hour < 6) {
+        lines.push("", "🌙 It's late — most shops are shut, but nightlife spots and convenience stores stay open.");
+      }
+      const weather = await weatherLine(areaName);
+      if (weather) lines.push("", weather);
+      lines.push("", "_Want the neighbourhood guide, or a specific place to check?_");
+      return ok(lines.join("\n"), [
+        { emoji: "🗺️", cmdEn: `Guide me around ${short}`, cmdKo: "동네 가이드", descEn: "what's there + getting around" },
+        { emoji: "🔎", cmdEn: `Find places in ${short}`, descEn: "things to see & do" },
+        { emoji: "🌤️", cmdEn: "Weather & fine dust today", descEn: "forecast + air quality" },
+      ]);
     }
 
     // VisitSeoul (Seoul) — extend the open/closed answer beyond the curated

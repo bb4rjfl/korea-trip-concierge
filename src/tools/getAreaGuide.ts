@@ -219,6 +219,27 @@ const AREAS: Area[] = [
 
 const INTERESTS = ["food", "shopping", "history", "nightlife"] as const;
 
+/** Map a free-text interest (incl. synonyms) to one of our 4 buckets — so an enum
+ *  miss like "drinks" or "eat" no longer leaks a raw -32602 (R7). Unknown values
+ *  pass through and renderGuide acknowledges them gracefully. */
+function normalizeInterest(raw?: string): string | undefined {
+  const q = (raw ?? "").trim().toLowerCase();
+  if (!q) return undefined;
+  if (/food|eat|restaurant|dining|cuisine|맛집|먹/.test(q)) return "food";
+  if (/shop|shopping|mall|buy|boutique|쇼핑/.test(q)) return "shopping";
+  if (/history|historic|culture|tradition|heritage|역사|문화/.test(q)) return "history";
+  if (/night|bar|club|drink|pub|booze|술|클럽/.test(q)) return "nightlife";
+  return q;
+}
+
+/** The display name of a curated area if `text` names one, else undefined.
+ *  Used by getNowInfo to recognise a neighbourhood (which has no single "open"
+ *  verdict) vs a specific venue. */
+export function matchAreaName(text: string): string | undefined {
+  const a = AREAS.find((x) => x.keys.test((text ?? "").trim()));
+  return a?.name;
+}
+
 function renderGuide(a: Area, interest?: string): string {
   const lines = [
     `🗺️ **${a.name}**`,
@@ -280,9 +301,9 @@ export const getAreaGuide: ToolDef = {
   inputSchema: {
     area: z.string().describe("Neighborhood name, e.g. 'Myeongdong' or '성수동'."),
     interest: z
-      .enum(INTERESTS)
+      .string()
       .optional()
-      .describe("Optional focus: food, shopping, history, or nightlife."),
+      .describe(`Optional focus: ${INTERESTS.join(", ")} (synonyms like 'drinks' or 'eat' are understood).`),
   },
   annotations: {
     title: "Get Neighborhood Guide",
@@ -293,7 +314,7 @@ export const getAreaGuide: ToolDef = {
   },
   handler: (args) => {
     const area = String(args.area ?? "").trim();
-    const interest = args.interest ? String(args.interest) : undefined;
+    const interest = normalizeInterest(args.interest ? String(args.interest) : undefined);
     const a = AREAS.find((x) => x.keys.test(area));
     if (!a) return ok(renderUnknown(area), unknownChoices(area));
     return ok(renderGuide(a, interest), CHOICES);

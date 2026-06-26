@@ -60,7 +60,7 @@ export const LANDMARKS: Landmark[] = [
   // ── Seoul palaces & royal heritage ──────────────────────────────────────────
   {
     name: "Gyeongbokgung Palace",
-    aliases: ["gyeongbokgung", "gyeongbokgung palace", "gyeongbok palace", "경복궁"],
+    aliases: ["gyeongbokgung", "gyeongbokgung palace", "gyeongbok palace", "경복궁", "景福宮", "景福宫"],
     hours: [{ open: hm(9), close: hm(18) }],
     hoursLabel: "09:00–18:00 (Nov–Feb to 17:00, summer to 18:30)",
     closedDays: [2],
@@ -72,7 +72,7 @@ export const LANDMARKS: Landmark[] = [
   },
   {
     name: "Changdeokgung Palace",
-    aliases: ["changdeokgung", "changdeokgung palace", "창덕궁"],
+    aliases: ["changdeokgung", "changdeokgung palace", "창덕궁", "昌德宮", "昌德宫"],
     hours: [{ open: hm(9), close: hm(18) }],
     hoursLabel: "09:00–18:00 (Secret Garden by timed guided tour)",
     closedDays: [1],
@@ -84,7 +84,7 @@ export const LANDMARKS: Landmark[] = [
   },
   {
     name: "Deoksugung Palace",
-    aliases: ["deoksugung", "deoksugung palace", "덕수궁"],
+    aliases: ["deoksugung", "deoksugung palace", "덕수궁", "德壽宮", "德寿宫"],
     hours: [{ open: hm(9), close: hm(21) }],
     hoursLabel: "09:00–21:00 (last entry 20:00)",
     closedDays: [1],
@@ -120,7 +120,7 @@ export const LANDMARKS: Landmark[] = [
   // ── Towers & observatories ──────────────────────────────────────────────────
   {
     name: "N Seoul Tower (Namsan)",
-    aliases: ["n seoul tower", "namsan tower", "namsan", "seoul tower", "남산타워", "남산", "엔서울타워", "n서울타워"],
+    aliases: ["n seoul tower", "namsan tower", "namsan", "seoul tower", "남산타워", "남산", "엔서울타워", "n서울타워", "南山タワー", "Nソウルタワー", "南山塔", "南山首爾塔", "南山首尔塔"],
     hours: [{ open: hm(10), close: hm(23) }],
     hoursLabel: "~10:00–23:00 (observatory; varies seasonally)",
     note: "Take the Namsan cable car up; sunset and night views over the city. The plaza is open even when the deck isn't.",
@@ -130,7 +130,7 @@ export const LANDMARKS: Landmark[] = [
   },
   {
     name: "Lotte World Tower – Seoul Sky",
-    aliases: ["seoul sky", "lotte world tower", "lotte tower", "롯데월드타워", "롯데타워", "서울스카이"],
+    aliases: ["seoul sky", "lotte world tower", "lotte tower", "롯데월드타워", "롯데타워", "서울스카이", "ロッテワールドタワー", "樂天世界塔", "乐天世界塔"],
     hours: [{ open: hm(10), close: hm(22) }],
     hoursLabel: "~10:00–22:00 (last entry 21:00)",
     note: "Observation deck on floors 117–123 of Korea's tallest building, at Jamsil. Glass floor and skywalk.",
@@ -142,7 +142,7 @@ export const LANDMARKS: Landmark[] = [
   // ── Theme park & aquarium ───────────────────────────────────────────────────
   {
     name: "Lotte World Adventure",
-    aliases: ["lotte world", "lotte world adventure", "롯데월드", "롯데월드어드벤처"],
+    aliases: ["lotte world", "lotte world adventure", "롯데월드", "롯데월드어드벤처", "ロッテワールド", "樂天世界", "乐天世界"],
     hours: [{ open: hm(10), close: hm(21) }],
     hoursLabel: "~10:00–21:00 (later on weekends/holidays — check the app)",
     note: "Huge indoor + outdoor theme park at Jamsil; the indoor half is great on a rainy or cold day.",
@@ -163,7 +163,7 @@ export const LANDMARKS: Landmark[] = [
   // ── Open-air parks, streams & villages ──────────────────────────────────────
   {
     name: "Han River Parks (Hangang)",
-    aliases: ["han river", "hangang", "han river park", "hangang park", "yeouido hangang park", "한강", "한강공원", "여의도한강공원"],
+    aliases: ["han river", "hangang", "han river park", "hangang park", "yeouido hangang park", "한강", "한강공원", "여의도한강공원", "漢江", "汉江"],
     hours: "24h",
     hoursLabel: "Open 24 hours",
     note: "Eleven riverside parks. Rent a mat, order fried chicken to the park, watch the bridge fountains, or bike the path.",
@@ -172,7 +172,7 @@ export const LANDMARKS: Landmark[] = [
   },
   {
     name: "Bukchon Hanok Village",
-    aliases: ["bukchon", "bukchon hanok village", "bukchon hanok", "북촌", "북촌한옥마을"],
+    aliases: ["bukchon", "bukchon hanok village", "bukchon hanok", "북촌", "북촌한옥마을", "北村韓屋村", "北村韩屋村"],
     hours: "daylight",
     hoursLabel: "Daylight hours — residential area (recommended 10:00–17:00)",
     note: "A living neighbourhood of traditional hanok houses between two palaces. Real people live here — visit by day and keep your voice down.",
@@ -190,7 +190,7 @@ export const LANDMARKS: Landmark[] = [
   },
   {
     name: "Dongdaemun Design Plaza (DDP)",
-    aliases: ["ddp", "dongdaemun design plaza", "dongdaemun", "동대문디자인플라자", "동대문"],
+    aliases: ["ddp", "dongdaemun design plaza", "dongdaemun", "동대문디자인플라자", "동대문", "東大門", "东大门"],
     hours: "24h",
     hoursLabel: "Plaza & some shops 24 hours; exhibition halls ~10:00–20:00",
     note: "Zaha Hadid's spaceship-like landmark. The illuminated plaza and night-market fashion malls run around the clock; ticketed exhibits keep daytime hours.",
@@ -210,7 +210,7 @@ export const LANDMARKS: Landmark[] = [
   // ── Markets & shopping streets ──────────────────────────────────────────────
   {
     name: "Gwangjang Market",
-    aliases: ["gwangjang market", "gwangjang", "광장시장"],
+    aliases: ["gwangjang market", "gwangjang", "광장시장", "廣藏市場", "广藏市场"],
     hours: [{ open: hm(9), close: hm(22) }],
     hoursLabel: "~09:00–22:00 (stalls vary; quieter on Sundays)",
     note: "Seoul's classic street-food market — bindaetteok (mung-bean pancake), mayak gimbap, and live-octopus stalls.",
@@ -220,7 +220,7 @@ export const LANDMARKS: Landmark[] = [
   },
   {
     name: "Namdaemun Market",
-    aliases: ["namdaemun", "namdaemun market", "남대문", "남대문시장"],
+    aliases: ["namdaemun", "namdaemun market", "남대문", "남대문시장", "南大門市場", "南大门市场", "南大門", "南大门"],
     hours: [{ open: hm(8, 30), close: hm(18) }],
     hoursLabel: "~08:30–18:00 retail (many wholesale stalls run overnight)",
     note: "Korea's largest traditional market — accessories, kitchenware, and the famous galchi-jorim (cutlassfish) alley.",
@@ -230,7 +230,7 @@ export const LANDMARKS: Landmark[] = [
   },
   {
     name: "Myeongdong Shopping Street",
-    aliases: ["myeongdong", "명동"],
+    aliases: ["myeongdong", "명동", "明洞"],
     hours: [{ open: hm(10, 30), close: hm(22) }],
     hoursLabel: "Shops ~10:30–22:00; street-food carts from late afternoon",
     note: "Cosmetics flagships, tax-free shops, and a famous evening street-food run. Busiest after dark.",
@@ -240,7 +240,7 @@ export const LANDMARKS: Landmark[] = [
   },
   {
     name: "Insadong",
-    aliases: ["insadong", "인사동"],
+    aliases: ["insadong", "인사동", "仁寺洞"],
     hours: [{ open: hm(10), close: hm(20) }],
     hoursLabel: "Shops ~10:00–20:00 (main street pedestrianised on weekends)",
     note: "Traditional crafts, hanji paper, teahouses, and the Ssamzigil spiral mall. Easy to pair with Gyeongbokgung.",
@@ -276,7 +276,7 @@ export const LANDMARKS: Landmark[] = [
   // ── Busan ───────────────────────────────────────────────────────────────────
   {
     name: "Haeundae Beach (Busan)",
-    aliases: ["haeundae", "haeundae beach", "해운대", "해운대해수욕장"],
+    aliases: ["haeundae", "haeundae beach", "해운대", "해운대해수욕장", "海雲臺", "海云台"],
     hours: "24h",
     hoursLabel: "Open 24 hours (swimming season Jul–Aug)",
     note: "Busan's most famous beach — cafés, seafood, and the coastal Blue Line Park train nearby. Lively day and night.",
@@ -319,7 +319,7 @@ export const LANDMARKS: Landmark[] = [
   // ── Jeju ────────────────────────────────────────────────────────────────────
   {
     name: "Seongsan Ilchulbong (Sunrise Peak, Jeju)",
-    aliases: ["seongsan ilchulbong", "sunrise peak", "seongsan", "성산일출봉", "성산"],
+    aliases: ["seongsan ilchulbong", "sunrise peak", "seongsan", "성산일출봉", "성산", "城山日出峰", "城山日出峯"],
     hours: "sunrise",
     hoursLabel: "Sunrise to ~20:00 (opens before dawn; last entry varies seasonally)",
     note: "A UNESCO tuff cone rising from the sea; a ~25-minute climb. Famous for sunrise — go early. Closed in storms.",
@@ -341,7 +341,7 @@ export const LANDMARKS: Landmark[] = [
   },
   {
     name: "Hallasan (Jeju)",
-    aliases: ["hallasan", "mt hallasan", "mount hallasan", "한라산"],
+    aliases: ["hallasan", "mt hallasan", "mount hallasan", "한라산", "漢拏山", "汉拿山"],
     hours: "daylight",
     hoursLabel: "Daylight — trail entry cutoffs vary by season & trail; start early",
     note: "Korea's highest peak. Summit trails (Seongpanak/Gwaneumsa) have strict entry-cutoff times and may need a reservation — check before you set out.",

@@ -27,6 +27,20 @@ const RETRY: Choice[] = [
 
 const CATEGORIES = ["attraction", "restaurant", "festival", "shopping", "accommodation", "theme"] as const;
 
+/** Map a free-text category (incl. synonyms) to a VisitJeju bucket — so an enum
+ *  miss like "spaceship" no longer leaks a raw -32602 (R7); unknown → highlights. */
+function normalizeJejuCategory(raw?: string): string | undefined {
+  const q = (raw ?? "").trim().toLowerCase();
+  if (!q) return undefined;
+  if (/attraction|sight|see|tour|landmark|nature|beach|관광|명소/.test(q)) return "attraction";
+  if (/rest|eat|food|dining|cuisine|맛집|먹/.test(q)) return "restaurant";
+  if (/festival|event|축제|행사/.test(q)) return "festival";
+  if (/shop|shopping|mall|buy|쇼핑/.test(q)) return "shopping";
+  if (/accommodation|hotel|stay|guesthouse|숙소|호텔/.test(q)) return "accommodation";
+  if (/theme|park|experience|체험|테마/.test(q)) return "theme";
+  return undefined; // unknown → highlights (no crash)
+}
+
 export const getJejuInfo: ToolDef = {
   name: "getJejuInfo",
   description:
@@ -35,9 +49,9 @@ export const getJejuInfo: ToolDef = {
     `Part of ${SERVICE_NAME}.`,
   inputSchema: {
     category: z
-      .enum(CATEGORIES)
+      .string()
       .optional()
-      .describe("What to show: attraction, restaurant, festival, shopping, accommodation, or theme."),
+      .describe(`What to show: ${CATEGORIES.join(", ")} (synonyms understood; unknown shows highlights).`),
     limit: z.number().int().min(1).max(10).optional().describe("How many results (default 6)."),
   },
   annotations: {
@@ -48,7 +62,7 @@ export const getJejuInfo: ToolDef = {
     openWorldHint: true,
   },
   handler: async (args) => {
-    const category = args.category ? String(args.category) : undefined;
+    const category = normalizeJejuCategory(args.category ? String(args.category) : undefined);
     const limit = typeof args.limit === "number" ? args.limit : 6;
     const label = category ?? "highlights";
 
