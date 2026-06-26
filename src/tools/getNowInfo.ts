@@ -162,9 +162,9 @@ export const getNowInfo: ToolDef = {
   inputSchema: {
     place: z.string().describe("Place or attraction name, e.g. 'Gyeongbokgung Palace'."),
     language: z
-      .enum(["en", "ja", "zh", "ko"])
+      .string()
       .optional()
-      .describe("Result language: en (default), ja, zh (Chinese Simplified), ko. Match the visitor's language."),
+      .describe("Result language: en (default), ja, zh (Chinese Simplified), ko — full names like 'english' also work. Match the visitor's language."),
   },
   annotations: {
     title: "Is It Good to Go Now?",

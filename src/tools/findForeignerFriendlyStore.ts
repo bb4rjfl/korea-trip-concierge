@@ -125,6 +125,13 @@ const CHOICES: Choice[] = [
   { emoji: "🧭", cmdEn: "What other essentials are nearby?", descEn: "exchange, ATM, pharmacy, info" },
 ];
 
+// Emergency context needs different next steps than "how do I pay" (N10).
+const EMERGENCY_CHOICES: Choice[] = [
+  { emoji: "💊", cmdEn: "Find a pharmacy near me", descEn: "약국 + after-hours options" },
+  { emoji: "🚇", cmdEn: "How do I get to a hospital?", descEn: "transit route" },
+  { emoji: "ℹ️", cmdEn: "Find a tourist information center", descEn: "multilingual help + 1330" },
+];
+
 const RETRY: Choice[] = [
   { emoji: "🔄", cmdEn: "Try again", cmdKo: "다시 시도", descEn: "retry the search" },
   { emoji: "🗺️", cmdEn: "Guide me around this area", descEn: "neighborhood overview instead" },
@@ -138,10 +145,13 @@ function renderNearby(places: PoiPlace[], query: string, need: Need): string[] {
   // in (an "ATM" search returning a pizzeria) — keeps the list on-need (Y11).
   const foodNeed = need === "foreignCardDining";
   const FOOD_RE = /caf[eé]|restaurant|bar\b|pub|bakery|dessert|bistro|커피|카페|맛집|식당|레스토랑/i;
+  // Never surface adult-entertainment venues on a family/KakaoTalk surface (N2).
+  const ADULT_RE = /룸\s?싸롱|룸\s?살롱|풀\s?싸롱|단란|안마|유흥|텐프로|레깅스룸|room\s?salon|host\s?bar|성인/i;
   const clean = places.filter((p) => {
     const name = (p.name ?? "").trim();
     const addr = (p.address ?? "").trim();
     if (!name || !addr || name === q || name.startsWith(`${q} (`)) return false;
+    if (ADULT_RE.test(`${name} ${p.category ?? ""}`)) return false;
     if (!foodNeed && FOOD_RE.test(`${name} ${p.category ?? ""}`)) return false;
     return true;
   });
@@ -240,6 +250,6 @@ export const findForeignerFriendlyStore: ToolDef = {
       }
     }
 
-    return ok([...head, ...nearby].join("\n"), CHOICES);
+    return ok([...head, ...nearby].join("\n"), need === "emergency" ? EMERGENCY_CHOICES : CHOICES);
   },
 };

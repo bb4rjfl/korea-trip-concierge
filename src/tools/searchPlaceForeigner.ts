@@ -107,7 +107,7 @@ function inferCategory(query: string, explicit?: string): string | undefined {
   // Sightseeing intent — incl. typos, "things to see", kid/family, and ja/zh terms
   // — so these route to discovery, never default into restaurants (R3).
   if (
-    /mus[eu]+ms?|museam|palace|temple|park|attraction|sight|landmark|tour|view|things?\s*to\s*(see|do)|worth\s*(see|visit)|관광|명소|구경|볼거리|가\s*볼|観光|名所|スポット|景点|景區|景区|kid|child|family|아이|어린이|가족|子供|親子/.test(
+    /mus[eu]+ms?|museam|palace|temple|park|beach|coast|mountain|hik|attraction|sight|landmark|tour|view|things?\s*to\s*(see|do)|worth\s*(see|visit)|관광|명소|구경|볼거리|해변|해수욕장|가\s*볼|観光|名所|スポット|景点|景區|景区|kid|child|family|아이|어린이|가족|子供|親子/.test(
       q,
     )
   )
@@ -278,13 +278,16 @@ export const searchPlaceForeigner: ToolDef = {
     "foreigner-friendliness (English support, walk-in, foreign-card acceptance). " +
     `Part of ${SERVICE_NAME}.`,
   inputSchema: {
-    query: z.string().describe("Natural-language intent, e.g. 'quiet cafe near Hongdae with English menu'."),
+    query: z
+      .string()
+      .optional()
+      .describe("Natural-language intent, e.g. 'quiet cafe near Hongdae with English menu'. If omitted, give an area."),
     area: z.string().optional().describe("Optional area/neighborhood to focus on."),
     category: z.string().optional().describe("Optional category: food, cafe, attraction, shopping, culture."),
     language: z
-      .enum(["en", "ja", "zh", "ko"])
+      .string()
       .optional()
-      .describe("Result language: en (default), ja, zh (Chinese Simplified), ko. Match the visitor's language."),
+      .describe("Result language: en (default), ja, zh (Chinese Simplified), ko — full names like 'english' also work. Match the visitor's language."),
   },
   annotations: {
     title: "Search Places for Foreign Visitors",
@@ -299,6 +302,14 @@ export const searchPlaceForeigner: ToolDef = {
     const category = args.category ? String(args.category) : undefined;
     const cat = inferCategory(query, category);
     const language = normalizeLang(args.language as string | undefined);
+
+    // No query and no area → ask, instead of letting an empty search run (N3).
+    if (!query.trim() && !area.trim()) {
+      return ok(
+        '🔎 **What are you looking for?**\n\nTell me a place type and/or an area — e.g. _"quiet cafe in Hongdae"_, _"things to see in Seoul"_, or _"vegan food near Itaewon"_.',
+        CHOICES,
+      );
+    }
 
     // Seoul + non-dining → VisitSeoul official curation leads (D-010): pre-translated
     // English summaries/hours/subway for the sightseeing, shopping, culture, nature

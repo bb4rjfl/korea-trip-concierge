@@ -34,7 +34,8 @@ interface ServiceGuide {
 
 const SERVICES: ServiceGuide[] = [
   {
-    match: /(taxi|kakao ?t|cab|hail|ride.?hail|택시|카카오\s*t)/i,
+    // `kakao ?t\b` so "KakaoTalk" (a different service) doesn't match the taxi guide (N1).
+    match: /(taxi|kakao ?t\b|cab|\bhail\b|ride.?hail|택시|카카오\s*t\b)/i,
     label: "Taxi apps (Kakao T)",
     emoji: "🚕",
     blocker:
@@ -58,7 +59,7 @@ const SERVICES: ServiceGuide[] = [
     dated: "Shuttle's delivery zones change — check the app covers your area.",
   },
   {
-    match: /(reserv|booking|book a (table|restaurant)|catch ?table|tabling|naver booking|예약|웨이팅|catchtable)/i,
+    match: /(reserv|booking|book[\w\s]{0,20}(table|restaurant|seat)|waitlist|catch ?table|tabling|naver booking|예약|웨이팅|catchtable)/i,
     label: "Restaurant reservations & waitlists",
     emoji: "🍽️",
     blocker:
@@ -104,7 +105,7 @@ const SERVICES: ServiceGuide[] = [
     dated: "Plan prices and data caps change constantly — don't trust an old quote; compare on arrival.",
   },
   {
-    match: /(tax.?refund|vat|refund|tax.?free|텍스|환급|부가세)/i,
+    match: /(tax.?refund|vat|refund|tax.?free|duty.?free|tax back|텍스|환급|부가세|면세)/i,
     label: "Tourist tax refund (VAT)",
     emoji: "🧾",
     blocker: "Two refund systems (immediate in-store vs. at the airport) and a customs step trip people up.",
@@ -200,11 +201,38 @@ function render(g: ServiceGuide, matched: boolean): string {
   return lines.join("\n");
 }
 
-const CHOICES: Choice[] = [
-  { emoji: "🚕", cmdEn: "How do I get a taxi without a Korean number?", descEn: "Kakao T workaround + k.ride" },
-  { emoji: "🍽️", cmdEn: "How do I book a popular restaurant as a tourist?", descEn: "CatchTable Global, walk-ins" },
-  { emoji: "🖥️", cmdEn: "How do I order at a Korean-only kiosk?", descEn: "find the English toggle" },
-];
+// Reusable bridging chips → the sibling tool or related service the visitor most
+// likely needs next, so a "stuck" answer flows into the next step (N4).
+const C = {
+  pay: { emoji: "💳", cmdEn: "How do I pay for this in Korea?", descEn: "cards, cash, T-money" },
+  route: { emoji: "🚇", cmdEn: "Plan a transit route", descEn: "subway/bus directions" },
+  menu: { emoji: "🍜", cmdEn: "Explain a Korean menu item", descEn: "what's in this dish" },
+  pharm: { emoji: "💊", cmdEn: "Find a pharmacy near me", descEn: "약국 + after-hours" },
+  resv: { emoji: "🍽️", cmdEn: "How do I book a restaurant as a tourist?", descEn: "CatchTable Global, walk-ins" },
+  sim: { emoji: "📶", cmdEn: "Which SIM or eSIM should I get?", descEn: "data + the verification trap" },
+  taxi: { emoji: "🚕", cmdEn: "How do I get a taxi without a Korean number?", descEn: "Kakao T workaround" },
+  kiosk: { emoji: "🖥️", cmdEn: "How do I use a Korean-only kiosk?", descEn: "find the English toggle" },
+  shop: { emoji: "🛒", cmdEn: "Why does my card fail on Korean websites?", descEn: "online checkout workaround" },
+  refund: { emoji: "🧾", cmdEn: "How does the tourist tax refund work?", descEn: "VAT refund steps" },
+  open: { emoji: "🕒", cmdEn: "Is this place open right now?", descEn: "live hours" },
+  eat: { emoji: "🔎", cmdEn: "Find foreigner-friendly places to eat", descEn: "restaurants nearby" },
+} satisfies Record<string, Choice>;
+
+/** 3 next-step chips tailored to the matched service (never itself). */
+function serviceChips(g: ServiceGuide): Choice[] {
+  const L = g.label;
+  if (L.startsWith("Taxi")) return [C.pay, C.route, C.resv];
+  if (L.startsWith("Food")) return [C.resv, C.eat, C.pay];
+  if (L.startsWith("Restaurant")) return [C.open, C.eat, C.pay];
+  if (L.startsWith("Online")) return [C.pay, C.refund, C.resv];
+  if (L.startsWith("KakaoTalk")) return [C.pay, C.taxi, C.resv];
+  if (L.startsWith("SIM")) return [C.taxi, C.route, C.pay];
+  if (L.startsWith("Tourist tax")) return [C.shop, C.pay, C.resv];
+  if (L.startsWith("Entry")) return [C.sim, C.taxi, C.pay];
+  if (L.startsWith("Emergency")) return [C.pharm, C.pay, C.kiosk];
+  if (L.startsWith("Korean-only")) return [C.menu, C.pay, C.resv];
+  return [C.taxi, C.resv, C.kiosk]; // GENERIC
+}
 
 export const explainKoreanService: ToolDef = {
   name: "explainKoreanService",
@@ -235,6 +263,7 @@ export const explainKoreanService: ToolDef = {
     const detail = args.detail ? String(args.detail) : "";
     const q = `${service} ${detail}`.trim();
     const matched = SERVICES.find((s) => s.match.test(q));
-    return ok(render(matched ?? GENERIC, Boolean(matched)), CHOICES);
+    const g = matched ?? GENERIC;
+    return ok(render(g, Boolean(matched)), serviceChips(g));
   },
 };

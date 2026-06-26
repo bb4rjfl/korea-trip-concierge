@@ -4,8 +4,45 @@ import { explainPayment } from "../src/tools/explainPayment.js";
 import { explainKoreanService } from "../src/tools/explainKoreanService.js";
 import { findForeignerFriendlyStore } from "../src/tools/findForeignerFriendlyStore.js";
 import { translateMenuContext } from "../src/tools/translateMenuContext.js";
+import { searchPlaceForeigner } from "../src/tools/searchPlaceForeigner.js";
+import { getNowInfo } from "../src/tools/getNowInfo.js";
 
 const text = (r: { content: { text: string }[] }) => r.content[0].text;
+
+describe("v2 fixes (N1–N6)", () => {
+  it("N1: 'KakaoTalk sign-up' routes to the signup guide, not Taxi", () => {
+    const t = text(explainKoreanService.handler({ service: "KakaoTalk sign-up" }));
+    expect(t).toContain("identity verification");
+    expect(t).not.toContain("Taxi apps (Kakao T)");
+  });
+  it("N1: 'kakao t' still routes to Taxi", () => {
+    expect(text(explainKoreanService.handler({ service: "kakao t card error" }))).toContain("Taxi apps (Kakao T)");
+  });
+  it("N5: 'book a popular restaurant' routes to reservations", () => {
+    expect(text(explainKoreanService.handler({ service: "book a popular restaurant" }))).toContain("CatchTable Global");
+  });
+  it("N4: taxi chips bridge to payment/route (not static)", async () => {
+    const r = explainKoreanService.handler({ service: "taxi app" });
+    expect(r.content[0].text).toContain("pay for this in Korea");
+  });
+  it("N3: full-name language values don't throw (z.string + normalizeLang)", async () => {
+    expect(text(await getNowInfo.handler({ place: "Gyeongbokgung", language: "english" }))).toContain("Gyeongbokgung");
+    const r = await searchPlaceForeigner.handler({ query: "cafe", area: "Hongdae", language: "japanese" });
+    expect(r.content[0].text.length).toBeGreaterThan(0);
+  });
+  it("N3: empty query+area asks instead of erroring", async () => {
+    expect(text(await searchPlaceForeigner.handler({}))).toContain("What are you looking for");
+  });
+  it("N6: samgyetang is flagged for vegetarians (was 'no allergens')", async () => {
+    const t = text(await translateMenuContext.handler({ menuText: "삼계탕", allergyConcerns: ["vegetarian"] }));
+    expect(t.toLowerCase()).toContain("not vegetarian");
+  });
+  it("N10: emergency need uses emergency-appropriate chips", async () => {
+    const t = text(await findForeignerFriendlyStore.handler({ area: "Myeongdong", need: "emergency" }));
+    expect(t).toContain("Find a pharmacy near me");
+    expect(t).not.toContain("How do I pay here as a foreigner?");
+  });
+});
 
 describe("Korean holiday calendar", () => {
   it("knows Chuseok/Seollal (major) vs minor vs none", () => {
