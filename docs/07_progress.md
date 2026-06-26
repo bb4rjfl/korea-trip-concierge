@@ -56,7 +56,7 @@
 - [x] **#3 기상특보 (KMA WthrWrnInfoService/getPwnStatus)** ✅ — 현재 활성 특보(태풍/호우/폭염/강풍/풍랑/대설/한파/황사…) 영문 매핑(고정어휘, 번역 아님)해 getWeatherAndAir에 🚨 배너. BUS_API_KEY. parseAlerts 테스트.
 - [x] **#2 TourAPI 국문 커버리지** ✅ — 영문 15,696 vs **국문 50,701**(서울 음식점 71 vs 1,130=16배) 확인. searchPlaceForeigner가 영어 thin 시 좌표기반 KorService2 결과를 **로마자화**해 보강. parsePlaces ko 로마자.
 - [x] **#4 지하철 API** ✅ — realtimeStationArrival(도착)+realtimePosition(위치) 이미 사용·검증 중(D-012). 첨부 xls 필드와 파서 일치.
-- [ ] **#1 VisitSeoul** — 키 발급 후 서울 콘텐츠 대폭 강화(D-010 로컬 다국어 인덱스). 대기.
+- [x] **#1 VisitSeoul** ✅ (2026-06-26, D-015) — 키 발급 → `src/lib/sources/visitseoul.ts`(공식 영어 큐레이션, 7개언어, 라이브+캐시). **searchPlaceForeigner 서울 메인 소스**(비식음 우선, 식음=POI 유지, 빈 곳 TourAPI 그라운딩) + **getNowInfo 서울 임의장소 영업시간/지하철 폴백**(C7 확장). 라이브 7/7 검증, 129 tests. ⏳ KC 재배포 필요.
 - 첨부 문서 추출본: `C:\Users\user\Downloads\_ktc_docs\` (기상특보·관광공사 매뉴얼 국/영·관광코스). 관광코스별 날씨(기상청27)는 COULD 후보.
 
 ## 🗺️ 여정 UX 강화 로드맵 (사용자 지시 2026-06-25) — 순서대로
@@ -121,6 +121,7 @@ Dockerfile               linux/amd64, 루트
 ```
 
 ## 세션 로그
+- 2026-06-26: **VisitSeoul 통합 (D-015)** — 키 발급(`0ad0…526c45`, .env+대장). 라이브 전수 파악(8대분류 61카테고리, 7개언어, contents/list·info POST, 영업시간/지하철/좌표/HTML본문, 레이트리밋). 새 소스 `src/lib/sources/visitseoul.ts`(category 매핑·inferSeoulCategory·isSeoulText 바운딩박스·pickConfidentMatch·clip·stripHtml·TTL캐시). **searchPlaceForeigner**: 서울+비식음 → VisitSeoul 공식 큐레이션 메인, 식음(cat=food)은 좌표 POI 유지, VisitSeoul 빈 곳/서울 외는 TourAPI·POI 그라운딩. **getNowInfo**: 큐레이션 랜드마크 다음 서울 임의장소를 VisitSeoul 상세(영업시간/휴무/영문지하철/주소)로 판정(C7 확장). +12 tests(**129 green**), tsc 클린, **라이브 e2e 7/7**(Insadong 발견·museums·temple stay 그라운딩·vegan ramen→POI·Busan→TourAPI·Seoul City Wall Museum 시간·Gyeongbokgung 큐레이션). docs 03/06/07 + CLAUDE.md 갱신. ⏳ KC 재배포 필요. ❎ 미적용(SHOULD): getAreaGuide VisitSeoul 하이라이트, 식음 VisitSeoul 보강픽.
 - 2026-06-26 (서브에이전트): **getNowInfo 랜드마크 오버레이 + getAreaGuide 확장 (D-014)**. `src/lib/landmarks.ts` 신설(~27 외국인 인기명소, 정확 영업시간·closedDays·24h/daylight/sunrise 4유형 + `resolveLandmark` 퍼지 + `landmarkVerdict` 순수함수). getNowInfo 핸들러가 TourAPI 검색 **전에** 신뢰매칭 시 현재 KST로 🟢/🔴 즉시 판정(키 불필요·API콜 0, C7 오매칭 해소). getAreaGuide 동네 8→21(부산5·제주2·서울+6, 기존 `Area` 형태). 테스트 +9(lib 랜드마크 resolve/verdict, tools 동네/getNowInfo 큐레이션) → **build+117 tests green**. docs 03/06/07 갱신. ⏳ **KC 재배포해야 라이브 반영**.
 - 2026-06-24 (1): 프로젝트 문서 세트 생성(CLAUDE.md + docs 01~07 + 슬래시 커맨드).
 - 2026-06-24 (2): 런타임 TS 확정(D-004), 데이터 전략 실연동 확정(D-005). TS MCP 서버 스캐폴드 전체 구축 — 8툴 계약 등록, 지식툴 3종 실동작, 공통 인프라(24k가드·칩푸터·네이밍린트·timeout/cache), Dockerfile. build/lint/46 tests/서버 end-to-end 검증 완료.

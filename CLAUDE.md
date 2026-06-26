@@ -89,7 +89,8 @@
 - [x] **API 키 발급·저장**(.env)+실연동 검증 — TourAPI다국어/TAGO/ODsay/VisitJeju/날씨/지하철/**POI(네이버+Foursquare 영문변환)**. 99 tests.
 - [x] **KC 배포 Active + 키 주입 완료(B2)** — 컨테이너 이미지(ghcr 비공개), ID 638, `https://korea-trip-concierge.playmcp-endpoint.kakaocloud.io/mcp`. sources 전부 true.
 - [x] **대규모 강화(2026-06-26)**: 시나리오 107개 점검→수정(C1~C9) + `fuzzy.ts`(did-you-mean·인천공항) + `intercity.ts`(도시간 그라운딩) + `landmarks.ts`(명소 영업시간 D-014) + 기상특보·국문 TourAPI 커버리지 + findStore 재정의(D-013) + 지하철 3모드(D-012) + 동네 8→21. **117 tests, 라이브검증 12/12 PASS.**
-- [ ] **🔥 다음: D-014 KC 재배포 → PlayMCP 심사요청(≤7/7) → 비즈폼(≤7/14)**. 상세 **docs/16 §7 / docs/14 §3**
-- [ ] 대기: 서울버스 키 전파(승인됐으나 ws.bus.go.kr 미전파) / VisitSeoul·카카오Local 승인 / 노출키 재발급
+- [x] **VisitSeoul 통합(2026-06-26, D-015)**: 키 발급 → `src/lib/sources/visitseoul.ts`. **searchPlaceForeigner 서울 메인 소스**(비식음=VisitSeoul 공식 영어 큐레이션, 식음=POI, 빈 곳=TourAPI 그라운딩) + **getNowInfo 서울 임의장소 영업시간/지하철 폴백**(C7 확장). **129 tests, 라이브 e2e 7/7 PASS.** ⏳ KC 재배포 미반영.
+- [ ] **🔥 다음: D-014+D-015 KC 재배포(중지→시작) → PlayMCP 심사요청(≤7/7, 단 서울버스·검증 전엔 보류) → 비즈폼(≤7/14)**. 상세 **docs/16 §7 / docs/14 §3**
+- [ ] 대기: 서울버스 키 전파(승인됐으나 ws.bus.go.kr 미전파, 매세션 재탐침) / 카카오Local 승인 / 노출키·VISITSEOUL 키 재발급
 
 > 상세 진행은 `docs/07_progress.md`(SSOT). **새 세션 진입점: `docs/16_handoff.md`**(풍부한 맥락판).

@@ -5,6 +5,7 @@ import { hasKey } from "../lib/env.js";
 import { searchPlaces, getPlaceIntro, normalizeLang, type Place } from "../lib/sources/tourapi.js";
 import { CITIES, resolveCity, getWeather, getAir } from "../lib/sources/weatherair.js";
 import { resolveLandmark, landmarkVerdict } from "../lib/landmarks.js";
+import { searchSeoulContent, getSeoulDetail, pickConfidentMatch, clip, type SeoulDetail } from "../lib/sources/visitseoul.js";
 import { similarity, normalizeName } from "../lib/fuzzy.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
@@ -126,6 +127,25 @@ function koreaNow(): { label: string; hour: number; minute: number; dow: number 
   return { label, hour, minute, dow };
 }
 
+// ── VisitSeoul (Seoul) ──────────────────────────────────────────────────────
+function renderSeoulNow(d: SeoulDetail, now: ReturnType<typeof koreaNow>, weather?: string): string {
+  const lines = [`🕒 **${d.title} — right now**`, ""];
+  if (d.address) lines.push(`📍 ${d.address}`);
+  lines.push(`⏰ Current Korea time: **${now.label} KST**`);
+  if (d.hours) lines.push(`🏛️ Opening hours: ${d.hours}`);
+  if (d.closedDays) lines.push(`🚫 Closed: ${d.closedDays}`);
+  if (!d.hours && !d.closedDays) {
+    lines.push("", "_No published hours found — check on arrival. Most attractions run ~09:00–18:00._");
+  }
+  if (d.subway) lines.push(`🚇 ${d.subway}`);
+  if (now.hour >= 21 || now.hour < 6) {
+    lines.push("", "⚠️ It's late — many attractions and shops are closed now.");
+  }
+  lines.push("", `_via official Seoul Tourism${d.summary ? ` · ${clip(d.summary, 120)}` : ""}_`);
+  if (weather) lines.push("", weather);
+  return lines.join("\n");
+}
+
 export const getNowInfo: ToolDef = {
   name: "getNowInfo",
   description:
@@ -173,6 +193,25 @@ export const getNowInfo: ToolDef = {
       const weather = await weatherLine(landmark.city ?? "Seoul");
       if (weather) lines.push("", weather);
       return ok(lines.join("\n"), CHOICES);
+    }
+
+    // VisitSeoul (Seoul) — extend the open/closed answer beyond the curated
+    // landmarks to any official Seoul place, with better English hours/subway than
+    // TourAPI. Confident title match only; otherwise fall through to TourAPI.
+    if (hasKey("VISITSEOUL_API_KEY")) {
+      try {
+        const cand = await searchSeoulContent({ keyword: place, language, limit: 6 });
+        const hit = pickConfidentMatch(place, cand);
+        if (hit) {
+          const detail = await getSeoulDetail(hit.cid, language);
+          if (detail && (detail.hours || detail.address || detail.subway)) {
+            const weather = await weatherLine("Seoul");
+            return ok(renderSeoulNow(detail, koreaNow(), weather), CHOICES);
+          }
+        }
+      } catch {
+        /* fall through to TourAPI */
+      }
     }
 
     if (!hasKey("TOUR_API_KEY")) {

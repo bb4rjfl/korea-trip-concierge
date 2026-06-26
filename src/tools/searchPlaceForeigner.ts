@@ -4,6 +4,14 @@ import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
 import { searchPlacesAny, searchPlacesNearby, normalizeLang, type Place } from "../lib/sources/tourapi.js";
 import { searchForeignerPois, hasPoiProvider, type PoiPlace } from "../lib/sources/poi.js";
+import {
+  searchSeoulContent,
+  isSeoulText,
+  inferSeoulCategory,
+  clip,
+  VS_CATEGORY,
+  type SeoulContent,
+} from "../lib/sources/visitseoul.js";
 import { resolvePlaceCoord } from "../lib/places.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
@@ -96,6 +104,86 @@ function renderPlaces(query: string, places: Place[]): string {
   ].join("\n");
 }
 
+// ── Seoul layer (VisitSeoul) ────────────────────────────────────────────────
+// For Seoul, VisitSeoul's official curation is the primary source; its chips
+// chain straight into "is it open now?" (getNowInfo also reads VisitSeoul).
+const SEOUL_CHOICES: Choice[] = [
+  { emoji: "🕒", cmdEn: "Is it good to go now?", cmdKo: "지금 가도 돼?", descEn: "live hours for a place above" },
+  { emoji: "🚇", cmdEn: "How do I get there?", descEn: "public-transit route" },
+  { emoji: "🗺️", cmdEn: "Guide me around this area", cmdKo: "동네 가이드", descEn: "neighborhood overview" },
+];
+
+const SEOUL_AREAS = [
+  "Myeongdong", "Hongdae", "Gangnam", "Insadong", "Itaewon", "Bukchon", "Dongdaemun",
+  "Yeouido", "Jamsil", "Seongsu", "Euljiro", "Samcheong", "Garosu", "Sinsa", "Jongno",
+  "Gwanghwamun", "Ikseon", "Gwangjang", "Namdaemun", "Apgujeong",
+];
+
+/** The keyword we hand VisitSeoul to narrow to a neighborhood. "Seoul" itself is
+ *  not a useful title keyword, so the bare city → category browse (empty). */
+function seoulKeyword(area: string, query: string): string {
+  const a = area.trim();
+  if (a && !/^seoul(특별시)?$|^서울(특별시)?$/i.test(a)) return a;
+  for (const name of SEOUL_AREAS) if (new RegExp(name, "i").test(query)) return name;
+  return "";
+}
+
+function dedupeByTitle(items: SeoulContent[], limit: number): SeoulContent[] {
+  const seen = new Set<string>();
+  const out: SeoulContent[] = [];
+  for (const it of items) {
+    const k = it.title.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(it);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+function renderSeoul(query: string, items: SeoulContent[]): string {
+  const lines = items.map((p, i) => {
+    const img = p.image && i < 2 ? ` ![photo](${p.image})` : "";
+    const cat = p.categoryPath ? ` · _${p.categoryPath.split(">").pop()?.trim()}_` : "";
+    const sum = p.summary ? `\n   ${clip(p.summary, 180)}` : "";
+    return `**${i + 1}. ${p.title}**${img}${cat}${sum}`;
+  });
+  return [
+    `🔎 **Seoul ideas for** _"${query}"_ — _official Seoul Tourism_`,
+    "",
+    ...lines,
+  ].join("\n");
+}
+
+/**
+ * VisitSeoul (Seoul, non-dining) — official curated discovery. Returns rendered
+ * Markdown when it has picks, else "" so the caller grounds the gap with the
+ * national sources (TourAPI/POI). Dining is handled by coordinate POI elsewhere.
+ */
+async function trySeoul(
+  query: string,
+  area: string,
+  cat: string | undefined,
+  language: ReturnType<typeof normalizeLang>,
+): Promise<string | undefined> {
+  const vsCat =
+    inferSeoulCategory([cat, query, area].filter(Boolean).join(" ")) ??
+    (cat === "shopping" ? VS_CATEGORY.shopping : cat === "accommodation" ? VS_CATEGORY.accommodation : undefined);
+  const kw = seoulKeyword(area, query);
+  try {
+    // 1) area-narrowed within category; broaden if thin so we still lead with VS.
+    let vs = await searchSeoulContent({ category: vsCat, keyword: kw, language, limit: 6 });
+    if (vs.length < 3) {
+      const broaden = vsCat ?? VS_CATEGORY.culture; // generic discovery → things to see
+      const more = await searchSeoulContent({ category: broaden, keyword: kw, language, limit: 6 });
+      vs = dedupeByTitle([...vs, ...more], 6);
+    }
+    return vs.length ? renderSeoul(query, vs) : undefined;
+  } catch {
+    return undefined; // fall through to national grounding
+  }
+}
+
 export const searchPlaceForeigner: ToolDef = {
   name: "searchPlaceForeigner",
   description:
@@ -124,6 +212,16 @@ export const searchPlaceForeigner: ToolDef = {
     const category = args.category ? String(args.category) : undefined;
     const cat = inferCategory(query, category);
     const language = normalizeLang(args.language as string | undefined);
+
+    // Seoul + non-dining → VisitSeoul official curation leads (D-010): pre-translated
+    // English summaries/hours/subway for the sightseeing, shopping, culture, nature
+    // and experience places visitors ask about. Dining stays on coordinate POI
+    // below (stronger for restaurants); any VisitSeoul gap falls through to the
+    // national grounding sources (TourAPI/POI).
+    if (cat !== "food" && hasKey("VISITSEOUL_API_KEY") && (isSeoulText(area) || isSeoulText(query))) {
+      const seoul = await trySeoul(query, area, cat, language);
+      if (seoul) return ok(seoul, SEOUL_CHOICES);
+    }
 
     // Dining queries → richer comprehensive POI (Naver/Foursquare, converted to
     // English) rather than TourAPI's sparse tourism dining data.

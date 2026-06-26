@@ -56,6 +56,7 @@ app.get("/", (_req: Request, res: Response) => {
       jeju: hasKey("JEJU_API_KEY"),
       naver: hasKey("NAVER_CLIENT_ID") && hasKey("NAVER_CLIENT_SECRET"),
       foursquare: hasKey("FOURSQUARE_API_KEY"),
+      visitseoul: hasKey("VISITSEOUL_API_KEY"),
     },
   });
 });
