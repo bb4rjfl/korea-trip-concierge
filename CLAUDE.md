@@ -87,8 +87,9 @@
 - [x] **public GitHub repo**: https://github.com/bb4rjfl/korea-trip-concierge
 - [x] 대화 예시 3개(docs/09) + API 키 발급 가이드(docs/08) + 핸드오프(docs/10) 작성
 - [x] **API 키 발급·저장**(.env)+실연동 검증 — TourAPI다국어/TAGO/ODsay/VisitJeju/날씨/지하철/**POI(네이버+Foursquare 영문변환)**. 99 tests.
-- [x] **KC 배포 Active + 키 주입 완료(B2)** — 컨테이너 이미지(ghcr 비공개) 재등록, ID 638, `https://korea-trip-concierge.playmcp-endpoint.kakaocloud.io/mcp`. 헬스 **sources 전부 true**, 11툴 라이브검증 ✅ (searchPlaceForeigner·getWeatherAndAir 실데이터)
-- [ ] **🔥 다음: PlayMCP 등록** — Endpoint 입력→정보불러오기→임시등록→도구함 테스트(AI채팅/Claude커넥터)→대화예시3개(docs/09)→심사요청(≤7/7)→전체공개→비즈폼(≤7/14). 상세 **docs/13 §1 / docs/14 §3**
-- [ ] 대기: 서울버스 전파 / VisitSeoul·카카오Local 승인
+- [x] **KC 배포 Active + 키 주입 완료(B2)** — 컨테이너 이미지(ghcr 비공개), ID 638, `https://korea-trip-concierge.playmcp-endpoint.kakaocloud.io/mcp`. sources 전부 true.
+- [x] **대규모 강화(2026-06-26)**: 시나리오 107개 점검→수정(C1~C9) + `fuzzy.ts`(did-you-mean·인천공항) + `intercity.ts`(도시간 그라운딩) + `landmarks.ts`(명소 영업시간 D-014) + 기상특보·국문 TourAPI 커버리지 + findStore 재정의(D-013) + 지하철 3모드(D-012) + 동네 8→21. **117 tests, 라이브검증 12/12 PASS.**
+- [ ] **🔥 다음: D-014 KC 재배포 → PlayMCP 심사요청(≤7/7) → 비즈폼(≤7/14)**. 상세 **docs/16 §7 / docs/14 §3**
+- [ ] 대기: 서울버스 키 전파(승인됐으나 ws.bus.go.kr 미전파) / VisitSeoul·카카오Local 승인 / 노출키 재발급
 
-> 상세 진행은 `docs/07_progress.md`(SSOT). **새 세션 진입점: `docs/13_handoff.md`**.
+> 상세 진행은 `docs/07_progress.md`(SSOT). **새 세션 진입점: `docs/16_handoff.md`**(풍부한 맥락판).
