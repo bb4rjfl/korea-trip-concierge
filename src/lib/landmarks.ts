@@ -353,6 +353,104 @@ export const LANDMARKS: Landmark[] = [
     lat: 33.3617,
     lng: 126.5292,
   },
+
+  // ── More Seoul — museums, the Blue House, temples & squares ──────────────────
+  {
+    name: "National Museum of Korea",
+    aliases: ["national museum of korea", "national museum", "국립중앙박물관", "中央博物館", "国立中央博物馆", "国立中央博物館"],
+    hours: [{ open: hm(10), close: hm(18) }],
+    hoursLabel: "10:00–18:00 (Wed & Sat to 21:00)",
+    note: "Korea's vast flagship museum in Yongsan — free permanent galleries, the famous gold crowns and the Pensive Bodhisattva. Closed Jan 1, Seollal & Chuseok.",
+    approx: true,
+    lat: 37.524,
+    lng: 126.9803,
+  },
+  {
+    name: "Cheong Wa Dae (Blue House)",
+    aliases: ["cheong wa dae", "cheongwadae", "blue house", "청와대", "靑瓦臺", "青瓦台"],
+    hours: [{ open: hm(9), close: hm(18) }],
+    hoursLabel: "09:00–18:00 (last entry 17:30)",
+    closedDays: [2],
+    closedLabel: "Tuesdays",
+    note: "The former presidential compound behind Gyeongbokgung, opened to the public in 2022. Free, but reserve a time slot online — slots fill up.",
+    lat: 37.5866,
+    lng: 126.9748,
+  },
+  {
+    name: "Bongeunsa Temple",
+    aliases: ["bongeunsa", "bongeunsa temple", "봉은사", "奉恩寺"],
+    hours: [{ open: hm(4), close: hm(21) }],
+    hoursLabel: "Grounds ~04:00–21:00 (free)",
+    note: "A 1,200-year-old working temple facing COEX in Gangnam — a calm contrast to the malls. English-friendly Temple Life program on Thursdays.",
+    approx: true,
+    lat: 37.515,
+    lng: 127.0577,
+  },
+  {
+    name: "Jogyesa Temple",
+    aliases: ["jogyesa", "jogyesa temple", "조계사", "曹溪寺"],
+    hours: [{ open: hm(4), close: hm(21) }],
+    hoursLabel: "Grounds ~04:00–21:00 (free)",
+    note: "The head temple of Korean Zen Buddhism, downtown by Insadong — spectacular lantern canopies, especially around Buddha's Birthday. Easy to pair with Gyeongbokgung.",
+    approx: true,
+    lat: 37.5725,
+    lng: 126.981,
+  },
+  {
+    name: "Gwanghwamun Square",
+    aliases: ["gwanghwamun square", "gwanghwamun", "광화문광장", "광화문", "光化門廣場", "光化门"],
+    hours: "24h",
+    hoursLabel: "Open 24 hours",
+    note: "The grand civic plaza leading to Gyeongbokgung, with the statues of King Sejong and Admiral Yi Sun-sin, fountains, and an underground exhibit. Lit at night.",
+    lat: 37.5725,
+    lng: 126.9769,
+  },
+  {
+    name: "Bukhansan National Park",
+    aliases: ["bukhansan", "bukhansan national park", "mt bukhansan", "북한산", "北漢山", "北汉山"],
+    hours: "daylight",
+    hoursLabel: "Daylight hiking — trail entry cutoffs vary by season; start early",
+    note: "The granite-peaked national park ringing northern Seoul — accessible day hikes with city views (Baegundae is the top). Wear real shoes; some trails need a permit.",
+    approx: true,
+    trailCutoff: true,
+    lat: 37.6586,
+    lng: 126.9779,
+  },
+
+  // ── Day-trips near Seoul ─────────────────────────────────────────────────────
+  {
+    name: "Everland (Yongin)",
+    aliases: ["everland", "에버랜드", "에버랜드 리조트"],
+    hours: [{ open: hm(10), close: hm(22) }],
+    hoursLabel: "~10:00–22:00 (varies daily/seasonally — check the app)",
+    note: "Korea's biggest theme park, in Yongin south of Seoul — the T Express wooden coaster, a zoo safari, and the panda twins. Hours shift, so confirm before you go.",
+    approx: true,
+    lat: 37.294,
+    lng: 127.2026,
+  },
+  {
+    name: "Nami Island (Gapyeong)",
+    aliases: ["nami island", "namiseom", "남이섬", "南怡島", "南怡岛"],
+    hours: [{ open: hm(8), close: hm(21) }],
+    hoursLabel: "~08:00–21:00 (last ferry back ~21:00; ferry ticket required)",
+    note: "The tree-lined river island famous from K-dramas, reached by a short ferry (or zipline) from Gapyeong — a popular day trip with Garden of Morning Calm or Petite France.",
+    approx: true,
+    lat: 37.7902,
+    lng: 127.5258,
+  },
+
+  // ── More Busan ───────────────────────────────────────────────────────────────
+  {
+    name: "Haedong Yonggungsa Temple (Busan)",
+    aliases: ["haedong yonggungsa", "yonggungsa", "해동용궁사", "용궁사", "海東龍宮寺"],
+    hours: [{ open: hm(5), close: hm(19, 30) }],
+    hoursLabel: "~05:00–19:30 (free)",
+    note: "A rare seaside temple built onto the rocks above the waves on Busan's east coast — sunrise is magical. Lots of stairs; pair with the nearby coast.",
+    approx: true,
+    city: "Busan",
+    lat: 35.1885,
+    lng: 129.2233,
+  },
 ];
 
 // Exact alias index for instant, unambiguous hits ("lotte world" → Adventure,
@@ -420,14 +518,22 @@ export function landmarkVerdict(l: Landmark, dow: number, minutes: number): Land
   }
 
   if (l.hours === "daylight") {
-    // Mountains: the summit is off-limits if you start too late (Y20).
-    if (l.trailCutoff && minutes >= hm(13)) {
-      return {
-        status: "info",
-        headline: "🟠 Too late for the summit — trails have strict early-afternoon entry cutoffs. Lower trails / visitor center only now; start at dawn for the top.",
-      };
+    const daytime = minutes >= hm(7) && minutes < hm(18);
+    // Mountains: daytime-only, with a strict early-afternoon summit cutoff (Y20).
+    if (l.trailCutoff === true) {
+      if (!daytime) {
+        return { status: "closed", headline: "🔴 Closed now — mountain trails are daytime-only. Start at dawn for the summit." };
+      }
+      if (minutes >= hm(13)) {
+        return {
+          status: "info",
+          headline: "🟠 Too late for the summit — trails have strict early-afternoon entry cutoffs. Lower trails / visitor center only now; start at dawn for the top.",
+        };
+      }
+      return { status: "open", headline: "🟢 Good to go now — daytime hiking; start early to reach the summit before the cutoff." };
     }
-    if (minutes >= hm(7) && minutes < hm(18)) {
+    // Open-air / residential spots (villages, riversides without gates).
+    if (daytime) {
       return { status: "open", headline: "🟢 Good to go now — open-air area, best by day." };
     }
     return { status: "info", headline: "🟠 Best by day — it's an open-air/residential spot with little to see after dark." };

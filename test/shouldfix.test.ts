@@ -78,8 +78,8 @@ describe("translateMenuContext allergens (Y12/Y13)", () => {
     expect(text(sundae)).toContain("gluten");
   });
   it("flags unidentified dish tokens instead of dropping them", async () => {
-    const r = await translateMenuContext.handler({ menuText: "회 물회 산낙지" });
+    const r = await translateMenuContext.handler({ menuText: "회 산낙지" });
     expect(text(r)).toContain("Couldn't identify");
-    expect(text(r)).toContain("물회");
+    expect(text(r)).toContain("산낙지");
   });
 });

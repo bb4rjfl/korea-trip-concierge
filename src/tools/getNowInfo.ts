@@ -107,6 +107,14 @@ const RETRY: Choice[] = [
   { emoji: "🗺️", cmdEn: "Guide me around the area", descEn: "neighborhood overview" },
 ];
 
+// For "not found": bridge to a real search instead of "Try again" with the same
+// unmatched name, which just loops (N12).
+const NOT_FOUND: Choice[] = [
+  { emoji: "🔎", cmdEn: "Search for places like this", descEn: "find it by type or area" },
+  { emoji: "🗺️", cmdEn: "Guide me around the area", descEn: "neighborhood overview" },
+  { emoji: "🌤️", cmdEn: "Weather & fine dust today", descEn: "forecast + air quality" },
+];
+
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 /** Current time in Korea (KST), independent of server timezone. */
@@ -292,8 +300,8 @@ export const getNowInfo: ToolDef = {
       if (matches.length === 0) {
         return fail(
           "Place not found",
-          `I couldn't find **${place}** in the tourism data. Try the official name or a nearby landmark.`,
-          RETRY,
+          `I couldn't find **${place}** in the tourism data. Try the official name, search by type/area, or pick a nearby landmark.`,
+          NOT_FOUND,
         );
       }
       // Re-rank by name relevance so the best-named match wins over TourAPI order.
@@ -322,8 +330,8 @@ export const getNowInfo: ToolDef = {
       if (!top.contentId || !top.contentTypeId) {
         return fail(
           "Place not found",
-          `I couldn't find **${place}** in the tourism data. Try the official name or a nearby landmark.`,
-          RETRY,
+          `I couldn't find **${place}** in the tourism data. Try the official name, search by type/area, or pick a nearby landmark.`,
+          NOT_FOUND,
         );
       }
       const intro = await getPlaceIntro(top.contentId, top.contentTypeId, effLang);

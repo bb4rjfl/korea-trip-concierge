@@ -135,11 +135,10 @@ function renderPlaces(query: string, places: Place[]): string {
     return `🔎 **No places found for** _"${query}"_.\n\nTry a broader term or a nearby landmark.`;
   }
   const lines = places.map((p, i) => {
-    // Only the top 2 results get a thumbnail — keeps the response scannable and
-    // well under the 24k budget (U8).
-    const img = p.image && i < 2 ? ` ![photo](${p.image})` : "";
+    // No inline image markdown: the chat surface renders `![photo](longURL)` as
+    // raw noise (and eats the 24k budget), so we keep results text-only (N11).
     const tel = p.tel ? ` · ☎ ${p.tel}` : "";
-    return `**${i + 1}. ${p.title}**${img}\n   📍 ${p.address}${tel}`;
+    return `**${i + 1}. ${p.title}**\n   📍 ${p.address}${tel}`;
   });
   return [
     `🔎 **Places for** _"${query}"_ — _from Korea Tourism data_`,
@@ -160,7 +159,8 @@ const SEOUL_CHOICES: Choice[] = [
 const SEOUL_AREAS = [
   "Myeongdong", "Hongdae", "Gangnam", "Insadong", "Itaewon", "Bukchon", "Dongdaemun",
   "Yeouido", "Jamsil", "Seongsu", "Euljiro", "Samcheong", "Garosu", "Sinsa", "Jongno",
-  "Gwanghwamun", "Ikseon", "Gwangjang", "Namdaemun", "Apgujeong",
+  "Gwanghwamun", "Ikseon", "Gwangjang", "Namdaemun", "Apgujeong", "Cheongdam", "Yeonnam",
+  "Hapjeong", "Mangwon",
 ];
 
 /** The keyword we hand VisitSeoul to narrow to a neighborhood. "Seoul" itself is
@@ -187,10 +187,10 @@ function dedupeByTitle(items: SeoulContent[], limit: number): SeoulContent[] {
 
 function renderSeoul(query: string, items: SeoulContent[]): string {
   const lines = items.map((p, i) => {
-    const img = p.image && i < 2 ? ` ![photo](${p.image})` : "";
+    // Text-only (no raw image markdown) — see renderPlaces (N11).
     const cat = p.categoryPath ? ` · _${p.categoryPath.split(">").pop()?.trim()}_` : "";
     const sum = p.summary ? `\n   ${clip(p.summary, 180)}` : "";
-    return `**${i + 1}. ${p.title}**${img}${cat}${sum}`;
+    return `**${i + 1}. ${p.title}**${cat}${sum}`;
   });
   return [
     `🔎 **Seoul ideas for** _"${query}"_ — _official Seoul Tourism_`,

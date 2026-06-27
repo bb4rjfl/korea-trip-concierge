@@ -27,6 +27,17 @@ const RETRY: Choice[] = [
 
 const CATEGORIES = ["attraction", "restaurant", "festival", "shopping", "accommodation", "theme"] as const;
 
+// Marquee Jeju sights — seeded ahead of the live list for the sightseeing views,
+// so VisitJeju's "latest" ordering doesn't bury the icons under niche operators (P8).
+const JEJU_ICONS = [
+  "**Seongsan Ilchulbong (Sunrise Peak)** — UNESCO tuff cone; the classic sunrise hike",
+  "**Hallasan** — Korea's highest peak; day hikes and crater lake (start early)",
+  "**Manjanggul Cave** — a walkable UNESCO lava tube (~11°C inside)",
+  "**Cheonjiyeon & Jeongbang Falls** — Seogwipo waterfalls (Jeongbang drops into the sea)",
+  "**Udo (Cow Island)** — bike or scooter the islet off the east coast",
+  "**Jusangjeolli Cliffs** — hexagonal basalt columns pounded by the surf",
+];
+
 /** Map a free-text category (incl. synonyms) to a VisitJeju bucket — so an enum
  *  miss like "spaceship" no longer leaks a raw -32602 (R7); unknown → highlights. */
 function normalizeJejuCategory(raw?: string): string | undefined {
@@ -84,6 +95,10 @@ export const getJejuInfo: ToolDef = {
         );
       }
       const lines = [`🌴 **Jeju Island — ${label}**`, ""];
+      // Lead the sightseeing views with the must-see icons (P8).
+      if (!category || category === "attraction") {
+        lines.push("⭐ **Must-see sights**", ...JEJU_ICONS.map((s) => `- ${s}`), "", "_More from VisitJeju:_", "");
+      }
       for (const p of places) {
         lines.push(`**${p.title}**${p.category ? ` · _${p.category}_` : ""}`);
         if (p.address) lines.push(`📍 ${p.address}`);

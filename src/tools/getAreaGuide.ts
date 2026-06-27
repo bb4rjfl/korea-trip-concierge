@@ -215,6 +215,55 @@ const AREAS: Area[] = [
     getThere: "~1 hr by bus (600/Limousine or 281) from Jeju Airport, or rent a car.",
     interests: { food: "Seafood, hallabong-citrus treats, and harbour restaurants.", history: "Olle trails and waterfalls; whale/cliff scenery along the coast." },
   },
+
+  // ── More Seoul (trendy & historic) ────────────────────────────────────────────
+  {
+    keys: /(yeonnam|연남)/i,
+    name: "Yeonnam-dong (연남동)",
+    blurb:
+      "A laid-back café-and-bistro neighbourhood beside Hongdae, strung along the grassy 'Yeontral Park' rail trail — indie coffee shops, brunch, and a Chinatown-ish food street. Calmer and more local than Hongdae itself.",
+    spots: ["Gyeongui Line Forest Park ('Yeontral Park')", "indie cafés & roasteries", "Yeonnam-dong Chinese-food street", "Dongjin Market"],
+    getThere: "Hongik Univ. Stn (Line 2 / AREX) Exit 3, then a short walk.",
+    interests: { food: "Specialty coffee, brunch, and hand-pulled noodles.", nightlife: "Low-key wine bars and izakayas, not clubs." },
+  },
+  {
+    keys: /(apgujeong|cheongdam|압구정|청담)/i,
+    name: "Apgujeong & Cheongdam (압구정·청담)",
+    blurb:
+      "Seoul's luxury quarter south of the river — flagship designer stores, K-pop entertainment HQs, high-end clinics, and the city's most exclusive dining. Polished and pricey.",
+    spots: ["Apgujeong Rodeo Street", "Galleria Department Store", "Cheongdam luxury-brand row & K-pop agencies (SM, etc.)", "Dosan Park"],
+    getThere: "Apgujeong Rodeo Stn (Suin-Bundang Line) or Apgujeong Stn (Line 3); Cheongdam Stn (Line 7).",
+    interests: { shopping: "Designer flagships, Galleria, and Rodeo boutiques.", food: "Fine dining, omakase, and celebrity-chef restaurants — book ahead." },
+  },
+  {
+    keys: /(jongno|jongro|gwanghwamun|종로|광화문)/i,
+    name: "Jongno & Gwanghwamun (종로·광화문)",
+    blurb:
+      "Seoul's historic heart — the grand Gwanghwamun Square and palaces, old alley eateries (Pimatgol), and the Cheonggyecheon stream, all walkable. Where royal Korea meets the modern downtown.",
+    spots: ["Gwanghwamun Square (King Sejong & Yi Sun-sin statues)", "Gyeongbokgung & Cheonggyecheon (both adjacent)", "Jogyesa Temple", "Gwangjang Market (nearby)"],
+    getThere: "Gwanghwamun Stn (Line 5) or Jonggak / Jongno 3-ga (Lines 1/3/5).",
+    interests: { history: "Palaces, Jogyesa, and the old Pimatgol back-alleys on foot.", food: "Historic gukbap, jokbal, and grilled-fish alleys around Jongno." },
+  },
+  {
+    keys: /(hapjeong|mangwon|합정|망원)/i,
+    name: "Hapjeong & Mangwon (합정·망원)",
+    blurb:
+      "A relaxed riverside pocket just west of Hongdae — the homely Mangwon Market, leafy Mangwon Hangang Park, and a thicket of cafés and small restaurants. Local-feeling and easy-going.",
+    spots: ["Mangwon Traditional Market (cheap street food)", "Mangwon Hangang Park (riverside picnics)", "café & brunch lanes", "Mecenatpolis Mall (Hapjeong)"],
+    getThere: "Hapjeong Stn (Lines 2/6) or Mangwon Stn (Line 6).",
+    interests: { food: "Market street food and unpretentious neighbourhood eateries.", nightlife: "Cosy bars and riverside convenience-store beers." },
+  },
+
+  // ── East coast (popular KTX day-trip) ─────────────────────────────────────────
+  {
+    keys: /(gangneung|강릉)/i,
+    name: "Gangneung (강릉)",
+    blurb:
+      "An east-coast beach-and-coffee town two hours from Seoul by KTX — wide sandy beaches, the famous Anmok 'coffee street', and pine-fringed shores. A favourite weekend escape.",
+    spots: ["Anmok Beach Coffee Street", "Gyeongpo Beach & Lake", "Jeongdongjin (seaside railway)", "Ojukheon historic house"],
+    getThere: "KTX from Seoul Stn or Cheongnyangni (~2 hr) to Gangneung Stn; local buses to the beaches.",
+    interests: { food: "Fresh raw fish, sundubu (soft-tofu) at Chodang village, and seaside cafés.", history: "Ojukheon & Seongyojang — Joseon-era houses near the lake." },
+  },
 ];
 
 const INTERESTS = ["food", "shopping", "history", "nightlife"] as const;

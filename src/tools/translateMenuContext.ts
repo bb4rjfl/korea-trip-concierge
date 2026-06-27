@@ -65,6 +65,22 @@ const DISHES: Dish[] = [
   { match: /콩나물국밥|kongnamul/i, en: "Bean-sprout soup rice", desc: "Rice in a clear, peppery bean-sprout broth — light and a popular hangover cure.", spice: 1, allergens: ["soy", "fish", "egg"] },
   { match: /두부김치|dubu.?kimchi/i, en: "Tofu with stir-fried kimchi", desc: "Warm tofu slices served with stir-fried pork kimchi — a classic drinking snack.", spice: 2, allergens: ["soy", "pork"] },
   { match: /보리밥|bori.?bap/i, en: "Barley rice (mixed)", desc: "Barley-and-rice mix served with assorted vegetables and gochujang to mix yourself — wholesome and light.", spice: 1, allergens: ["gluten", "soy", "sesame"] },
+  // ── Busan & southern-coast specialties ──────────────────────────────────────
+  { match: /돼지국밥|dwaeji.?gukbap/i, en: "Pork soup rice (Busan)", desc: "Busan's signature — slices of boiled pork in a milky pork-bone broth over rice; season with salted shrimp, chives, and chili paste.", spice: 1, allergens: ["pork", "soy", "shellfish"] },
+  { match: /밀면|milmyeon/i, en: "Busan cold wheat noodles", desc: "Chewy wheat noodles in an icy broth (mul) or spicy sauce (bibim), topped with a slice of meat and egg — Busan's take on naengmyeon.", spice: 1, allergens: ["gluten", "soy", "egg"] },
+  { match: /물회|mulhoe/i, en: "Cold raw-fish soup", desc: "Sliced raw fish in an icy sweet-spicy broth with vegetables — a refreshing coastal summer dish (Busan, Jeju, the east coast).", spice: 2, allergens: ["fish", "soy", "sesame"] },
+  // ── Jeju specialties ────────────────────────────────────────────────────────
+  { match: /흑돼지|heuk.?dwaeji|black pork/i, en: "Jeju black-pork BBQ", desc: "Prized Jeju heritage-breed pork grilled at the table and dipped in meljeot (anchovy sauce) — richer and chewier than ordinary samgyeopsal.", spice: 0, allergens: ["pork", "fish", "sesame"] },
+  { match: /갈치조림|galchi.?jorim/i, en: "Braised cutlassfish", desc: "Silvery cutlassfish braised with radish and potato in a spicy-savory sauce — a Jeju seafood staple.", spice: 2, allergens: ["fish", "soy"] },
+  { match: /전복죽|jeonbok.?juk|abalone porridge/i, en: "Abalone porridge", desc: "Creamy rice porridge cooked with abalone, tinged green from its roe — gentle and nourishing, a Jeju classic.", spice: 0, allergens: ["shellfish"] },
+  // ── Seoul & nationwide classics foreigners seek out ─────────────────────────
+  { match: /간장게장|ganjang.?gejang|soy.?sauce.?crab|marinated crab/i, en: "Soy-marinated raw crab", desc: "Raw crab cured in soy sauce — silky briny roe and meat eaten over rice; nicknamed the 'rice thief' (밥도둑). It's raw, so eat it where it's fresh.", spice: 0, allergens: ["shellfish", "soy"] },
+  { match: /닭한마리|dak.?han.?mari/i, en: "Whole-chicken hotpot", desc: "A whole chicken simmered at the table in a clear broth with potato and rice cakes; dip in soy-mustard sauce and finish with noodles — a Dongdaemun favorite to share.", spice: 0, allergens: ["soy"] },
+  { match: /곰탕|gomtang/i, en: "Beef-bone soup", desc: "Clear, long-simmered beef-and-brisket broth with rice — cleaner and milder than the milky seolleongtang; season it yourself.", spice: 0, allergens: [] },
+  { match: /수제비|sujebi/i, en: "Hand-torn dough soup", desc: "Soft hand-torn wheat-dough flakes in an anchovy-or-seafood broth with vegetables — homey comfort food, especially on a rainy day.", spice: 0, allergens: ["gluten", "soy", "fish"] },
+  { match: /막국수|makguksu/i, en: "Chilled buckwheat noodles (makguksu)", desc: "Gangwon-style cold buckwheat noodles tossed in a tangy-sweet sauce (bibim) or served in a cool broth (mul) with vegetables.", spice: 1, allergens: ["gluten", "soy", "sesame", "egg"] },
+  { match: /콩국수|kong.?guksu|kongguksu/i, en: "Cold soy-milk noodles", desc: "Wheat noodles in a chilled, nutty soy-milk broth — a creamy, plant-based summer dish; add a pinch of salt to taste.", spice: 0, allergens: ["gluten", "soy"] },
+  { match: /추어탕|chueotang|loach/i, en: "Loach soup", desc: "Hearty soup of ground freshwater loach with perilla and vegetables — earthy and nourishing, often seasoned with sancho pepper.", spice: 1, allergens: ["fish", "soy"] },
 ];
 
 const SPICE_LABEL = ["🌶️ none", "🌶️ mild", "🌶️🌶️ medium", "🌶️🌶️🌶️ hot"];
@@ -79,9 +95,11 @@ const ANIMAL = ["pork", "fish", "shellfish"];
 const MEAT_RE =
   /\b(beef|pork|chicken|duck|lamb|meat|fish|seafood|sausage|\bham\b|spam|anchovy|broth|intestine|trotter|monkfish|blood|octopus|squid|shrimp|prawn|crab|oyster|clam)\b|galbi|bulgogi|samgye|jeyuk|gukbap|haejang|jokbal|gopchang/i;
 
-function renderDish(d: Dish, supportedConcerns: string[], noPork: boolean, veg: boolean): string {
+function renderDish(d: Dish, supportedConcerns: string[], noPork: boolean, veg: boolean, vegan: boolean): string {
   const hits = d.allergens.filter((a) => supportedConcerns.includes(a));
-  const allergenLine = d.allergens.length ? `Allergens: ${d.allergens.join(", ")}` : "No common allergens";
+  // "…to flag" scopes this to the tracked allergen set, so it never reads as a
+  // contradiction next to a "contains meat" diet flag (e.g. 설렁탕/삼계탕) — P7.
+  const allergenLine = d.allergens.length ? `Allergens: ${d.allergens.join(", ")}` : "No common allergens to flag";
   let warn = hits.length ? `\n  - ⚠️ **Contains ${hits.join(", ")}** (you flagged this)` : "";
   // Hard per-dish flag for halal/pork-free diners (Y12) — the soft broth note isn't enough.
   if (noPork && d.allergens.includes("pork")) warn += `\n  - ⚠️ **Contains pork — not halal/pork-free**`;
@@ -90,6 +108,11 @@ function renderDish(d: Dish, supportedConcerns: string[], noPork: boolean, veg: 
     const animal = d.allergens.filter((a) => ANIMAL.includes(a));
     if (animal.length) warn += `\n  - ⚠️ **Contains ${animal.join("/")} — not vegetarian/vegan**`;
     else if (MEAT_RE.test(`${d.en} ${d.desc}`)) warn += `\n  - ⚠️ **Contains meat or fish — not vegetarian/vegan**`;
+    // Vegetarian-OK but egg/dairy → flag for vegans specifically (P7).
+    else if (vegan) {
+      const ed = d.allergens.filter((a) => a === "egg" || a === "dairy");
+      if (ed.length) warn += `\n  - ⚠️ **Contains ${ed.join("/")} — not vegan** (fine for vegetarians)`;
+    }
   }
   return `- **${d.en}** — ${d.desc}\n  - Spice: ${SPICE_LABEL[d.spice]} · ${allergenLine}${warn}`;
 }
@@ -127,11 +150,12 @@ function render(menuText: string, concerns: string[]): string {
   const supported = concerns.filter((c) => SUPPORTED_ALLERGENS.has(c));
   const unsupported = concerns.filter((c) => !SUPPORTED_ALLERGENS.has(c));
   const veg = concerns.some((c) => /veg|vegan|meat|pork.?free|halal|beef/.test(c));
+  const vegan = concerns.some((c) => /\bvegan\b/.test(c));
   const noPork = concerns.some((c) => /halal|pork.?free|no.?pork/.test(c));
 
   const lines = [head];
   if (supported.length) lines.push("", `_Checking against: **${supported.join(", ")}** (⚠️ marks dishes that contain these)_`);
-  lines.push("", ...found.map((d) => renderDish(d, supported, noPork, veg)));
+  lines.push("", ...found.map((d) => renderDish(d, supported, noPork, veg, vegan)));
 
   const notes: string[] = [];
   // Y13: dish-like tokens we couldn't identify — surface them instead of dropping silently.

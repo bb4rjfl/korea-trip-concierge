@@ -47,8 +47,8 @@
 - **title**: "Explain Payment Options for Foreigners"
 - **description(영문)**: "Explains which payment methods a foreign visitor can actually use in a given Korean situation (transit, market, taxi, kiosk), including foreign-card and contactless caveats. Korea Trip Concierge(코리아 트립 컨시어지)."
 - **inputSchema**: `{ situation: string (required), cardType?: string }`
-- **output**: 가능/불가 방법 + 대안(현금/충전 등) 영문 정리. 끝에 선택지(관련 상황 더보기).
-- **확장(D-016)**: 상황 매트릭스에 **KTX/SRT(국내카드전용 키오스크), 세금환급(VAT), ATM(Global ATM·DCC·4자리PIN), 온라인/앱결제(본인인증 차단)** 추가 + 택시 안티스캠(미터·1330)·T-money 심화(태그아웃·환승·환불·Climate Card/K-Pass).
+- **output**: 가능/불가 방법 + 대안(현금/충전 등) 영문 정리. 끝에 **상황별 브릿지 칩**(D-017, N4식): ATM→Global ATM 찾기, 병원→약국·응급, 식당→메뉴, 교통/택시→경로 등 형제 툴 연결.
+- **확장(D-016)**: 상황 매트릭스에 **KTX/SRT(국내카드전용 키오스크), 세금환급(VAT), ATM(Global ATM·DCC·4자리PIN), 온라인/앱결제(본인인증 차단), 병원/응급(F1)** 추가 + 택시 안티스캠(미터·1330)·T-money 심화(태그아웃·환승·환불·Climate Card/K-Pass).
 - annotations: readOnly true / idempotent true / openWorld false (큐레이션 지식 중심) — 단 실시간 요소 있으면 openWorld true
 
 ## 5b. `explainKoreanService`  (한국 시스템 장벽 내비 — D-016, 12번째 툴)
@@ -63,7 +63,7 @@
 - **title**: "Get Neighborhood Guide"
 - **description(영문)**: "Gives a concise English one-paragraph guide and top spots for a Korean neighborhood, tailored to foreign visitors. Korea Trip Concierge(코리아 트립 컨시어지)."
 - **inputSchema**: `{ area: string (required), interest?: string }`
-- **데이터**: **큐레이션 동네가이드**(키 불필요·항상 동작). **21개 동네**(D-014로 8→21 확장): 서울 14(명동·홍대·강남·인사동·성수·이태원·북촌·동대문 + **여의도·잠실/롯데월드·익선동·을지로·삼청동·가로수길/신사**), **부산 5**(해운대·서면·광안리·남포동/자갈치·감천문화마을), **제주 2**(제주시·서귀포). `keys` 정규식에 한글 별칭 포함, 첫 매칭 우선(순서 주의).
+- **데이터**: **큐레이션 동네가이드**(키 불필요·항상 동작). **26개 동네**(D-014로 8→21, D-017로 21→26): 서울 18(명동·홍대·강남·인사동·성수·이태원·북촌·동대문·여의도·잠실/롯데월드·익선동·을지로·삼청동·가로수길/신사 + **연남·압구정/청담·종로/광화문·합정/망원**), **부산 5**(해운대·서면·광안리·남포동/자갈치·감천문화마을), **제주 2**(제주시·서귀포), **강원 1**(강릉, KTX 당일치기). `keys` 정규식에 한글 별칭 포함, 첫 매칭 우선(순서 주의).
 - **output**: 동네 요약 + 스팟 3~5 + 이동 팁 + interest별 노트. 끝에 선택지(근처 필수시설/길찾기/지금가기/날씨 → 다른 툴 연결). 미수록 동네는 "실제 검색" 유도 폴백.
 - annotations: readOnly true / idempotent true / openWorld true
 

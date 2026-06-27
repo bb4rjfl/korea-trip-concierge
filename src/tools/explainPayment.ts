@@ -247,9 +247,7 @@ const GENERIC: PaymentGuide = {
   tip: "Keep both a foreign card and some cash. For transit, use a T-money card.",
 };
 
-function render(situation: string, cardType?: string): string {
-  const matched = GUIDES.find((x) => x.match.test(situation));
-  const g = matched ?? GENERIC;
+function render(g: PaymentGuide, matched: boolean, cardType?: string): string {
   const cardNote = cardType
     ? `\n\n_Your card: **${cardType}** — foreign-issued cards follow the same rules above; acceptance depends on the merchant terminal, not the brand._`
     : "";
@@ -271,13 +269,37 @@ function render(situation: string, cardType?: string): string {
   ].join("\n");
 }
 
-// Location-free chips: keep the user in explainPayment (which needs no area) and
-// surface the high-value new topics, instead of a "find stores nearby" dead-end.
-const CHOICES: Choice[] = [
-  { emoji: "🚌", cmdEn: "How do I pay on the bus or subway?", cmdKo: "교통 결제", descEn: "T-money, tap-out, transfers, passes" },
-  { emoji: "🚕", cmdEn: "How do I avoid getting overcharged by taxis?", descEn: "meter, fair fare, 1330" },
-  { emoji: "🧾", cmdEn: "How does the tourist tax refund work?", descEn: "VAT refund steps at the airport" },
-];
+// Chip palette: most stay in explainPayment (no area needed); a few bridge to the
+// sibling tool the situation implies (ATM/pharmacy/eat/menu/route), so a payment
+// answer flows into the next step instead of a dead-end (P2, mirrors N4).
+const P = {
+  transit: { emoji: "🚌", cmdEn: "How do I pay on the bus or subway?", cmdKo: "교통 결제", descEn: "T-money, tap-out, transfers" },
+  taxi: { emoji: "🚕", cmdEn: "How do I avoid getting overcharged by taxis?", descEn: "meter, fair fare, 1330" },
+  refund: { emoji: "🧾", cmdEn: "How does the tourist tax refund work?", descEn: "VAT refund steps" },
+  atm: { emoji: "🏧", cmdEn: "Find a Global ATM near me", descEn: "foreign-card ATMs nearby" },
+  pharmacy: { emoji: "💊", cmdEn: "Find a pharmacy near me", descEn: "약국 + after-hours" },
+  emergency: { emoji: "🆘", cmdEn: "Medical emergency — what do I do?", descEn: "119, 1339, 1330" },
+  eat: { emoji: "🍽️", cmdEn: "Find foreigner-friendly places to eat", descEn: "restaurants that take foreign cards" },
+  menu: { emoji: "🍜", cmdEn: "Explain a Korean menu item", descEn: "what's in this dish" },
+  route: { emoji: "🚇", cmdEn: "Plan a transit route", descEn: "subway/bus directions" },
+} satisfies Record<string, Choice>;
+
+/** 3 next-step chips tailored to the matched payment situation (P2). */
+function paymentChips(label: string, matched: boolean): Choice[] {
+  if (!matched) return [P.transit, P.taxi, P.refund];
+  if (label.startsWith("Public transit")) return [P.taxi, P.route, P.refund];
+  if (label.startsWith("Taxi")) return [P.transit, P.route, P.atm];
+  if (label.startsWith("ATMs")) return [P.atm, P.transit, P.taxi];
+  if (label.startsWith("Hospitals")) return [P.pharmacy, P.emergency, P.taxi];
+  if (label.startsWith("Tax refund")) return [P.transit, P.atm, P.eat];
+  if (label.startsWith("Restaurants")) return [P.menu, P.eat, P.taxi];
+  if (label.startsWith("Self-order")) return [P.menu, P.eat, P.transit];
+  if (label.startsWith("Online")) return [P.refund, P.atm, P.transit];
+  if (label.startsWith("Department")) return [P.refund, P.atm, P.eat];
+  if (label.startsWith("Train")) return [P.transit, P.route, P.refund];
+  if (label.startsWith("Admission")) return [P.transit, P.route, P.eat];
+  return [P.transit, P.taxi, P.refund];
+}
 
 export const explainPayment: ToolDef = {
   name: "explainPayment",
@@ -301,6 +323,8 @@ export const explainPayment: ToolDef = {
   handler: (args) => {
     const situation = String(args.situation ?? "");
     const cardType = args.cardType ? String(args.cardType) : undefined;
-    return ok(render(situation, cardType), CHOICES);
+    const matched = GUIDES.find((x) => x.match.test(situation));
+    const g = matched ?? GENERIC;
+    return ok(render(g, Boolean(matched), cardType), paymentChips(g.label, Boolean(matched)));
   },
 };

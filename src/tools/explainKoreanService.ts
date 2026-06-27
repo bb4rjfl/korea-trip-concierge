@@ -59,7 +59,9 @@ const SERVICES: ServiceGuide[] = [
     dated: "Shuttle's delivery zones change — check the app covers your area.",
   },
   {
-    match: /(reserv|booking|book[\w\s]{0,20}(table|restaurant|seat)|waitlist|catch ?table|tabling|naver booking|예약|웨이팅|catchtable)/i,
+    // Require a determiner-ish word after "book" so "book a (popular) restaurant"
+    // matches but "I read a book about restaurants" doesn't (P5).
+    match: /(reserv|booking|book(?:ing)?\s+(?!about|on\b|by\b)[\w\s]{0,15}?(?:table|seat|spot|restaurant|reservation)|waitlist|catch ?table|tabling|naver booking|예약|웨이팅|catchtable)/i,
     label: "Restaurant reservations & waitlists",
     emoji: "🍽️",
     blocker:
@@ -229,7 +231,7 @@ function serviceChips(g: ServiceGuide): Choice[] {
   if (L.startsWith("SIM")) return [C.taxi, C.route, C.pay];
   if (L.startsWith("Tourist tax")) return [C.shop, C.pay, C.resv];
   if (L.startsWith("Entry")) return [C.sim, C.taxi, C.pay];
-  if (L.startsWith("Emergency")) return [C.pharm, C.pay, C.kiosk];
+  if (L.startsWith("Emergency")) return [C.pharm, C.route, C.pay]; // find care → get there → pay (P6: drop off-topic kiosk)
   if (L.startsWith("Korean-only")) return [C.menu, C.pay, C.resv];
   return [C.taxi, C.resv, C.kiosk]; // GENERIC
 }
