@@ -71,7 +71,9 @@ const SERVICES: ServiceGuide[] = [
     fallback: "Call the restaurant, ask your hotel concierge to book, or simply **walk in and wait** (많은 곳이 워크인 가능).",
   },
   {
-    match: /(online shop|checkout|coupang|gmarket|e.?commerce|buy.*online|website won't|payment fail|온라인|쇼핑몰|결제\s*오류)/i,
+    // Include "website" and card-failure phrasings so the tool's OWN chip
+    // ("Why does my card fail on Korean websites?") routes here, not to GENERIC.
+    match: /(online shop|checkout|coupang|gmarket|e.?commerce|buy.*online|website|payment fail|card.?fail|card.*(declin|reject)|온라인|쇼핑몰|결제\s*오류|카드.*(안\s*돼|실패|거절))/i,
     label: "Online shopping & checkout",
     emoji: "🛒",
     blocker:

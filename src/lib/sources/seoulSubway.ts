@@ -192,12 +192,18 @@ export function resolveLineName(input: string): string | undefined {
     "suin-bundang": "수인분당선",
     "suin bundang": "수인분당선",
     bundang: "수인분당선",
+    "분당선": "수인분당선", // bare 분당선 → the merged Suin-Bundang line
     gyeongchun: "경춘선",
     "ui-sinseol": "우이신설선",
     "ui sinseol": "우이신설선",
     seohae: "서해선",
   };
-  return named[s];
+  if (named[s]) return named[s];
+  // Already a Korean line name the API expects ("신분당선", "경의중앙선", "공항철도",
+  // "신림선"…) → pass it straight through.
+  const raw = input.trim();
+  if (/[가-힣]/.test(raw) && /(선|철도|라인)$/.test(raw)) return raw;
+  return undefined;
 }
 
 /** trainSttus → English status (realtimePosition codes differ from arrival). */

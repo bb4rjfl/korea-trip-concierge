@@ -27,7 +27,7 @@ const PLACES: GeoPlace[] = [
   { label: "Myeongdong", lng: 126.9863, lat: 37.5609, aliases: ["myeongdong", "명동"] },
   { label: "Hongik Univ. Station", lng: 126.9245, lat: 37.5572, aliases: ["hongdae", "hongik", "홍대", "홍대입구"] },
   { label: "Gangnam Station", lng: 127.0276, lat: 37.4979, aliases: ["gangnam", "강남"] },
-  { label: "Seoul Station", lng: 126.9707, lat: 37.5547, aliases: ["seoul station", "서울역"] },
+  { label: "Seoul Station", lng: 126.9707, lat: 37.5547, aliases: ["seoul station", "서울역", "ソウル", "首爾", "首尔"] },
   { label: "Itaewon", lng: 126.9947, lat: 37.5345, aliases: ["itaewon", "이태원"] },
   { label: "Insadong", lng: 126.985, lat: 37.574, aliases: ["insadong", "인사동"] },
   { label: "Dongdaemun (DDP)", lng: 127.009, lat: 37.5663, aliases: ["dongdaemun", "ddp", "동대문"] },
@@ -61,19 +61,19 @@ const PLACES: GeoPlace[] = [
   { label: "Incheon Int'l Airport T2", lng: 126.4407, lat: 37.4602, aliases: ["incheon airport t2", "incheon airport terminal 2", "인천공항2터미널"] },
   { label: "Dongmyo Flea Market", lng: 127.0166, lat: 37.5727, aliases: ["dongmyo", "동묘"] },
   // ── Major non-Seoul cities & destinations (geocode anchors for national search) ──
-  { label: "Busan", lng: 129.0413, lat: 35.1151, aliases: ["busan", "부산", "busan station", "부산역"] },
+  { label: "Busan", lng: 129.0413, lat: 35.1151, aliases: ["busan", "부산", "busan station", "부산역", "釜山", "プサン"] },
   { label: "Haeundae (Busan)", lng: 129.1639, lat: 35.1631, aliases: ["haeundae", "해운대"] },
   { label: "Seomyeon (Busan)", lng: 129.0594, lat: 35.1577, aliases: ["seomyeon", "서면"] },
   { label: "Gwangalli (Busan)", lng: 129.1187, lat: 35.1532, aliases: ["gwangalli", "gwangan", "광안리", "광안"] },
   { label: "Nampo-dong / Jagalchi (Busan)", lng: 129.0306, lat: 35.0975, aliases: ["nampo", "nampo-dong", "jagalchi", "남포동", "자갈치"] },
   { label: "Gamcheon Culture Village (Busan)", lng: 129.0107, lat: 35.0976, aliases: ["gamcheon", "감천", "감천문화마을"] },
-  { label: "Jeju City", lng: 126.5312, lat: 33.4996, aliases: ["jeju", "jeju city", "제주", "제주시"] },
+  { label: "Jeju City", lng: 126.5312, lat: 33.4996, aliases: ["jeju", "jeju city", "제주", "제주시", "済州", "濟州", "チェジュ"] },
   { label: "Seogwipo (Jeju)", lng: 126.5601, lat: 33.2542, aliases: ["seogwipo", "서귀포"] },
   { label: "Daegu", lng: 128.6014, lat: 35.8714, aliases: ["daegu", "대구", "동성로"] },
   { label: "Incheon (Chinatown)", lng: 126.6166, lat: 37.4759, aliases: ["incheon", "인천", "incheon chinatown", "인천차이나타운"] },
   { label: "Gwangju", lng: 126.8526, lat: 35.1595, aliases: ["gwangju", "광주"] },
   { label: "Daejeon", lng: 127.3845, lat: 36.3504, aliases: ["daejeon", "대전"] },
-  { label: "Gyeongju", lng: 129.2247, lat: 35.8562, aliases: ["gyeongju", "경주"] },
+  { label: "Gyeongju", lng: 129.2247, lat: 35.8562, aliases: ["gyeongju", "경주", "慶州"] },
   { label: "Jeonju (Hanok Village)", lng: 127.153, lat: 35.815, aliases: ["jeonju", "전주", "jeonju hanok village", "전주한옥마을"] },
   { label: "Gangneung", lng: 128.8761, lat: 37.7519, aliases: ["gangneung", "강릉"] },
   { label: "Sokcho", lng: 128.5918, lat: 38.207, aliases: ["sokcho", "속초"] },
@@ -108,10 +108,9 @@ export function findPlaceInText(text: string): GeoPlace | undefined {
   for (const p of PLACES) {
     for (const a of p.aliases) {
       const al = a.toLowerCase();
-      if (al.length < 3) continue;
-      const hit = /[a-z]/.test(al)
-        ? new RegExp(`\\b${al.replace(ESC_RE, "\\$&")}\\b`).test(t)
-        : t.includes(al);
+      const latin = /[a-z]/.test(al);
+      if (al.length < (latin ? 3 : 2)) continue; // 2-char CJK/Korean city names are valid
+      const hit = latin ? new RegExp(`\\b${al.replace(ESC_RE, "\\$&")}\\b`).test(t) : t.includes(al);
       if (hit && (!best || al.length > best.len)) best = { p, len: al.length };
     }
   }

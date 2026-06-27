@@ -96,7 +96,8 @@
 - [x] **v4 폴리시 마무리 + 콘텐츠 확대(2026-06-27, D-017)**: docs/20 잔여 폴리시(P2 explainPayment 상황별 브릿지칩·Hallasan 야간 오라벨·P7 메뉴 vegan egg/dairy·P5/P6 explainKoreanService·N12 not-found 검색칩·N11 이미지 노이즈 제거) + **콘텐츠**(메뉴 +13 부산/제주/명물, 명소 27→36 +CJK, 동네 21→26, 제주 대표명소 시딩). **N8=라이브 정상**. **커밋 `ad37b6b` 배포·라이브검증 27/0 PASS**(프로토콜 컴플라이언스 포함=Inspector 필요분 충족).
 - [x] **콘텐츠 라운드①(D-018) + UI/UX v4 테스트→수정(D-019) (2026-06-27)**: ① explainKoreanService **+티켓팅**(11서비스, K-pop), 메뉴 +6, 명소 36→43, 동네 26→29. ② v4 테스트(docs/22, 백그라운드 에이전트)="**submission-ready, fix one bug**"(회귀 전부 유지·안전 클린·D-017 12/13 라이브) → **수정 4종**: P-V1🔴(콩국수 broth 오플래그→bone), P-V2(이벤트 강등 + Seoul must-see 시딩), P-V3(비서울 지오코딩+findPlaceInText), P-V4(필수시설 노이즈필터). **206 tests green.** **배포·라이브검증 완료: `7e1b0c8` 18/0 + `ce630d0`(P-V2 시딩) 확인.**
 - [x] **완성도 라운드(2026-06-27, D-020)**: 저우선 잔여(P3 temple-stay 라우팅·Jamsil 면책·P4 특정업소 투명안내) + 콘텐츠(explainKoreanService **+은행/송금**=12서비스, explainPayment +찜질방, 메뉴 +6, 명소 43→50, 동네 29→32). 부수: 가입 매처 bare `account` 충돌 제거. **212 tests green.** **배포·라이브검증 완료: `3660698` 14/0 PASS.**
-- [~] **콘텐츠 라운드②(2026-06-27, D-021) + 새 시나리오 테스트(v5)**: **다도시 must-see 시딩**(Seoul→Busan/Jeju/Gyeongju, 비서울 discovery 품질↑), 명소 50→55, 동네 32→35, 메뉴 +3. **215 tests green.** ⏳ 재배포 후 v5 시나리오 테스트 예정.
+- [x] **콘텐츠 라운드②(2026-06-27, D-021)**: **다도시 must-see 시딩**(Seoul→Busan/Jeju/Gyeongju), 명소 50→55, 동네 32→35, 메뉴 +3. 배포·검증 `9d35679` 11/0.
+- [~] **UI/UX v5 테스트→수정(2026-06-28, D-022)**: v5(docs/23, 에이전트, 9d35679)="**PASS, ship-ready**"(🔴0/🟡3/🟢4, 회귀0, 안전클린, P-V1 수정확인) → **수정 5종**: V1(online 자기칩 라우팅)·V2(콜드 타임아웃 시드유지)·V3(CJK/가나 도시)·V4(도시개요 Busan/Seoul)·V5(한글 노선명). **219 tests green.** ⏳ 재배포 대기.
 - [ ] **🔥 다음: 재배포(KC 중지→시작)+`build` SHA 검증 → 라이브 probe(폴리시/콘텐츠 + MCP 프로토콜 컴플라이언스 동시) → (검증 끝나면)PlayMCP 심사요청(보류중) → 비즈폼**. 상세 **docs/21 §7~9**. (Inspector 별도 GUI 불필요=재배포 후 라이브 검증에 포함, 노출키 재발급=사용자 결정 스킵)
 - [ ] 대기: 서울버스 키 전파(승인됐으나 ws.bus.go.kr 미전파, 매세션 재탐침) / 카카오Local 승인 / 저우선 잔여 P3·P4·Jamsil(docs/21 §8)
 

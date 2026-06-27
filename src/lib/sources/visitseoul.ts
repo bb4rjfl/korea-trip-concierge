@@ -95,7 +95,7 @@ const SEOUL_BBOX = { minLng: 126.76, maxLng: 127.18, minLat: 37.43, maxLat: 37.7
 export function isSeoulText(text?: string): boolean {
   const t = (text ?? "").trim();
   if (!t) return false;
-  if (/\bseoul\b|서울/i.test(t)) return true;
+  if (/\bseoul\b|서울|ソウル|首爾|首尔/i.test(t)) return true;
   const c = resolvePlaceCoord(t);
   if (!c) return false;
   return (

@@ -116,11 +116,12 @@ src/tools/               12개 툴 (types, index, *.ts) — 지식툴4 즉시동
 src/server.ts            +툴별 타이밍 로그(S1), 헬스 키요약(S5)
 scripts/lint-naming.ts   빌드 게이트 (kakao 토큰/charset/중복/개수, 3~20)
 scripts/verify-live.ts   실 API 호출 점검 (키 필요)
-test/                    vitest 215개 (헬퍼 + 로마자 + 퍼지 + 랜드마크 + 다국어 + 폴리시 v4 + 콘텐츠 + 지오코딩 + 다도시 must-see + 완성도 + 전체 툴 계약 + 핸들러 스모크 + 소스 파서)
+test/                    vitest 219개 (헬퍼 + 로마자 + 퍼지 + 랜드마크 + 다국어 + 폴리시 v4 + 콘텐츠 + 지오코딩 + 다도시 must-see + 완성도 + v5수정 + 전체 툴 계약 + 핸들러 스모크 + 소스 파서)
 Dockerfile               linux/amd64, 루트
 ```
 
 ## 세션 로그
+- 2026-06-28 (v5 테스트 수정, D-022): v5 분기 에이전트(build 9d35679, ~70콜)="**PASS, ship-ready**"(🔴0/🟡3/🟢4, 회귀0, 안전클린, P-V1 수정확인). 발견 5종 수정: V1(online 매처 자기칩 라우팅), V2(콜드 타임아웃 must-see 시드 유지), V3(CJK/가나 도시 인식·지오코딩), V4(getAreaGuide 도시개요 Busan/Seoul), V5(한글 노선명). docs/23. **+4 tests(219 green)**, tsc·빌드 클린. ⚠️ 도중 안전분류기 일시다운으로 Agent/Bash 한때 막혔다 복구(인프라 transient). 배포·검증 대기.
 - 2026-06-27 (콘텐츠 라운드 ②, D-021): 사용자 "한 라운드 더 + 새 시나리오 테스트". **city must-see 시딩 다도시 일반화**(`cityMustSeeLead`: Seoul→Busan/Jeju/Gyeongju, 핸들러에서 Seoul/TourAPI 양쪽 prepend) → 비서울 discovery 품질↑(P-V3 보강). 명소 50→55(불국사·첨성대·수원화성·설악산·송도센트럴파크), 동네 32→35(경주·인천·속초), 메뉴 +3(한정식·백반·수육). **+3 tests(215 green)**, tsc·빌드 클린. 배포 후 새 시나리오 테스트(v5) 예정.
 - 2026-06-27 (완성도 라운드, D-020): 사용자 "주어진 시간 완성도 최대화" → **저우선 잔여 마감 + 콘텐츠 추가**. 잔여: P3(temple stay→Seoul VisitSeoul, findPlaceInText 가드)·Jamsil 면책·P4(특정업소 인근거리 해소 시 투명안내). 콘텐츠: explainKoreanService **+은행/송금**(12서비스), explainPayment +찜질방, 메뉴 +6, 명소 43→50, 동네 29→32. 부수: 가입 매처 bare `account` 제거(은행계좌 충돌). **+12 tests(212 green)**, tsc·빌드 클린. 배포·검증 대기.
 - 2026-06-27 (콘텐츠 라운드 ①, D-018): D-017 배포·검증(27/0) 후 사용자 지시로 **추가 콘텐츠 라운드 + v4 시나리오 테스트 동시 진행**. ① explainKoreanService **+콘서트/이벤트 티켓팅**(11서비스, Interpark Global·Klook), 메뉴 +6(닭볶음탕·쭈꾸미·양꼬치·골뱅이·김치전·번데기 +MEAT_RE silkworm/whelk), 명소 36→43(반포분수·이화벽화·별마당·서울로7017·올림픽공원·태종대·섭지코지), 동네 26→29(서촌·건대·신촌). **+4 tests(202 green)**. ② v4 테스트=백그라운드 에이전트로 분기(deployed ad37b6b 블랙박스, docs/22 작성+요약회수; send_message는 비대화형 승인불가라 Agent로 대체). v4 결과: **"submission-ready, fix one bug"**(회귀 전부 유지, 안전 클린, D-017 12/13 라이브). **v4 발견 4종 수정(D-019)**: P-V1🔴(콩국수 broth 오플래그→bone), P-V2(이벤트 강등), P-V3(비서울 지명 지오코딩+findPlaceInText), P-V4(필수시설 노이즈필터). **① + v4수정 묶어 1회 커밋·재배포**. 204 tests green.

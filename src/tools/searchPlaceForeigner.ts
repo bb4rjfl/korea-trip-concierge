@@ -216,10 +216,10 @@ const SEOUL_GENERIC_RE =
 /** Detect the headline city named in a generic query, for must-see seeding. */
 function detectMustSeeCity(query: string, area: string): keyof typeof CITY_MUSTSEE | null {
   const t = `${area} ${query}`;
-  if (/\bseoul\b|서울/i.test(t)) return "Seoul";
-  if (/busan|부산/i.test(t)) return "Busan";
-  if (/jeju|제주/i.test(t)) return "Jeju";
-  if (/gyeongju|경주/i.test(t)) return "Gyeongju";
+  if (/\bseoul\b|서울|ソウル|首爾|首尔/i.test(t)) return "Seoul";
+  if (/busan|부산|釜山|プサン/i.test(t)) return "Busan";
+  if (/jeju|제주|済州|濟州|チェジュ/i.test(t)) return "Jeju";
+  if (/gyeongju|경주|慶州/i.test(t)) return "Gyeongju";
   return null;
 }
 
@@ -466,6 +466,14 @@ export const searchPlaceForeigner: ToolDef = {
       }
       return ok(mustSee + renderPlaces(query, places), CHOICES);
     } catch {
+      // Even when live data is slow, still serve the curated must-see lead so the
+      // fallback doesn't vanish exactly when the API fails (P-V2 cold case).
+      if (mustSee) {
+        return ok(
+          mustSee + "_Live results are slow right now — the must-see picks above are a solid start; tap one to check it, or try again._",
+          CHOICES,
+        );
+      }
       return fail(
         "Couldn't reach the places service",
         "The Korea Tourism data source didn't respond in time. Please try again in a moment.",

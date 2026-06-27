@@ -6,6 +6,8 @@ import { getAreaGuide } from "../src/tools/getAreaGuide.js";
 import { resolveLandmark, landmarkVerdict, LANDMARKS } from "../src/lib/landmarks.js";
 import { resolvePlaceCoord, findPlaceInText } from "../src/lib/places.js";
 import { cityMustSeeLead } from "../src/tools/searchPlaceForeigner.js";
+import { isSeoulText } from "../src/lib/sources/visitseoul.js";
+import { resolveLineName } from "../src/lib/sources/seoulSubway.js";
 
 const text = (r: { content: { text: string }[] }) => r.content[0].text;
 
@@ -189,6 +191,31 @@ describe("D-021 content additions", () => {
   it("identifies hanjeongsik/baekban/suyuk", () => {
     expect(text(translateMenuContext.handler({ menuText: "수육" }))).toContain("Boiled pork");
     expect(text(translateMenuContext.handler({ menuText: "한정식" }))).toMatch(/hanjeongsik|table d'h/i);
+  });
+});
+
+// ── v5 test findings (D-022) ──────────────────────────────────────────────────
+describe("v5 fixes (D-022)", () => {
+  it("V1: routes its own chip text (card fail on websites) to Online, not GENERIC", () => {
+    const r = explainKoreanService.handler({ service: "Why does my card fail on Korean websites?" });
+    expect(text(r)).toContain("Online shopping & checkout");
+  });
+  it("V3: CJK/kana city names seed must-see + geocode", () => {
+    expect(cityMustSeeLead("釜山 観光", "")).toMatch(/Busan must-see/);
+    expect(cityMustSeeLead("観光 ソウル", "")).toMatch(/Seoul must-see/);
+    expect(findPlaceInText("釜山 観光")?.label).toMatch(/Busan/);
+    expect(isSeoulText("ソウル 観光")).toBe(true);
+  });
+  it("V4: city-level area overviews (Busan/Seoul) without shadowing hoods", () => {
+    expect(text(getAreaGuide.handler({ area: "Busan" }))).toContain("Busan (부산)");
+    expect(text(getAreaGuide.handler({ area: "Seoul" }))).toContain("Seoul (서울)");
+    expect(text(getAreaGuide.handler({ area: "Haeundae" }))).toContain("Haeundae"); // hood still wins
+  });
+  it("V5: trackSubwayArrival accepts Hangul line names", () => {
+    expect(resolveLineName("신분당선")).toBe("신분당선");
+    expect(resolveLineName("경의중앙선")).toBe("경의중앙선");
+    expect(resolveLineName("분당선")).toBe("수인분당선");
+    expect(resolveLineName("2호선")).toBe("2호선"); // numbered still works
   });
 });
 

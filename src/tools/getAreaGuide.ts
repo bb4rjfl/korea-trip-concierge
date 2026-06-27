@@ -347,6 +347,27 @@ const AREAS: Area[] = [
     getThere: "Express bus from Seoul (Express Bus Terminal / Dong Seoul, ~2–2.5 hr) to Sokcho terminal; local buses to Seorak.",
     interests: { food: "Abai sundae, dakgangjeong, and just-caught seafood at the market.", history: "Abai Village's refugee history and the coastal Yeonggeumjeong." },
   },
+
+  // ── City-level overviews (must come AFTER the neighbourhood entries so a hood
+  //    like "Haeundae" or "Myeongdong" still matches its own guide first) ────────
+  {
+    keys: /busan|부산/i,
+    name: "Busan (부산)",
+    blurb:
+      "Korea's coastal second city — wide beaches, fresh seafood, hillside art villages, and mountains meeting the sea, all linked by an easy metro. Laid-back and scenic, ~2.5 hr from Seoul by KTX.",
+    spots: ["Haeundae & Gwangalli beaches", "Gamcheon Culture Village", "Jagalchi Market & Nampo-dong (BIFF Square)", "Haedong Yonggungsa seaside temple"],
+    getThere: "KTX from Seoul to Busan Stn (~2.5 hr) or fly into Gimhae (PUS); the Busan Metro reaches most sights.",
+    interests: { food: "Dwaeji-gukbap, milmyeon, and raw fish (hoe) by the sea.", nightlife: "Beach bars at Gwangalli and Seomyeon's night streets." },
+  },
+  {
+    keys: /\bseoul\b|서울/i,
+    name: "Seoul (서울)",
+    blurb:
+      "The capital — royal palaces and hanok lanes next to neon mega-markets, K-beauty, and the Han River. Huge but effortless by subway; pick a neighbourhood to go deep.",
+    spots: ["Gyeongbokgung & the palaces", "Myeongdong + Namdaemun markets", "Hongdae & Bukchon", "Gangnam / COEX & the Han River parks"],
+    getThere: "AREX from Incheon Airport to Seoul Stn; the subway covers everything else.",
+    interests: { history: "Palaces, Bukchon, and Jongno's old quarter.", shopping: "Myeongdong, Dongdaemun, and Gangnam.", nightlife: "Hongdae, Itaewon, and Euljiro.", food: "From street stalls to Michelin — everywhere." },
+  },
 ];
 
 const INTERESTS = ["food", "shopping", "history", "nightlife"] as const;
