@@ -9,6 +9,11 @@ export const ENV = {
   get PORT(): string {
     return process.env.PORT ?? "8080";
   },
+  /** Git commit the running image was built from — a reliable deploy-freshness
+   *  signal in /health (tools count & version don't change between builds). */
+  get GIT_SHA(): string {
+    return process.env.GIT_SHA ?? "dev";
+  },
   get BUS_API_KEY(): string {
     return process.env.BUS_API_KEY ?? "";
   },

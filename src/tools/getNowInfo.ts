@@ -4,7 +4,7 @@ import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
 import { searchPlaces, getPlaceIntro, normalizeLang, type Place } from "../lib/sources/tourapi.js";
 import { CITIES, resolveCity, getWeather, getAir } from "../lib/sources/weatherair.js";
-import { resolveLandmark, landmarkVerdict } from "../lib/landmarks.js";
+import { resolveLandmark, landmarkVerdict, landmarkSuggestions } from "../lib/landmarks.js";
 import { searchSeoulContent, getSeoulDetail, pickConfidentMatch, seoulHoursVerdict, clip, type SeoulDetail } from "../lib/sources/visitseoul.js";
 import { matchAreaName } from "./getAreaGuide.js";
 import { koreanHolidayToday, holidayBanner } from "../lib/holidays.js";
@@ -204,6 +204,21 @@ export const getNowInfo: ToolDef = {
       const weather = await weatherLine(landmark.city ?? "Seoul");
       if (weather) lines.push("", weather);
       return ok(lines.join("\n"), CHOICES);
+    }
+
+    // Ambiguous brand/partial ("Lotte") → ask which curated landmark, instead of
+    // letting TourAPI pick a wrong-city department store (F2/Y7).
+    const suggestions = landmarkSuggestions(place);
+    if (suggestions.length >= 2) {
+      const chips: Choice[] = suggestions.slice(0, 3).map((l) => ({
+        emoji: "🕒",
+        cmdEn: `Is ${l.name} open now?`,
+        descEn: l.city && l.city !== "Seoul" ? `in ${l.city}` : "check this one",
+      }));
+      return ok(
+        `🤔 **Which "${place}" do you mean?**\n\nTap the one you want and I'll check if it's good to go right now.`,
+        chips,
+      );
     }
 
     // A bare neighbourhood ("Hongdae", "Seongsu") has no single open/closed verdict

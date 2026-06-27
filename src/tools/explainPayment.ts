@@ -154,6 +154,20 @@ const GUIDES: PaymentGuide[] = [
     tip: "Bring the card you booked with + your passport. Keep some cash for small family-run stays.",
   },
   {
+    // Before "admission" so "hospital admission / ER" isn't read as a ticket booth (F1).
+    match: /(hospital|clinic|emergency room|\ber\b|doctor|pharmac|medical|dentist|병원|의원|약국|진료|응급실|치과)/i,
+    label: "Hospitals, clinics & pharmacies",
+    works: [
+      "**Foreign cards** and **cash** at most hospitals, clinics, and pharmacies — international clinics at big/university hospitals are used to foreign cards.",
+      "Keep the itemized **receipt + diagnosis** for a **travel-insurance** claim.",
+    ],
+    avoid: [
+      "Assuming a small neighborhood clinic has English staff — head to a **university/international hospital** for English service.",
+      "Domestic-only insurance / benefit apps (residents only).",
+    ],
+    tip: "Pay out of pocket (card or cash) and claim on travel insurance. Emergencies: **119** (ambulance, free), **1339** (medical info / nearest ER), **1330** (24h English + live interpretation).",
+  },
+  {
     match: /(temple|palace|admission|entrance|entry fee|ticket booth|museum|attraction|사찰|입장|관람|매표|입장료)/i,
     label: "Admission (palaces, temples, attractions)",
     works: [

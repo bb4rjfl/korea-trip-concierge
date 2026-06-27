@@ -46,6 +46,7 @@ app.get("/", (_req: Request, res: Response) => {
   res.json({
     name: SERVER_NAME,
     version: SERVER_VERSION,
+    build: ENV.GIT_SHA.slice(0, 7), // deploy-freshness signal (commit SHA)
     tools: TOOL_NAMES.length,
     status: "ok",
     sources: {

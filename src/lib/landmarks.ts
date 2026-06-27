@@ -14,7 +14,7 @@
  * Korea time (KST). Days of week follow JS convention (0 = Sunday … 6 = Saturday).
  */
 
-import { resolveName } from "./fuzzy.js";
+import { resolveName, rankCandidates } from "./fuzzy.js";
 
 /** An open window within a single day, in minutes-of-day (09:00 = 540). */
 export interface Interval {
@@ -377,6 +377,20 @@ export function resolveLandmark(input: string): Landmark | undefined {
   if (direct) return direct;
   const r = resolveName(raw, LANDMARKS, landmarkKeys, { exact: 0.84, suggest: 0.84, maxSuggest: 1 });
   return r.kind === "exact" ? r.item : undefined;
+}
+
+/** Plausible landmark candidates for an ambiguous brand/partial name ("Lotte" →
+ *  Lotte World / Lotte World Tower / Lotte World Adventure). Empty when nothing is
+ *  close or a single match is confident. Lets getNowInfo ask "which one?" instead
+ *  of letting TourAPI pick a wrong-city department store (F2). */
+export function landmarkSuggestions(input: string): Landmark[] {
+  const raw = (input ?? "").trim();
+  if (!raw) return [];
+  // Only STRONG candidates (≥0.8) AND only when genuinely ambiguous (≥2 of them) —
+  // so a brand token like "Lotte" → its two Lotte landmarks, but a loose fuzzy
+  // neighbourhood like "Hongdae" (own area-redirect path) returns nothing.
+  const strong = rankCandidates(raw, LANDMARKS, landmarkKeys).filter((r) => r.score >= 0.8);
+  return strong.length >= 2 ? strong.slice(0, 3).map((r) => r.item) : [];
 }
 
 export interface LandmarkVerdict {

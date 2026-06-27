@@ -37,9 +37,12 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/korea-trip-concierge:latest
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/korea-trip-concierge:latest
+            ghcr.io/${{ github.repository_owner }}/korea-trip-concierge:sha-${{ github.sha }}
           provenance: false
           build-args: |
+            GIT_SHA=${{ github.sha }}
             TOUR_API_KEY=${{ secrets.TOUR_API_KEY }}
             BUS_API_KEY=${{ secrets.BUS_API_KEY }}
             TRANSIT_API_KEY=${{ secrets.TRANSIT_API_KEY }}

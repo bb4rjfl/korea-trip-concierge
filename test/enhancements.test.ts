@@ -42,6 +42,16 @@ describe("v2 fixes (N1–N6)", () => {
     expect(t).toContain("Find a pharmacy near me");
     expect(t).not.toContain("How do I pay here as a foreigner?");
   });
+  it("F1: 'hospital ER admission' routes to medical payment, not attraction admission", () => {
+    const t = text(explainPayment.handler({ situation: "hospital ER admission" }));
+    expect(t.toLowerCase()).toContain("travel insurance");
+    expect(t).not.toContain("palaces");
+  });
+  it("F2: ambiguous 'Lotte' asks which landmark instead of guessing", async () => {
+    const t = text(await getNowInfo.handler({ place: "Lotte" }));
+    expect(t).toContain("Which");
+    expect(t).toContain("Lotte World");
+  });
 });
 
 describe("Korean holiday calendar", () => {
