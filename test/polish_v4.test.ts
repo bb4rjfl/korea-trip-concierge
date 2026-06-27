@@ -5,6 +5,7 @@ import { translateMenuContext } from "../src/tools/translateMenuContext.js";
 import { getAreaGuide } from "../src/tools/getAreaGuide.js";
 import { resolveLandmark, landmarkVerdict, LANDMARKS } from "../src/lib/landmarks.js";
 import { resolvePlaceCoord, findPlaceInText } from "../src/lib/places.js";
+import { seoulMustSeeLead } from "../src/tools/searchPlaceForeigner.js";
 
 const text = (r: { content: { text: string }[] }) => r.content[0].text;
 
@@ -137,5 +138,18 @@ describe("national geocoding (P-V3)", () => {
     expect(resolvePlaceCoord("Busan")?.label).toMatch(/Busan/);
     expect(resolvePlaceCoord("제주")?.label).toMatch(/Jeju/);
     expect(resolvePlaceCoord("Gangneung")?.label).toMatch(/Gangneung/);
+  });
+});
+
+// ── P-V2: Seoul must-see seeding for generic city-wide sightseeing ─────────────
+describe("Seoul must-see seeding (P-V2)", () => {
+  it("seeds icons for a generic city-wide 'things to see' query", () => {
+    const lead = seoulMustSeeLead("things to see in Seoul", "");
+    expect(lead).toMatch(/Seoul must-see/);
+    expect(lead).toMatch(/Gyeongbokgung/);
+  });
+  it("does NOT seed for a specific neighbourhood or a specific noun", () => {
+    expect(seoulMustSeeLead("things to see", "Myeongdong")).toBe("");
+    expect(seoulMustSeeLead("museums", "")).toBe("");
   });
 });

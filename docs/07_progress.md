@@ -116,7 +116,7 @@ src/tools/               12개 툴 (types, index, *.ts) — 지식툴4 즉시동
 src/server.ts            +툴별 타이밍 로그(S1), 헬스 키요약(S5)
 scripts/lint-naming.ts   빌드 게이트 (kakao 토큰/charset/중복/개수, 3~20)
 scripts/verify-live.ts   실 API 호출 점검 (키 필요)
-test/                    vitest 204개 (헬퍼 + 로마자 + 퍼지 + 랜드마크 + 다국어 + 폴리시 v4 + 콘텐츠 + 지오코딩 + 전체 툴 계약 + 핸들러 스모크 + 소스 파서)
+test/                    vitest 206개 (헬퍼 + 로마자 + 퍼지 + 랜드마크 + 다국어 + 폴리시 v4 + 콘텐츠 + 지오코딩 + must-see시딩 + 전체 툴 계약 + 핸들러 스모크 + 소스 파서)
 Dockerfile               linux/amd64, 루트
 ```
 

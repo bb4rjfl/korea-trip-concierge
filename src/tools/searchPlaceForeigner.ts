@@ -172,6 +172,33 @@ function seoulKeyword(area: string, query: string): string {
   return "";
 }
 
+// Iconic Seoul sights, seeded ahead of the live VisitSeoul list for a GENERIC,
+// city-wide "things to see in Seoul" query — so the flagship first-timer query
+// doesn't lead with a current exhibition (P-V2). A specific neighbourhood or a
+// specific noun ("museums") skips this and uses the targeted VisitSeoul results.
+const SEOUL_MUSTSEE = [
+  "**Gyeongbokgung Palace** — the grand royal palace + changing-of-the-guard",
+  "**N Seoul Tower (Namsan)** — city views, cable car, sunset",
+  "**Bukchon Hanok Village** — traditional hanok alleys between the palaces",
+  "**Myeongdong** — shopping + evening street food",
+  "**Insadong & Gwangjang Market** — crafts, teahouses, classic street eats",
+  "**Han River Park (Hangang)** — riverside picnics & bike paths",
+];
+const SEOUL_GENERIC_RE =
+  /things?\s*to\s*(see|do)|worth\s*(see|visit)|sightsee|what\s*to\s*do|must.?see|attraction|landmark|명소|관광|볼거리|가\s*볼|観光|名所|景点|景區|景区/i;
+
+/** Lead block of curated Seoul must-see sights for a generic, city-wide
+ *  sightseeing query (empty neighbourhood keyword + a generic-sightseeing term);
+ *  "" otherwise. Pure/exported for testing. (P-V2) */
+export function seoulMustSeeLead(query: string, area: string): string {
+  if (seoulKeyword(area, query)) return ""; // a specific neighbourhood → targeted results
+  if (!SEOUL_GENERIC_RE.test(query)) return ""; // a specific noun (e.g. "museums") → targeted
+  return (
+    ["⭐ **Seoul must-see**", ...SEOUL_MUSTSEE.map((s) => `- ${s}`), "", "_More official Seoul Tourism ideas:_", ""].join("\n") +
+    "\n"
+  );
+}
+
 function dedupeByTitle(items: SeoulContent[], limit: number): SeoulContent[] {
   const seen = new Set<string>();
   const out: SeoulContent[] = [];
@@ -276,7 +303,7 @@ async function trySeoul(
       vs.filter((c) => !isStalePastEvent(c.title, year)),
       query,
     ).slice(0, 6);
-    return vs.length ? renderSeoul(query, vs) : undefined;
+    return vs.length ? seoulMustSeeLead(query, area) + renderSeoul(query, vs) : undefined;
   } catch {
     return undefined; // fall through to national grounding
   }
