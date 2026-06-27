@@ -96,7 +96,9 @@ const SERVICES: ServiceGuide[] = [
     dated: "K-pop on-sales and global-window timing change per tour — check the artist's official channels for the global sale date.",
   },
   {
-    match: /(kakaotalk|kakao talk|naver|sign.?up|account|본인인증|verif|카톡|가입|인증)/i,
+    // No bare "account" — that stole "open a bank account" from the banking guide;
+    // a KakaoTalk/Naver account still matches by name or "sign-up".
+    match: /(kakaotalk|kakao talk|naver|sign.?up|본인인증|verif|카톡|가입|인증)/i,
     label: "KakaoTalk / Naver sign-up & identity verification",
     emoji: "🆔",
     blocker:
@@ -170,6 +172,20 @@ const SERVICES: ServiceGuide[] = [
       "No toggle? Point **Google Translate's camera** at the screen.",
     ],
     fallback: "Order at the **counter** (\"영어 메뉴 있어요?\") — counter registers usually take foreign cards even when the kiosk doesn't.",
+  },
+  {
+    match: /(banking|bank account|open.*account|mobile bank|kakao ?bank|toss bank|\bwise\b|revolut|remittance|wire money|send money|transfer money|송금|계좌|은행)/i,
+    label: "Banking & money transfers",
+    emoji: "🏦",
+    blocker:
+      "Opening a Korean bank account or using **KakaoPay / Toss / Naver Pay** needs an **ARC (resident card) + Korean phone** — short-stay tourists generally can't, which also locks domestic transfers and pay apps.",
+    workaround: [
+      "For spending, use a **foreign card** + cash from **Global ATMs** (choose KRW, decline the DCC conversion).",
+      "To move money in or out, use **Wise / Revolut** or your home bank — not a Korean account.",
+    ],
+    twin: "**Wise** or **Revolut** for FX and transfers; for cash, the **Global ATMs** in convenience stores (24h).",
+    fallback: "Staying long-term with an **ARC** (student/work)? Internet banks **Kakao Bank / Toss Bank** onboard foreigners who have one.",
+    dated: "Foreign-card and FX-app fees change — compare Wise/Revolut and your bank's overseas-ATM fee before you travel.",
   },
 ];
 
@@ -249,6 +265,7 @@ function serviceChips(g: ServiceGuide): Choice[] {
   if (L.startsWith("Entry")) return [C.sim, C.taxi, C.pay];
   if (L.startsWith("Emergency")) return [C.pharm, C.route, C.pay]; // find care → get there → pay (P6: drop off-topic kiosk)
   if (L.startsWith("Korean-only")) return [C.menu, C.pay, C.resv];
+  if (L.startsWith("Banking")) return [C.pay, C.shop, C.refund];
   return [C.taxi, C.resv, C.kiosk]; // GENERIC
 }
 
@@ -257,8 +274,9 @@ export const explainKoreanService: ToolDef = {
   description:
     "Explains how a foreign visitor gets past Korean services and apps that assume you're a local — taxi apps " +
     "(Kakao T), food delivery, restaurant reservations, online checkout, concert/event ticketing, KakaoTalk/Naver " +
-    "sign-up & identity verification, SIM/eSIM, the tourist VAT refund, entry documents (e-Arrival Card / K-ETA), " +
-    "medical emergencies, and Korean-only kiosks — naming the foreigner-usable workaround or alternative app for each. " +
+    "sign-up & identity verification, SIM/eSIM, banking & money transfers, the tourist VAT refund, entry documents " +
+    "(e-Arrival Card / K-ETA), medical emergencies, and Korean-only kiosks — naming the foreigner-usable workaround " +
+    "or alternative app for each. " +
     `No login or personal information needed. Part of ${SERVICE_NAME}.`,
   inputSchema: {
     service: z

@@ -349,12 +349,21 @@ export const searchPlaceForeigner: ToolDef = {
       );
     }
 
+    // "temple stay" with no city context → route to Seoul's VisitSeoul templestay
+    // curation (its best English coverage) instead of generic TourAPI geography
+    // (P3). A named non-Seoul city (e.g. "temple stay in Busan") opts out.
+    let forceSeoulTemple = false;
+    if (/temple\s*stay|templestay|템플스테이/i.test(query) && !area.trim()) {
+      const qc = findPlaceInText(query);
+      forceSeoulTemple = !qc || isSeoulText(qc.label);
+    }
+
     // Seoul + non-dining → VisitSeoul official curation leads (D-010): pre-translated
     // English summaries/hours/subway for the sightseeing, shopping, culture, nature
     // and experience places visitors ask about. Dining stays on coordinate POI
     // below (stronger for restaurants); any VisitSeoul gap falls through to the
     // national grounding sources (TourAPI/POI).
-    if (cat !== "food" && hasKey("VISITSEOUL_API_KEY") && (isSeoulText(area) || isSeoulText(query))) {
+    if (cat !== "food" && hasKey("VISITSEOUL_API_KEY") && (isSeoulText(area) || isSeoulText(query) || forceSeoulTemple)) {
       const seoul = await trySeoul(query, area, cat, language);
       if (seoul) return ok(seoul, SEOUL_CHOICES);
     }

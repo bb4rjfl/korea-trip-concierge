@@ -141,6 +141,38 @@ describe("national geocoding (P-V3)", () => {
   });
 });
 
+// ── Completeness round (residuals + more content) ─────────────────────────────
+describe("completeness round", () => {
+  it("Jamsil guide notes the ticketed theme park (policy)", () => {
+    expect(text(getAreaGuide.handler({ area: "Jamsil" }))).toMatch(/ticketed theme park/i);
+  });
+  it("explainKoreanService routes banking (ARC barrier) + Wise/Revolut", () => {
+    const r = explainKoreanService.handler({ service: "open a bank account" });
+    expect(text(r)).toContain("Banking & money transfers");
+    expect(text(r)).toMatch(/Wise|Revolut/);
+  });
+  it("explainPayment covers jjimjilbang/sauna", () => {
+    expect(text(explainPayment.handler({ situation: "jjimjilbang" }))).toMatch(/Jjimjilbang/i);
+  });
+  it("identifies more dishes", () => {
+    expect(text(translateMenuContext.handler({ menuText: "닭강정" }))).toContain("Sweet crispy chicken bites");
+    expect(text(translateMenuContext.handler({ menuText: "양념게장" }))).toContain("Spicy marinated raw crab");
+    expect(text(translateMenuContext.handler({ menuText: "김치볶음밥" }))).toContain("Kimchi fried rice");
+    expect(text(translateMenuContext.handler({ menuText: "새우장" }))).toContain("Soy-marinated raw shrimp");
+  });
+  it("resolves more landmarks", () => {
+    expect(resolveLandmark("Udo")?.name).toMatch(/Udo/);
+    expect(resolveLandmark("천지연폭포")?.name).toMatch(/Cheonjiyeon/);
+    expect(resolveLandmark("Common Ground")?.name).toMatch(/Common Ground/);
+    expect(resolveLandmark("Oryukdo Skywalk")?.name).toMatch(/Oryukdo/);
+  });
+  it("resolves more neighbourhood guides", () => {
+    expect(text(getAreaGuide.handler({ area: "대학로" }))).toContain("Daehangno");
+    expect(text(getAreaGuide.handler({ area: "Haebangchon" }))).toContain("Haebangchon");
+    expect(text(getAreaGuide.handler({ area: "전주" }))).toContain("Jeonju");
+  });
+});
+
 // ── P-V2: Seoul must-see seeding for generic city-wide sightseeing ─────────────
 describe("Seoul must-see seeding (P-V2)", () => {
   it("seeds icons for a generic city-wide 'things to see' query", () => {

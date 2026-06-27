@@ -107,7 +107,7 @@ const AREAS: Area[] = [
     keys: /(jamsil|lotte\s*world|롯데월드|잠실)/i,
     name: "Jamsil / Lotte World (잠실)",
     blurb:
-      "Family-and-entertainment hub in southeast Seoul, built around Lotte World theme park and the soaring Lotte World Tower — Korea's tallest building.",
+      "Family-and-entertainment hub in southeast Seoul, built around Lotte World theme park and the soaring Lotte World Tower — Korea's tallest building. (Lotte World is a **ticketed theme park** and the Seoul Sky observatory is a separate ticket — check hours and book ahead, especially on weekends.)",
     spots: ["Lotte World Adventure (indoor + outdoor theme park)", "Seoul Sky observatory (Lotte World Tower)", "Lotte World Mall & Aquarium", "Seokchon Lake (cherry blossoms)"],
     getThere: "Jamsil Stn (Lines 2/8) — exits connect straight into the complex.",
     interests: { shopping: "Lotte World Mall + duty-free under one roof.", food: "Mall food courts and lakeside cafés." },
@@ -292,6 +292,33 @@ const AREAS: Area[] = [
     spots: ["Ewha shopping street (fashion & K-beauty)", "Ewha Campus Complex (ECC)", "Sinchon Yonsei-ro car-free street", "cheap eats & noraebang (karaoke)"],
     getThere: "Sinchon Stn (Line 2) or Ewha Womans Univ. Stn (Line 2).",
     interests: { shopping: "Budget fashion and cosmetics along the Ewha street.", food: "Student-priced eats, cafés, and late-night snacks." },
+  },
+  {
+    keys: /(haebangchon|\bhbc\b|gyeongnidan|gyeongridan|해방촌|경리단길)/i,
+    name: "Haebangchon & Gyeongnidan-gil (해방촌·경리단길)",
+    blurb:
+      "A hip hillside above Itaewon — craft-beer bars, rooftop cafés with Namsan views, and a global mix of small restaurants (Mexican, Middle Eastern, Korean-fusion). Artsy, walkable, and very foreigner-friendly.",
+    spots: ["HBC craft-beer & wine bars", "Gyeongnidan-gil international restaurants", "rooftop cafés facing N Seoul Tower", "Sinheung Market stairs"],
+    getThere: "Noksapyeong Stn (Line 6) Exit 2, then uphill; or a short walk from Itaewon.",
+    interests: { food: "Global cuisines and brunch with English menus.", nightlife: "Craft-beer pubs and low-key rooftop bars." },
+  },
+  {
+    keys: /(daehangno|daehakro|혜화|대학로)/i,
+    name: "Daehangno (대학로)",
+    blurb:
+      "Seoul's live-theatre district around Hyehwa — hundreds of small playhouses, Marronnier Park street performances, and cheap student cafés and eats. Liveliest on weekend afternoons.",
+    spots: ["Marronnier Park (buskers & street theatre)", "small live-theatre playhouses", "Naksan Park & Seoul City Wall (uphill)", "Ihwa Mural Village (nearby)"],
+    getThere: "Hyehwa Stn (Line 4), Exit 1 or 2.",
+    interests: { history: "Walk up to Naksan Park and the old city wall for sunset views.", food: "Student-budget eats, dessert cafés, and theatre-district bars." },
+  },
+  {
+    keys: /(jeonju|전주)/i,
+    name: "Jeonju Hanok Village (전주)",
+    blurb:
+      "Korea's largest hanok village and the home of bibimbap — 700+ traditional houses, hanji paper and craft workshops, and makgeolli alleys. A favourite slow-travel day or overnight from Seoul (~1.5–2 hr by KTX/bus).",
+    spots: ["Jeonju Hanok Village lanes", "Gyeonggijeon Shrine", "Jaman Mural Village", "Pungnammun Gate & nambu night market"],
+    getThere: "KTX or express bus to Jeonju (~1.5–2 hr from Seoul), then a local bus/taxi to the Hanok Village.",
+    interests: { food: "Jeonju bibimbap, kongnamul-gukbap, and makgeolli alley spreads.", history: "Hanok lanes, Gyeonggijeon Shrine, and hanbok photo walks." },
   },
 ];
 

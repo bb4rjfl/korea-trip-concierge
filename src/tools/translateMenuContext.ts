@@ -88,6 +88,13 @@ const DISHES: Dish[] = [
   { match: /골뱅이|golbaeng/i, en: "Spicy whelk salad", desc: "Chewy canned whelks tossed with vegetables in a sweet-spicy sauce, usually with thin somyeon noodles — a classic bar snack (anju).", spice: 2, allergens: ["shellfish", "gluten", "soy"] },
   { match: /김치전|kimchi.?jeon|kimchi pancake/i, en: "Kimchi pancake", desc: "Crispy pan-fried pancake of chopped kimchi in batter — tangy and savory, great on a rainy day (kimchi usually contains fish sauce).", spice: 1, allergens: ["gluten", "soy", "fish"] },
   { match: /번데기|beondegi|silkworm/i, en: "Steamed silkworm pupae", desc: "Steamed silkworm pupae sold from street carts — nutty, earthy, and an adventurous Korean snack (not for the squeamish).", spice: 0, allergens: [] },
+  // ── More everyday & drinking-food dishes ────────────────────────────────────
+  { match: /김치볶음밥|kimchi.?bokkeumbap|kimchi.?fried.?rice/i, en: "Kimchi fried rice", desc: "Rice stir-fried with kimchi (and usually pork/ham), topped with a fried egg and seaweed flakes — a quick, comforting one-plate meal.", spice: 1, allergens: ["soy", "egg", "fish"] },
+  { match: /닭강정|dakgangjeong/i, en: "Sweet crispy chicken bites", desc: "Bite-size double-fried chicken in a sticky sweet-and-spicy glaze — a market and street-stall favorite, great to share.", spice: 1, allergens: ["gluten", "soy", "peanut"] },
+  { match: /쫄면|jjolmyeon/i, en: "Chewy spicy cold noodles", desc: "Very chewy wheat noodles tossed with vegetables in a sweet-spicy gochujang sauce — served cold, a bunsik (snack-bar) classic.", spice: 2, allergens: ["gluten", "egg", "soy", "sesame"] },
+  { match: /닭발|dakbal|chicken feet/i, en: "Spicy chicken feet", desc: "Boneless or bone-in chicken feet in a fiery gochugaru sauce — a chewy, very spicy drinking food (anju). Order with cold drinks.", spice: 3, allergens: ["soy", "sesame"] },
+  { match: /양념게장|yangnyeom.?gejang|spicy.?(marinated|raw).?crab/i, en: "Spicy marinated raw crab", desc: "Raw crab marinated in a spicy gochujang-garlic sauce — eaten with rice; the spicy cousin of soy-marinated ganjang-gejang. It's raw, so eat it fresh.", spice: 2, allergens: ["shellfish", "soy", "sesame"] },
+  { match: /새우장|saewujang|soy.?(marinated)?.?shrimp/i, en: "Soy-marinated raw shrimp", desc: "Raw shrimp cured in soy sauce — sweet, briny, and silky over rice; another 'rice thief'. Raw, so eat where it's fresh.", spice: 0, allergens: ["shellfish", "soy"] },
 ];
 
 const SPICE_LABEL = ["🌶️ none", "🌶️ mild", "🌶️🌶️ medium", "🌶️🌶️🌶️ hot"];

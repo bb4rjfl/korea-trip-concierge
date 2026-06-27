@@ -231,6 +231,19 @@ const GUIDES: PaymentGuide[] = [
     ],
     tip: "Withdraw at Global ATMs in convenience stores (24h). Citibank / Standard Chartered and major banks (KB, Woori, Hana, Shinhan) are the most reliable.",
   },
+  {
+    match: /(jjimjilbang|jjimjil|sauna|찜질방|사우나|목욕탕|bathhouse|\bspa\b|스파)/i,
+    label: "Jjimjilbang / sauna / spa",
+    works: [
+      "**Cash** at the front desk (entry ~₩8,000–15,000); bigger spas also take **foreign cards**.",
+      "You get a **locker key / wristband** — food and drinks inside are tapped to it and **paid in cash at checkout**.",
+    ],
+    avoid: [
+      "Assuming card works at every in-building counter — many snack bars inside are **cash-only**.",
+      "Losing the wristband — there's a replacement fee.",
+    ],
+    tip: "Bring **cash** for entry and snacks. Shoes go in a shoe locker first; settle the wristband total at the front desk when you leave.",
+  },
 ];
 
 const GENERIC: PaymentGuide = {
@@ -298,6 +311,7 @@ function paymentChips(label: string, matched: boolean): Choice[] {
   if (label.startsWith("Department")) return [P.refund, P.atm, P.eat];
   if (label.startsWith("Train")) return [P.transit, P.route, P.refund];
   if (label.startsWith("Admission")) return [P.transit, P.route, P.eat];
+  if (label.startsWith("Jjimjilbang")) return [P.atm, P.transit, P.eat];
   return [P.transit, P.taxi, P.refund];
 }
 

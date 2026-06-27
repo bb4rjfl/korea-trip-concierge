@@ -336,13 +336,15 @@ export const getNowInfo: ToolDef = {
       }
       const intro = await getPlaceIntro(top.contentId, top.contentTypeId, effLang);
       const now = koreaNow();
-      const lines = [
-        `🕒 **${top.title} — right now**`,
-        "",
-        ...(hbanner ? [hbanner, ""] : []),
-        `📍 ${top.address}`,
-        `⏰ Current Korea time: **${now.label} KST**`,
-      ];
+      const lines = [`🕒 **${top.title} — right now**`, ""];
+      // Be transparent when we resolved to a nearby/containing place rather than the
+      // exact name typed (e.g. a specific restaurant → its street), so the hours
+      // aren't mistaken for that venue's (P4).
+      if (!exact && relevance(place, top.title) < 1.5) {
+        lines.push(`_Closest match for "${place}" — for a specific restaurant or shop, search it by name._`, "");
+      }
+      if (hbanner) lines.push(hbanner, "");
+      lines.push(`📍 ${top.address}`, `⏰ Current Korea time: **${now.label} KST**`);
       if (intro.hours) lines.push(`🏛️ Opening hours: ${intro.hours}`);
       if (intro.closedDays) lines.push(`🚫 Closed: ${intro.closedDays}`);
       if (!intro.hours && !intro.closedDays) {
