@@ -112,15 +112,16 @@ src/server.ts            Streamable HTTP stateless 진입점 (loadEnv 최초 imp
 src/lib/                 constants, env, loadEnv(.env), naming, markdown(24k), footer(칩), http(timeout), cache(TTL), responses, romanize(지명 KO→EN)
 src/lib/                 constants, env, naming, markdown, footer, http, cache, responses, romanize, fuzzy, places, intercity, **landmarks(getNowInfo 큐레이션 영업시간 오버레이, D-014)**
 src/lib/sources/         TourAPI, TAGO(버스), ODsay(경로), VisitJeju, weatherair(기상청+에어코리아), seoulSubway(지하철)
-src/tools/               12개 툴 (types, index, *.ts) — 지식툴4 즉시동작 + API툴8 실연동. getNowInfo=랜드마크 오버레이→VisitSeoul→TourAPI 폴백, getAreaGuide=32 동네, landmarks ~50 명소(D-017/018/020), explainKoreanService 12서비스
+src/tools/               12개 툴 (types, index, *.ts) — 지식툴4 즉시동작 + API툴8 실연동. getNowInfo=랜드마크 오버레이→VisitSeoul→TourAPI 폴백, getAreaGuide=35 동네, landmarks ~55 명소(D-017/018/020/021), explainKoreanService 12서비스, searchPlaceForeigner=다도시 must-see 시딩(D-021)
 src/server.ts            +툴별 타이밍 로그(S1), 헬스 키요약(S5)
 scripts/lint-naming.ts   빌드 게이트 (kakao 토큰/charset/중복/개수, 3~20)
 scripts/verify-live.ts   실 API 호출 점검 (키 필요)
-test/                    vitest 212개 (헬퍼 + 로마자 + 퍼지 + 랜드마크 + 다국어 + 폴리시 v4 + 콘텐츠 + 지오코딩 + must-see시딩 + 완성도 + 전체 툴 계약 + 핸들러 스모크 + 소스 파서)
+test/                    vitest 215개 (헬퍼 + 로마자 + 퍼지 + 랜드마크 + 다국어 + 폴리시 v4 + 콘텐츠 + 지오코딩 + 다도시 must-see + 완성도 + 전체 툴 계약 + 핸들러 스모크 + 소스 파서)
 Dockerfile               linux/amd64, 루트
 ```
 
 ## 세션 로그
+- 2026-06-27 (콘텐츠 라운드 ②, D-021): 사용자 "한 라운드 더 + 새 시나리오 테스트". **city must-see 시딩 다도시 일반화**(`cityMustSeeLead`: Seoul→Busan/Jeju/Gyeongju, 핸들러에서 Seoul/TourAPI 양쪽 prepend) → 비서울 discovery 품질↑(P-V3 보강). 명소 50→55(불국사·첨성대·수원화성·설악산·송도센트럴파크), 동네 32→35(경주·인천·속초), 메뉴 +3(한정식·백반·수육). **+3 tests(215 green)**, tsc·빌드 클린. 배포 후 새 시나리오 테스트(v5) 예정.
 - 2026-06-27 (완성도 라운드, D-020): 사용자 "주어진 시간 완성도 최대화" → **저우선 잔여 마감 + 콘텐츠 추가**. 잔여: P3(temple stay→Seoul VisitSeoul, findPlaceInText 가드)·Jamsil 면책·P4(특정업소 인근거리 해소 시 투명안내). 콘텐츠: explainKoreanService **+은행/송금**(12서비스), explainPayment +찜질방, 메뉴 +6, 명소 43→50, 동네 29→32. 부수: 가입 매처 bare `account` 제거(은행계좌 충돌). **+12 tests(212 green)**, tsc·빌드 클린. 배포·검증 대기.
 - 2026-06-27 (콘텐츠 라운드 ①, D-018): D-017 배포·검증(27/0) 후 사용자 지시로 **추가 콘텐츠 라운드 + v4 시나리오 테스트 동시 진행**. ① explainKoreanService **+콘서트/이벤트 티켓팅**(11서비스, Interpark Global·Klook), 메뉴 +6(닭볶음탕·쭈꾸미·양꼬치·골뱅이·김치전·번데기 +MEAT_RE silkworm/whelk), 명소 36→43(반포분수·이화벽화·별마당·서울로7017·올림픽공원·태종대·섭지코지), 동네 26→29(서촌·건대·신촌). **+4 tests(202 green)**. ② v4 테스트=백그라운드 에이전트로 분기(deployed ad37b6b 블랙박스, docs/22 작성+요약회수; send_message는 비대화형 승인불가라 Agent로 대체). v4 결과: **"submission-ready, fix one bug"**(회귀 전부 유지, 안전 클린, D-017 12/13 라이브). **v4 발견 4종 수정(D-019)**: P-V1🔴(콩국수 broth 오플래그→bone), P-V2(이벤트 강등), P-V3(비서울 지명 지오코딩+findPlaceInText), P-V4(필수시설 노이즈필터). **① + v4수정 묶어 1회 커밋·재배포**. 204 tests green.
 - 2026-06-27 (v4 폴리시+콘텐츠, D-017): **새 세션 진입**(docs/21 핸드오프 + kpass3 대화 전수). 세션시작 점검: 🚌서울버스 여전히 error30(재탐침 지속), 🟢배포 `build:2429b18` 신선·12툴·8소스 true 라이브 확인. **v3(docs/20) 잔여 폴리시 마감**: P2(explainPayment 상황별 브릿지칩)·Hallasan 산 야간=closed/"residential"제거·P7(메뉴 vegan egg/dairy 플래그+설렁탕 모순)·P5(예약 "book about" 오매칭)·P6(응급칩 kiosk→route)·N12(getNowInfo not-found→검색칩)·N11(raw 이미지 마크다운 제거). **N8=라이브 정상**(Gyeongbokgung/N Tower 날씨 출력 확인)→코드 무변경. **콘텐츠 확대**: 메뉴 +13(부산·제주·명물), 명소 27→36(+CJK), 동네 21→26, 제주 대표명소 시딩(P8). **+14 tests(198 green)**, tsc·빌드 클린. 보류: P3/P4/Jamsil(저가치/회귀위험, 문서노트). 노출키 재발급=사용자 결정으로 스킵. ⏳ 재배포 필요.

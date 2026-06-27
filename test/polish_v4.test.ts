@@ -5,7 +5,7 @@ import { translateMenuContext } from "../src/tools/translateMenuContext.js";
 import { getAreaGuide } from "../src/tools/getAreaGuide.js";
 import { resolveLandmark, landmarkVerdict, LANDMARKS } from "../src/lib/landmarks.js";
 import { resolvePlaceCoord, findPlaceInText } from "../src/lib/places.js";
-import { seoulMustSeeLead } from "../src/tools/searchPlaceForeigner.js";
+import { cityMustSeeLead } from "../src/tools/searchPlaceForeigner.js";
 
 const text = (r: { content: { text: string }[] }) => r.content[0].text;
 
@@ -173,15 +173,36 @@ describe("completeness round", () => {
   });
 });
 
-// ── P-V2: Seoul must-see seeding for generic city-wide sightseeing ─────────────
-describe("Seoul must-see seeding (P-V2)", () => {
-  it("seeds icons for a generic city-wide 'things to see' query", () => {
-    const lead = seoulMustSeeLead("things to see in Seoul", "");
-    expect(lead).toMatch(/Seoul must-see/);
-    expect(lead).toMatch(/Gyeongbokgung/);
+// ── D-021 content (historic cities, mountains, more dishes) ───────────────────
+describe("D-021 content additions", () => {
+  it("resolves historic-city & mountain landmarks", () => {
+    expect(resolveLandmark("Bulguksa")?.name).toMatch(/Bulguksa/);
+    expect(resolveLandmark("설악산")?.name).toMatch(/Seoraksan/);
+    expect(resolveLandmark("Hwaseong Fortress")?.name).toMatch(/Hwaseong/);
+    expect(resolveLandmark("첨성대")?.name).toMatch(/Cheomseongdae/);
   });
-  it("does NOT seed for a specific neighbourhood or a specific noun", () => {
-    expect(seoulMustSeeLead("things to see", "Myeongdong")).toBe("");
-    expect(seoulMustSeeLead("museums", "")).toBe("");
+  it("resolves Gyeongju/Incheon/Sokcho guides", () => {
+    expect(text(getAreaGuide.handler({ area: "경주" }))).toContain("Gyeongju");
+    expect(text(getAreaGuide.handler({ area: "Incheon" }))).toContain("Incheon");
+    expect(text(getAreaGuide.handler({ area: "속초" }))).toContain("Sokcho");
+  });
+  it("identifies hanjeongsik/baekban/suyuk", () => {
+    expect(text(translateMenuContext.handler({ menuText: "수육" }))).toContain("Boiled pork");
+    expect(text(translateMenuContext.handler({ menuText: "한정식" }))).toMatch(/hanjeongsik|table d'h/i);
+  });
+});
+
+// ── P-V2 / D-021: multi-city must-see seeding ─────────────────────────────────
+describe("city must-see seeding (P-V2, multi-city)", () => {
+  it("seeds icons for a generic city-wide query (Seoul/Busan/Jeju/Gyeongju)", () => {
+    expect(cityMustSeeLead("things to see in Seoul", "")).toMatch(/Seoul must-see[\s\S]*Gyeongbokgung/);
+    expect(cityMustSeeLead("things to see in Busan", "")).toMatch(/Busan must-see[\s\S]*Haeundae/);
+    expect(cityMustSeeLead("attractions in Jeju", "")).toMatch(/Jeju must-see[\s\S]*Seongsan/);
+    expect(cityMustSeeLead("things to see", "Gyeongju")).toMatch(/Gyeongju must-see[\s\S]*Bulguksa/);
+  });
+  it("does NOT seed for a specific neighbourhood, specific noun, or unknown city", () => {
+    expect(cityMustSeeLead("things to see in Seoul", "Myeongdong")).toBe("");
+    expect(cityMustSeeLead("museums", "")).toBe("");
+    expect(cityMustSeeLead("things to see in Daegu", "")).toBe(""); // no curated list yet → falls through
   });
 });

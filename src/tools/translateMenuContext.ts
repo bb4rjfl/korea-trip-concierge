@@ -95,6 +95,9 @@ const DISHES: Dish[] = [
   { match: /닭발|dakbal|chicken feet/i, en: "Spicy chicken feet", desc: "Boneless or bone-in chicken feet in a fiery gochugaru sauce — a chewy, very spicy drinking food (anju). Order with cold drinks.", spice: 3, allergens: ["soy", "sesame"] },
   { match: /양념게장|yangnyeom.?gejang|spicy.?(marinated|raw).?crab/i, en: "Spicy marinated raw crab", desc: "Raw crab marinated in a spicy gochujang-garlic sauce — eaten with rice; the spicy cousin of soy-marinated ganjang-gejang. It's raw, so eat it fresh.", spice: 2, allergens: ["shellfish", "soy", "sesame"] },
   { match: /새우장|saewujang|soy.?(marinated)?.?shrimp/i, en: "Soy-marinated raw shrimp", desc: "Raw shrimp cured in soy sauce — sweet, briny, and silky over rice; another 'rice thief'. Raw, so eat where it's fresh.", spice: 0, allergens: ["shellfish", "soy"] },
+  { match: /한정식|hanjeongsik|korean.?(course|set|table).?(meal|menu|course)?/i, en: "Korean table d'hôte (hanjeongsik)", desc: "A multi-course spread of many small dishes — rice, soups, grilled meat or fish, and a parade of banchan side dishes. Set price, shared at the table.", spice: 1, allergens: ["soy", "sesame", "egg", "fish"] },
+  { match: /백반|baekban/i, en: "Home-style set meal (baekban)", desc: "A simple, cheap set of rice, a soup or stew, and an assortment of banchan — the everyday Korean comfort meal at small eateries.", spice: 1, allergens: ["soy", "fish"] },
+  { match: /수육|suyuk|boiled pork/i, en: "Boiled pork slices (suyuk)", desc: "Tender thin-sliced boiled pork served with salt, ssamjang, and wraps — milder than samgyeopsal, often eaten with rice or as drinking food.", spice: 0, allergens: ["pork", "soy"] },
 ];
 
 const SPICE_LABEL = ["🌶️ none", "🌶️ mild", "🌶️🌶️ medium", "🌶️🌶️🌶️ hot"];

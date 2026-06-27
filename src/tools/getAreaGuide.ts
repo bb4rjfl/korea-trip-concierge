@@ -320,6 +320,33 @@ const AREAS: Area[] = [
     getThere: "KTX or express bus to Jeonju (~1.5–2 hr from Seoul), then a local bus/taxi to the Hanok Village.",
     interests: { food: "Jeonju bibimbap, kongnamul-gukbap, and makgeolli alley spreads.", history: "Hanok lanes, Gyeonggijeon Shrine, and hanbok photo walks." },
   },
+  {
+    keys: /(gyeongju|경주)/i,
+    name: "Gyeongju (경주)",
+    blurb:
+      "The 'museum without walls' — the thousand-year Silla capital, with grassy royal tombs, UNESCO temples, and a floodlit night pond, all on a small, bikeable scale. A history-lover's day or overnight (~2 hr by KTX from Seoul).",
+    spots: ["Bulguksa Temple & Seokguram Grotto", "Daereungwon royal tombs (Cheonmachong)", "Cheomseongdae observatory", "Donggung Palace & Wolji Pond (night)"],
+    getThere: "KTX to Singyeongju Stn (~2 hr from Seoul), then city bus/taxi; the central sites are close together.",
+    interests: { history: "Silla tombs, Bulguksa, and the night-lit Wolji Pond.", food: "Hwangnam-bbang (red-bean pastry) and ssambap set meals." },
+  },
+  {
+    keys: /(incheon|인천|songdo|송도)/i,
+    name: "Incheon (인천 · Chinatown & Songdo)",
+    blurb:
+      "Korea's gateway port city by the airport — a historic Chinatown with jajangmyeon's birthplace and fairy-tale murals, plus the sleek, futuristic Songdo district with its waterfront park. An easy stop on the way in or out.",
+    spots: ["Incheon Chinatown & Jjajangmyeon Museum", "Songwol-dong Fairy-Tale Village", "Songdo Central Park", "Wolmido seaside & ferries"],
+    getThere: "Incheon Stn (Subway Line 1) for Chinatown; Incheon Line 1 to Central Park for Songdo; or AREX from the airport.",
+    interests: { food: "Chinatown jjajangmyeon and mooncakes; Wolmido raw fish.", history: "Open Port-era streets, Chinatown, and the fairy-tale village." },
+  },
+  {
+    keys: /(sokcho|속초)/i,
+    name: "Sokcho (속초)",
+    blurb:
+      "An east-coast town that's the gateway to Seoraksan National Park — fresh seafood, a beach, and the boat-pulled Abai Village settled by North Korean refugees. Pairs mountains and sea in one trip (~2–2.5 hr bus from Seoul).",
+    spots: ["Seoraksan National Park (cable car)", "Sokcho Tourist & Fish Market", "Abai Village (hand-pulled ferry)", "Sokcho Beach & Yeonggeumjeong sunrise pavilion"],
+    getThere: "Express bus from Seoul (Express Bus Terminal / Dong Seoul, ~2–2.5 hr) to Sokcho terminal; local buses to Seorak.",
+    interests: { food: "Abai sundae, dakgangjeong, and just-caught seafood at the market.", history: "Abai Village's refugee history and the coastal Yeonggeumjeong." },
+  },
 ];
 
 const INTERESTS = ["food", "shopping", "history", "nightlife"] as const;

@@ -172,30 +172,67 @@ function seoulKeyword(area: string, query: string): string {
   return "";
 }
 
-// Iconic Seoul sights, seeded ahead of the live VisitSeoul list for a GENERIC,
-// city-wide "things to see in Seoul" query — so the flagship first-timer query
-// doesn't lead with a current exhibition (P-V2). A specific neighbourhood or a
-// specific noun ("museums") skips this and uses the targeted VisitSeoul results.
-const SEOUL_MUSTSEE = [
-  "**Gyeongbokgung Palace** — the grand royal palace + changing-of-the-guard",
-  "**N Seoul Tower (Namsan)** — city views, cable car, sunset",
-  "**Bukchon Hanok Village** — traditional hanok alleys between the palaces",
-  "**Myeongdong** — shopping + evening street food",
-  "**Insadong & Gwangjang Market** — crafts, teahouses, classic street eats",
-  "**Han River Park (Hangang)** — riverside picnics & bike paths",
-];
+// Iconic must-see lists, seeded ahead of the live results for a GENERIC, city-wide
+// sightseeing query (e.g. "things to see in Busan") — so the flagship first-timer
+// query leads with real marquee sights instead of a current exhibition (Seoul) or
+// a rough romanized POI (non-Seoul) (P-V2, extended to major cities, D-021). A
+// specific neighbourhood or a specific noun ("museums") skips this.
+const CITY_MUSTSEE: Record<string, string[]> = {
+  Seoul: [
+    "**Gyeongbokgung Palace** — the grand royal palace + changing-of-the-guard",
+    "**N Seoul Tower (Namsan)** — city views, cable car, sunset",
+    "**Bukchon Hanok Village** — traditional hanok alleys between the palaces",
+    "**Myeongdong** — shopping + evening street food",
+    "**Insadong & Gwangjang Market** — crafts, teahouses, classic street eats",
+    "**Han River Park (Hangang)** — riverside picnics & bike paths",
+  ],
+  Busan: [
+    "**Haeundae Beach** — the famous bay + Blue Line beach train",
+    "**Gamcheon Culture Village** — pastel hillside art village",
+    "**Haedong Yonggungsa** — seaside temple on the rocks",
+    "**Jagalchi Market & Nampo-dong** — huge fish market + BIFF Square",
+    "**Gwangalli Beach** — café strip facing the lit Gwangan Bridge",
+    "**Taejongdae / Oryukdo Skywalk** — coastal cliffs and sea views",
+  ],
+  Jeju: [
+    "**Seongsan Ilchulbong (Sunrise Peak)** — UNESCO tuff cone, sunrise hike",
+    "**Hallasan** — Korea's highest peak (start early)",
+    "**Manjanggul Cave** — a walkable UNESCO lava tube",
+    "**Cheonjiyeon & Jeongbang Falls** — Seogwipo waterfalls",
+    "**Udo (Cow Island)** — bike the islet off the east coast",
+    "**Seopjikoji & Jusangjeolli** — coastal cape and basalt cliffs",
+  ],
+  Gyeongju: [
+    "**Bulguksa Temple & Seokguram Grotto** — UNESCO Silla masterpieces",
+    "**Daereungwon Tumuli Park** — grassy royal burial mounds (Cheonmachong)",
+    "**Cheomseongdae** — the ancient stone observatory",
+    "**Donggung Palace & Wolji Pond** — stunning at night",
+    "**Gyeongju National Museum** — Silla gold crowns & the Emille Bell",
+  ],
+};
 const SEOUL_GENERIC_RE =
   /things?\s*to\s*(see|do)|worth\s*(see|visit)|sightsee|what\s*to\s*do|must.?see|attraction|landmark|명소|관광|볼거리|가\s*볼|観光|名所|景点|景區|景区/i;
 
-/** Lead block of curated Seoul must-see sights for a generic, city-wide
- *  sightseeing query (empty neighbourhood keyword + a generic-sightseeing term);
- *  "" otherwise. Pure/exported for testing. (P-V2) */
-export function seoulMustSeeLead(query: string, area: string): string {
-  if (seoulKeyword(area, query)) return ""; // a specific neighbourhood → targeted results
+/** Detect the headline city named in a generic query, for must-see seeding. */
+function detectMustSeeCity(query: string, area: string): keyof typeof CITY_MUSTSEE | null {
+  const t = `${area} ${query}`;
+  if (/\bseoul\b|서울/i.test(t)) return "Seoul";
+  if (/busan|부산/i.test(t)) return "Busan";
+  if (/jeju|제주/i.test(t)) return "Jeju";
+  if (/gyeongju|경주/i.test(t)) return "Gyeongju";
+  return null;
+}
+
+/** Lead block of curated must-see sights for a generic, city-wide sightseeing
+ *  query; "" otherwise. Pure/exported for testing. (P-V2, multi-city) */
+export function cityMustSeeLead(query: string, area: string): string {
   if (!SEOUL_GENERIC_RE.test(query)) return ""; // a specific noun (e.g. "museums") → targeted
+  // A specific Seoul neighbourhood keyword → targeted VisitSeoul results, no seed.
+  if (seoulKeyword(area, query) && detectMustSeeCity(query, area) === "Seoul") return "";
+  const city = detectMustSeeCity(query, area);
+  if (!city) return "";
   return (
-    ["⭐ **Seoul must-see**", ...SEOUL_MUSTSEE.map((s) => `- ${s}`), "", "_More official Seoul Tourism ideas:_", ""].join("\n") +
-    "\n"
+    [`⭐ **${city} must-see**`, ...CITY_MUSTSEE[city].map((s) => `- ${s}`), "", "_More ideas below:_", ""].join("\n") + "\n"
   );
 }
 
@@ -303,7 +340,7 @@ async function trySeoul(
       vs.filter((c) => !isStalePastEvent(c.title, year)),
       query,
     ).slice(0, 6);
-    return vs.length ? seoulMustSeeLead(query, area) + renderSeoul(query, vs) : undefined;
+    return vs.length ? renderSeoul(query, vs) : undefined;
   } catch {
     return undefined; // fall through to national grounding
   }
@@ -340,6 +377,9 @@ export const searchPlaceForeigner: ToolDef = {
     const category = args.category ? String(args.category) : undefined;
     const cat = inferCategory(query, category);
     const language = normalizeLang(args.language as string | undefined);
+    // Curated must-see lead for a generic, city-wide sightseeing query (P-V2/D-021);
+    // "" otherwise. Prepended to whichever result path runs.
+    const mustSee = cat !== "food" ? cityMustSeeLead(query, area) : "";
 
     // No query and no area → ask, instead of letting an empty search run (N3).
     if (!query.trim() && !area.trim()) {
@@ -365,7 +405,7 @@ export const searchPlaceForeigner: ToolDef = {
     // national grounding sources (TourAPI/POI).
     if (cat !== "food" && hasKey("VISITSEOUL_API_KEY") && (isSeoulText(area) || isSeoulText(query) || forceSeoulTemple)) {
       const seoul = await trySeoul(query, area, cat, language);
-      if (seoul) return ok(seoul, SEOUL_CHOICES);
+      if (seoul) return ok(mustSee + seoul, SEOUL_CHOICES);
     }
 
     // Dining queries → richer comprehensive POI (Naver/Foursquare, converted to
@@ -424,7 +464,7 @@ export const searchPlaceForeigner: ToolDef = {
           }
         }
       }
-      return ok(renderPlaces(query, places), CHOICES);
+      return ok(mustSee + renderPlaces(query, places), CHOICES);
     } catch {
       return fail(
         "Couldn't reach the places service",
