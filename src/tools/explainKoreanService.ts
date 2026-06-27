@@ -81,6 +81,21 @@ const SERVICES: ServiceGuide[] = [
     fallback: "Buy in person, or have a Korean friend pay with Kakao/Naver Pay and settle up.",
   },
   {
+    // No bare "ticket" (would steal "train/bus ticket"); require an event context.
+    match: /(concert|k-?pop|kpop|interpark|yes24|melon ?ticket|fan ?meet|fan.?sign|musical|baseball game|event ?ticket|show ?ticket|gig|예매|콘서트|공연|티켓)/i,
+    label: "Concert & event tickets",
+    emoji: "🎫",
+    blocker:
+      "Interpark / Yes24 / Melon Ticket — Korea's main ticketing sites — need a **Korean-phone identity check (본인인증)**, and many K-pop sales are Korean-only or open a tiny global window that sells out instantly.",
+    workaround: [
+      "Use the **global ticketing site** when one exists — **Interpark Global** (English) sells many concerts, musicals, and shows to overseas buyers with a foreign card.",
+      "For festivals, shows, and theme parks, **Klook / Trazy** resell tickets to foreigners (no Korean ID).",
+    ],
+    twin: "**Interpark Global** (globalinterpark, EN/JA/ZH) and **Klook / Trazy** for events; for a **baseball** game, just buy at the **stadium box office** on the day.",
+    fallback: "Ask your hotel concierge to book, or have a Korean friend buy with their account and pay them back.",
+    dated: "K-pop on-sales and global-window timing change per tour — check the artist's official channels for the global sale date.",
+  },
+  {
     match: /(kakaotalk|kakao talk|naver|sign.?up|account|본인인증|verif|카톡|가입|인증)/i,
     label: "KakaoTalk / Naver sign-up & identity verification",
     emoji: "🆔",
@@ -227,6 +242,7 @@ function serviceChips(g: ServiceGuide): Choice[] {
   if (L.startsWith("Food")) return [C.resv, C.eat, C.pay];
   if (L.startsWith("Restaurant")) return [C.open, C.eat, C.pay];
   if (L.startsWith("Online")) return [C.pay, C.refund, C.resv];
+  if (L.startsWith("Concert")) return [C.shop, C.pay, C.route];
   if (L.startsWith("KakaoTalk")) return [C.pay, C.taxi, C.resv];
   if (L.startsWith("SIM")) return [C.taxi, C.route, C.pay];
   if (L.startsWith("Tourist tax")) return [C.shop, C.pay, C.resv];
@@ -240,9 +256,9 @@ export const explainKoreanService: ToolDef = {
   name: "explainKoreanService",
   description:
     "Explains how a foreign visitor gets past Korean services and apps that assume you're a local — taxi apps " +
-    "(Kakao T), food delivery, restaurant reservations, online checkout, KakaoTalk/Naver sign-up & identity " +
-    "verification, SIM/eSIM, the tourist VAT refund, entry documents (e-Arrival Card / K-ETA), medical " +
-    "emergencies, and Korean-only kiosks — naming the foreigner-usable workaround or alternative app for each. " +
+    "(Kakao T), food delivery, restaurant reservations, online checkout, concert/event ticketing, KakaoTalk/Naver " +
+    "sign-up & identity verification, SIM/eSIM, the tourist VAT refund, entry documents (e-Arrival Card / K-ETA), " +
+    "medical emergencies, and Korean-only kiosks — naming the foreigner-usable workaround or alternative app for each. " +
     `No login or personal information needed. Part of ${SERVICE_NAME}.`,
   inputSchema: {
     service: z

@@ -81,6 +81,13 @@ const DISHES: Dish[] = [
   { match: /막국수|makguksu/i, en: "Chilled buckwheat noodles (makguksu)", desc: "Gangwon-style cold buckwheat noodles tossed in a tangy-sweet sauce (bibim) or served in a cool broth (mul) with vegetables.", spice: 1, allergens: ["gluten", "soy", "sesame", "egg"] },
   { match: /콩국수|kong.?guksu|kongguksu/i, en: "Cold soy-milk noodles", desc: "Wheat noodles in a chilled, nutty soy-milk broth — a creamy, plant-based summer dish; add a pinch of salt to taste.", spice: 0, allergens: ["gluten", "soy"] },
   { match: /추어탕|chueotang|loach/i, en: "Loach soup", desc: "Hearty soup of ground freshwater loach with perilla and vegetables — earthy and nourishing, often seasoned with sancho pepper.", spice: 1, allergens: ["fish", "soy"] },
+  // ── More popular / adventurous dishes ───────────────────────────────────────
+  { match: /닭볶음탕|닭도리탕|dak.?bokkeum|dakdoritang/i, en: "Spicy braised chicken stew", desc: "Chicken simmered with potato, carrot, and a spicy gochujang-gochugaru sauce — hearty and shared from one pot.", spice: 2, allergens: ["soy", "sesame"] },
+  { match: /쭈꾸미|주꾸미|jjukkumi/i, en: "Spicy stir-fried baby octopus", desc: "Baby octopus stir-fried in a fiery gochujang sauce — small but seriously spicy, a favorite drinking dish.", spice: 3, allergens: ["shellfish", "soy", "sesame"] },
+  { match: /양꼬치|yangkkochi|lamb skewer/i, en: "Cumin lamb skewers", desc: "Chinese-Korean grilled lamb skewers rolled in cumin and chili — rotated over a tabletop grill, a beer favorite.", spice: 1, allergens: ["sesame", "peanut"] },
+  { match: /골뱅이|golbaeng/i, en: "Spicy whelk salad", desc: "Chewy canned whelks tossed with vegetables in a sweet-spicy sauce, usually with thin somyeon noodles — a classic bar snack (anju).", spice: 2, allergens: ["shellfish", "gluten", "soy"] },
+  { match: /김치전|kimchi.?jeon|kimchi pancake/i, en: "Kimchi pancake", desc: "Crispy pan-fried pancake of chopped kimchi in batter — tangy and savory, great on a rainy day (kimchi usually contains fish sauce).", spice: 1, allergens: ["gluten", "soy", "fish"] },
+  { match: /번데기|beondegi|silkworm/i, en: "Steamed silkworm pupae", desc: "Steamed silkworm pupae sold from street carts — nutty, earthy, and an adventurous Korean snack (not for the squeamish).", spice: 0, allergens: [] },
 ];
 
 const SPICE_LABEL = ["🌶️ none", "🌶️ mild", "🌶️🌶️ medium", "🌶️🌶️🌶️ hot"];
@@ -92,8 +99,10 @@ const SUPPORTED_ALLERGENS = new Set(DISHES.flatMap((d) => d.allergens));
 const ANIMAL = ["pork", "fish", "shellfish"];
 // Beef/chicken aren't allergen tokens, so detect meat/fish by name too — else a
 // vegetarian sees "No common allergens" for 삼계탕/불고기 (N6).
+// Note: "bone" (ox-bone/pork-bone broths) not bare "broth" — else a plant-based
+// "soy-milk broth" (콩국수) is falsely flagged not-veg (P-V1). 설렁탕 "ox-bone" still hits.
 const MEAT_RE =
-  /\b(beef|pork|chicken|duck|lamb|meat|fish|seafood|sausage|\bham\b|spam|anchovy|broth|intestine|trotter|monkfish|blood|octopus|squid|shrimp|prawn|crab|oyster|clam)\b|galbi|bulgogi|samgye|jeyuk|gukbap|haejang|jokbal|gopchang/i;
+  /\b(beef|pork|chicken|duck|lamb|meat|fish|seafood|sausage|\bham\b|spam|anchovy|bone|intestine|trotter|monkfish|blood|octopus|squid|shrimp|prawn|crab|oyster|clam|whelk|silkworm|pupae)\b|galbi|bulgogi|samgye|jeyuk|gukbap|haejang|jokbal|gopchang/i;
 
 function renderDish(d: Dish, supportedConcerns: string[], noPork: boolean, veg: boolean, vegan: boolean): string {
   const hits = d.allergens.filter((a) => supportedConcerns.includes(a));

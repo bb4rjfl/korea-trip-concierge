@@ -144,15 +144,21 @@ function renderNearby(places: PoiPlace[], query: string, need: Need): string[] {
   // For non-dining needs, drop café/restaurant/bar results the keyword search drags
   // in (an "ATM" search returning a pizzeria) — keeps the list on-need (Y11).
   const foodNeed = need === "foreignCardDining";
-  const FOOD_RE = /caf[eé]|restaurant|bar\b|pub|bakery|dessert|bistro|커피|카페|맛집|식당|레스토랑/i;
+  // For a utility need (ATM/exchange/pharmacy…), the keyword search drags in
+  // eateries and culture venues — drop both so the list stays on-need (Y11/P-V4).
+  const FOOD_RE =
+    /caf[eé]|coffee|restaurant|bar\b|pub|bakery|dessert|bistro|pizz|burger|grill|\bbbq\b|brunch|noodle|chicken|커피|카페|맛집|식당|레스토랑|피자|치킨|베이커리|디저트|이자카야|호프|포차|주점/i;
+  const NOISE_RE =
+    /gallery|galler|museum|art\s?space|exhibition|piknic|studio|theat(er|re)|cinema|\bclub\b|갤러리|미술관|전시|스튜디오|공방|클럽/i;
   // Never surface adult-entertainment venues on a family/KakaoTalk surface (N2).
   const ADULT_RE = /룸\s?싸롱|룸\s?살롱|풀\s?싸롱|단란|안마|유흥|텐프로|레깅스룸|room\s?salon|host\s?bar|성인/i;
   const clean = places.filter((p) => {
     const name = (p.name ?? "").trim();
     const addr = (p.address ?? "").trim();
+    const hay = `${name} ${p.category ?? ""}`;
     if (!name || !addr || name === q || name.startsWith(`${q} (`)) return false;
-    if (ADULT_RE.test(`${name} ${p.category ?? ""}`)) return false;
-    if (!foodNeed && FOOD_RE.test(`${name} ${p.category ?? ""}`)) return false;
+    if (ADULT_RE.test(hay)) return false;
+    if (!foodNeed && (FOOD_RE.test(hay) || NOISE_RE.test(hay))) return false;
     return true;
   });
   if (!clean.length) return [];

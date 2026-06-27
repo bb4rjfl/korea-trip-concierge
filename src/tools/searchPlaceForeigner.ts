@@ -14,7 +14,7 @@ import {
   VS_CATEGORY,
   type SeoulContent,
 } from "../lib/sources/visitseoul.js";
-import { resolvePlaceCoord } from "../lib/places.js";
+import { resolvePlaceCoord, findPlaceInText } from "../lib/places.js";
 import { similarity } from "../lib/fuzzy.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
@@ -160,7 +160,7 @@ const SEOUL_AREAS = [
   "Myeongdong", "Hongdae", "Gangnam", "Insadong", "Itaewon", "Bukchon", "Dongdaemun",
   "Yeouido", "Jamsil", "Seongsu", "Euljiro", "Samcheong", "Garosu", "Sinsa", "Jongno",
   "Gwanghwamun", "Ikseon", "Gwangjang", "Namdaemun", "Apgujeong", "Cheongdam", "Yeonnam",
-  "Hapjeong", "Mangwon",
+  "Hapjeong", "Mangwon", "Seochon", "Konkuk", "Sinchon",
 ];
 
 /** The keyword we hand VisitSeoul to narrow to a neighborhood. "Seoul" itself is
@@ -199,8 +199,14 @@ function renderSeoul(query: string, items: SeoulContent[]): string {
   ].join("\n");
 }
 
-/** Float results matching a specific noun in the query (museum/palace/gallery)
- *  above tangential exhibitions/events the "latest" sort surfaces first (Y3). */
+// Ephemeral content (a current exhibition/concert/festival) that the "latest"
+// sort surfaces first — demoted for general sightseeing so real, permanent places
+// lead "things to see in Seoul" (P-V2).
+const EPHEMERAL_RE = /festival|exhibition|concert|performance|\bshow\b|biennale|fair\b|행사|축제|전시|공연|콘서트|페스티벌/i;
+
+/** Rank Seoul results for the query: float a specific noun (museum/palace/gallery)
+ *  up (Y3), and demote ephemeral events/exhibitions for general sightseeing intent
+ *  (P-V2) — unless the user explicitly asked for events. */
 function rankByIntent(items: SeoulContent[], query: string): SeoulContent[] {
   const q = query.toLowerCase();
   const want = /museum|박물관/.test(q)
@@ -210,9 +216,14 @@ function rankByIntent(items: SeoulContent[], query: string): SeoulContent[] {
       : /gallery|미술관/.test(q)
         ? /galler|미술/i
         : null;
-  if (!want) return items;
-  const score = (c: SeoulContent): number =>
-    (want.test(c.title) ? 2 : 0) + (c.categoryPath && want.test(c.categoryPath) ? 1 : 0);
+  const wantsEvents = /festival|event|exhibition|concert|performance|\bshow\b|축제|행사|전시|공연|콘서트/.test(q);
+  if (!want && wantsEvents) return items; // user wants events → keep the live order
+  const score = (c: SeoulContent): number => {
+    let s = 0;
+    if (want) s += (want.test(c.title) ? 2 : 0) + (c.categoryPath && want.test(c.categoryPath) ? 1 : 0);
+    if (!wantsEvents && (EPHEMERAL_RE.test(c.title) || (c.categoryPath && EPHEMERAL_RE.test(c.categoryPath)))) s -= 2;
+    return s;
+  };
   return items
     .map((c, i) => ({ c, i, s: score(c) }))
     .sort((a, b) => b.s - a.s || a.i - b.i)
@@ -326,7 +337,7 @@ export const searchPlaceForeigner: ToolDef = {
     if (cat === "food" && hasPoiProvider()) {
       try {
         const what = foodKeyword(query); // concrete term (ramen/sushi/vegan…) not just "restaurant"
-        const coord = resolvePlaceCoord(area) ?? resolvePlaceCoord(query);
+        const coord = resolvePlaceCoord(area) ?? resolvePlaceCoord(query) ?? findPlaceInText(query) ?? findPlaceInText(area);
         const pois = await searchForeignerPois({
           area: area || query,
           query: what,
@@ -356,7 +367,7 @@ export const searchPlaceForeigner: ToolDef = {
       // we know the area's coordinates, broaden with the much larger KOREAN
       // dataset by radius (romanized) — far better national/long-tail coverage.
       if (places.length < 5 && language === "en") {
-        const coord = resolvePlaceCoord(area) ?? resolvePlaceCoord(query);
+        const coord = resolvePlaceCoord(area) ?? resolvePlaceCoord(query) ?? findPlaceInText(query) ?? findPlaceInText(area);
         if (coord) {
           const ko = await searchPlacesNearby({
             lat: coord.lat,

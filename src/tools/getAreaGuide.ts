@@ -264,6 +264,35 @@ const AREAS: Area[] = [
     getThere: "KTX from Seoul Stn or Cheongnyangni (~2 hr) to Gangneung Stn; local buses to the beaches.",
     interests: { food: "Fresh raw fish, sundubu (soft-tofu) at Chodang village, and seaside cafés.", history: "Ojukheon & Seongyojang — Joseon-era houses near the lake." },
   },
+
+  // ── More Seoul (hanok-quiet & student-lively) ─────────────────────────────────
+  {
+    keys: /(seochon|서촌)/i,
+    name: "Seochon (서촌)",
+    blurb:
+      "The quieter hanok quarter on the west side of Gyeongbokgung — old alleys, artist studios, galleries, and the traditional Tongin Market, with a calmer, more local feel than Bukchon across the palace.",
+    spots: ["Tongin Market (the brass-coin lunchbox)", "Suseong-dong Valley walk", "art galleries & hanok cafés", "Gyeongbokgung & Gwanghwamun (adjacent)"],
+    getThere: "Gyeongbokgung Stn (Line 3) Exit 2, then walk west.",
+    interests: { history: "Hanok lanes, the palace wall, and old literati haunts on foot.", food: "Tongin Market's coin-lunchbox (yeopjeon dosirak) and cosy hanok cafés." },
+  },
+  {
+    keys: /(konkuk|kondae|건대|건국대)/i,
+    name: "Konkuk Univ. (건대)",
+    blurb:
+      "A high-energy student district around Konkuk University east of the river — the Common Ground container mall, a buzzing 'Rodeo' eating-and-bar street, and a lakeside park. Cheap, lively, and open late.",
+    spots: ["Common Ground (shipping-container mall)", "Konkuk Rodeo eating & bar street", "Children's Grand Park (nearby)", "Ttukseom Hangang Park (nearby)"],
+    getThere: "Konkuk Univ. Stn (Lines 2/7) — the heart of the area.",
+    interests: { nightlife: "Student bars, pojangmacha, and clubs, busiest after 9pm.", food: "Cheap eats, lamb skewers (yangkkochi) street, and dessert cafés." },
+  },
+  {
+    keys: /(sinchon|ewha|edae|신촌|이대|이화여대)/i,
+    name: "Sinchon & Ewha (신촌·이대)",
+    blurb:
+      "A youthful university belt by Yonsei and Ewha — budget eats, karaoke, and the Ewha fashion-and-beauty shopping street, with the striking ECC glass-canyon campus you can walk into.",
+    spots: ["Ewha shopping street (fashion & K-beauty)", "Ewha Campus Complex (ECC)", "Sinchon Yonsei-ro car-free street", "cheap eats & noraebang (karaoke)"],
+    getThere: "Sinchon Stn (Line 2) or Ewha Womans Univ. Stn (Line 2).",
+    interests: { shopping: "Budget fashion and cosmetics along the Ewha street.", food: "Student-priced eats, cafés, and late-night snacks." },
+  },
 ];
 
 const INTERESTS = ["food", "shopping", "history", "nightlife"] as const;

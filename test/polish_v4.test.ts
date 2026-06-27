@@ -4,6 +4,7 @@ import { explainKoreanService } from "../src/tools/explainKoreanService.js";
 import { translateMenuContext } from "../src/tools/translateMenuContext.js";
 import { getAreaGuide } from "../src/tools/getAreaGuide.js";
 import { resolveLandmark, landmarkVerdict, LANDMARKS } from "../src/lib/landmarks.js";
+import { resolvePlaceCoord, findPlaceInText } from "../src/lib/places.js";
 
 const text = (r: { content: { text: string }[] }) => r.content[0].text;
 
@@ -46,9 +47,12 @@ describe("translateMenuContext vegan nuance (P7)", () => {
     const r = translateMenuContext.handler({ menuText: "bibimbap", allergyConcerns: ["vegan"] });
     expect(text(r)).toMatch(/not vegan/i);
   });
-  it("does not false-flag a genuinely vegan dish", () => {
+  it("does not false-flag a genuinely vegan dish (P-V1: 콩국수 'broth' regression)", () => {
     const r = translateMenuContext.handler({ menuText: "콩국수", allergyConcerns: ["vegan"] });
-    expect(text(r)).not.toMatch(/not vegan/i);
+    // The false flag was the full "not vegetarian/vegan" line — match either form.
+    expect(text(r)).not.toMatch(/not veg(etarian|an)/i);
+    // 설렁탕 (ox-bone) must STILL be flagged — the fix must stay narrow.
+    expect(text(translateMenuContext.handler({ menuText: "설렁탕", allergyConcerns: ["vegetarian"] }))).toMatch(/not veg/i);
   });
   it("empty-allergen meat dish reads 'to flag', not a bare reassurance", () => {
     const r = translateMenuContext.handler({ menuText: "설렁탕", allergyConcerns: ["vegetarian"] });
@@ -94,5 +98,44 @@ describe("content coverage expansion", () => {
     expect(text(translateMenuContext.handler({ menuText: "간장게장" }))).toContain("Soy-marinated raw crab");
     expect(text(translateMenuContext.handler({ menuText: "흑돼지" }))).toContain("black-pork");
     expect(text(translateMenuContext.handler({ menuText: "전복죽" }))).toContain("Abalone porridge");
+  });
+});
+
+// ── Round ① additions (ticketing service, more dishes/landmarks/areas) ─────────
+describe("round-1 content additions", () => {
+  it("explainKoreanService routes concert/ticketing", () => {
+    const r = explainKoreanService.handler({ service: "buy K-pop concert tickets" });
+    expect(text(r)).toContain("Concert & event tickets");
+    expect(text(r)).toMatch(/Interpark Global/i);
+  });
+  it("flags insect/lamb dishes for vegetarians (MEAT_RE)", () => {
+    expect(text(translateMenuContext.handler({ menuText: "번데기", allergyConcerns: ["vegetarian"] }))).toMatch(/not vegetarian/i);
+    expect(text(translateMenuContext.handler({ menuText: "양꼬치", allergyConcerns: ["vegetarian"] }))).toMatch(/not vegetarian/i);
+    expect(text(translateMenuContext.handler({ menuText: "닭볶음탕" }))).toContain("Spicy braised chicken stew");
+  });
+  it("resolves more landmarks", () => {
+    expect(resolveLandmark("Banpo Bridge")?.name).toMatch(/Banpo|Rainbow/i);
+    expect(resolveLandmark("별마당도서관")?.name).toContain("Starfield Library");
+    expect(resolveLandmark("Olympic Park")?.name).toContain("Olympic Park");
+    expect(resolveLandmark("Seopjikoji")?.name).toContain("Seopjikoji");
+  });
+  it("resolves more neighbourhood guides", () => {
+    expect(text(getAreaGuide.handler({ area: "서촌" }))).toContain("Seochon");
+    expect(text(getAreaGuide.handler({ area: "Konkuk" }))).toContain("Konkuk");
+    expect(text(getAreaGuide.handler({ area: "신촌" }))).toContain("Sinchon");
+  });
+});
+
+// ── v4 test findings: national geocoding (P-V3) ───────────────────────────────
+describe("national geocoding (P-V3)", () => {
+  it("extracts a place embedded in a query phrase", () => {
+    expect(findPlaceInText("things to see in Busan")?.label).toMatch(/Busan/);
+    expect(findPlaceInText("attractions near Haeundae")?.label).toMatch(/Haeundae/);
+    expect(findPlaceInText("just some random words")).toBeUndefined();
+  });
+  it("geocodes major non-Seoul cities", () => {
+    expect(resolvePlaceCoord("Busan")?.label).toMatch(/Busan/);
+    expect(resolvePlaceCoord("제주")?.label).toMatch(/Jeju/);
+    expect(resolvePlaceCoord("Gangneung")?.label).toMatch(/Gangneung/);
   });
 });
