@@ -300,7 +300,7 @@ export const getNowInfo: ToolDef = {
       if (matches.length === 0) {
         return fail(
           "Place not found",
-          `I couldn't find **${place}** in the tourism data. Try the official name, search by type/area, or pick a nearby landmark.`,
+          `I couldn't find **${place.slice(0, 80)}** in the tourism data. Try the official name, search by type/area, or pick a nearby landmark.`,
           NOT_FOUND,
         );
       }
@@ -330,7 +330,7 @@ export const getNowInfo: ToolDef = {
       if (!top.contentId || !top.contentTypeId) {
         return fail(
           "Place not found",
-          `I couldn't find **${place}** in the tourism data. Try the official name, search by type/area, or pick a nearby landmark.`,
+          `I couldn't find **${place.slice(0, 80)}** in the tourism data. Try the official name, search by type/area, or pick a nearby landmark.`,
           NOT_FOUND,
         );
       }

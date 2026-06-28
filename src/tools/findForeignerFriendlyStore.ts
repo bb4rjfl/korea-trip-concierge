@@ -202,7 +202,9 @@ export const findForeignerFriendlyStore: ToolDef = {
     "friendly food, and emergency/medical help (119/1339/1330) — with curated tips on which chains and " +
     `options actually work for foreigners, plus real nearby places. Part of ${SERVICE_NAME}.`,
   inputSchema: {
-    area: z.string().describe("Neighborhood/area, e.g. 'Myeongdong' or '명동'."),
+    // Optional so a missing area hits the graceful "Which area?" fallback in the
+    // handler instead of leaking a raw -32602 — the last required field (N13).
+    area: z.string().optional().describe("Neighborhood/area, e.g. 'Myeongdong' or '명동'."),
     need: z
       .string()
       .optional()

@@ -9,6 +9,7 @@ import { cityMustSeeLead } from "../src/tools/searchPlaceForeigner.js";
 import { isSeoulText } from "../src/lib/sources/visitseoul.js";
 import { resolveLineName } from "../src/lib/sources/seoulSubway.js";
 import { getJejuInfo } from "../src/tools/getJejuInfo.js";
+import { findForeignerFriendlyStore } from "../src/tools/findForeignerFriendlyStore.js";
 
 const text = (r: { content: { text: string }[] }) => r.content[0].text;
 
@@ -234,6 +235,15 @@ describe("v6 fixes (D-023)", () => {
   it("V6-3: getJejuInfo out-of-range limit doesn't throw (clamped)", async () => {
     await expect(getJejuInfo.handler({ category: "nature", limit: 99 })).resolves.toBeDefined();
     await expect(getJejuInfo.handler({ category: "nature", limit: "abc" })).resolves.toBeDefined();
+  });
+  it("N13: findForeignerFriendlyStore with no area → graceful 'Which area?' (no -32602)", async () => {
+    const r = await findForeignerFriendlyStore.handler({ need: "atm" });
+    expect(text(r)).toMatch(/Which area/i);
+    expect(text(r)).not.toMatch(/-32602/);
+  });
+  it("🟢: more seeding synonyms — 'what to see' + traditional 景點", () => {
+    expect(cityMustSeeLead("what to see in Busan", "")).toMatch(/Busan must-see/);
+    expect(cityMustSeeLead("釜山 景點", "")).toMatch(/Busan must-see/);
   });
 });
 
