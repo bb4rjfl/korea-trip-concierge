@@ -114,9 +114,9 @@
 ## 12. `recommendTripCourse`  (페르소나별 인기 코스 — D-025, 13번째 툴)
 - **title**: "Recommend Trip Courses by Traveler Profile"
 - **description(영문)**: 페르소나별 인기 한국 여행코스 추천 — 20s women(K-beauty·salon·photo studio·hanbok)·families·couples·K-pop fans·foodies·culture/history. 큐레이션, 예약·광고 없음. `Part of Korea Trip Concierge(코리아 트립 컨시어지).`
-- **inputSchema**: `{ persona?: string, interest?: string }` — z.string(enum 미사용), 핸들러 정규식 매칭 + GENERIC(첫방문) 폴백.
-- **데이터/로직**: 순수 큐레이션(API無·PII無·**광고無**, D-009 안전·키 불필요). 7 페르소나(20대여성/가족/커플/K-pop팬/푸디/문화역사/GENERIC), 각 4~7 코스 항목. 출력 끝 **칩이 기존 툴로 브릿지**(getNowInfo 시간/route 길찾기/getAreaGuide 동네/translateMenuContext 메뉴/explainKoreanService 티켓팅·앱우회). ⚠️ **시술/의료 항목은 카테고리·상담흐름 정보수준만**(특정병원 지목·예약대행 X = 의료법 유인·알선 회피). "_not ads_" 명시.
-- **output**: `{이모지} **Popular in Korea — {persona}**` + intro + 코스 불릿 + 면책라인 + 칩 3개. 매칭 실패 시 페르소나 예시 되묻기.
+- **inputSchema**: `{ persona?, duration?, themes?, location? }` (전부 z.string optional). **persona 조합 가능**("20s woman, foodie" → `,&+/`·and 분리), duration=half-day/1-day/2-day(3일+→2-day 베이스+안내), themes=콤마(동의어맵), location=비서울이면 graceful 안내.
+- **데이터/로직**: `src/lib/courses.ts` — 태깅 **서울스팟 35**(area/zone/themes/blocks/note) + **7 페르소나 테마맵**(조합 시 테마 인터리브) + **조합엔진**(테마점수 랭킹→존클러스터로 동선 묶음→시간블록[아침/점심/오후/저녁] 채움→슬롯별 **스왑대안**) + **1-day 시그니처 골든코스 5**(beauty/family/kpop/foodie/culture, 단일페르소나=하이브리드). 순수 큐레이션·결정적(랜덤無)·**빌드타임 큐레이션**(런타임 LLM/웹 아님→D-009 안전)·키 불필요. ⚠️ **시술/의료(dermainfo) 항목은 info-only**(특정병원 지목·예약대행 X = 의료법 유인·알선 회피). "_not ads_" 명시. **Phase 2**: 부산/제주 스팟·3일+·시그니처 확장.
+- **output**: `🗺️ **{기간} Seoul course — for a {조합 페르소나}**` + Themes줄 + 일자(Day 1/2)·시간블록별 스톱(↔ 스왑대안) + 면책 + 칩(now/route/menu·find·service/remix). 비서울→getAreaGuide/searchPlace/getJejuInfo 유도 칩.
 - annotations: readOnly true / destructive false / idempotent true / openWorld false
 - **수익화 주의**: 이 툴(및 전 툴)은 **광고/예약커미션/랭킹조작 절대 금지**(규칙·의료법). BM은 docs/07 "수익화/BM 로드맵" 참조 — MCP 바깥 별도 트랙.
 

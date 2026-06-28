@@ -1,187 +1,96 @@
 import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok } from "../lib/responses.js";
+import {
+  resolvePersonas,
+  composeCourse,
+  type Duration,
+  type DayPlan,
+  type PersonaDef,
+} from "../lib/courses.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
 /**
- * recommendTripCourse — persona-based "what visitors like you actually do in
- * Korea" discovery. Foreign visitors follow strong, predictable patterns by
- * profile (20s women → K-beauty/photo studios/hanbok; families → hanbok+palace,
- * theme parks; K-pop fans → agency streets + concerts; foodies → markets+BBQ),
- * so leading with a curated set of popular courses solves the "what can I even do
- * here?" first-step problem and then hands each item off to the other tools via
- * chips. Knowledge-only curation (no API, no PII, no ads) — Kakao-rule-safe and
- * higher-trust than an LLM web search. Medical/aesthetic items are kept at the
- * category/how-it-works level (no clinic steering — Korean medical law).
+ * recommendTripCourse — persona-based, combinable, duration-aware trip-course
+ * discovery (D-025). Foreign visitors follow strong profile patterns (20s women →
+ * K-beauty/photo/hanbok; families → palace+theme parks; K-pop fans → agency
+ * streets+concerts; foodies → markets/BBQ), so we lead with a rich, customizable
+ * itinerary and hand each stop off to the other tools via chips.
+ *
+ * Personas COMBINE ("20s woman, foodie") and the engine blends their themes;
+ * duration scales the plan (half-day / 1-day / 2-day, Seoul Phase 1); explicit
+ * themes/location refine it. Curated knowledge composed from tagged spots — no
+ * API, no PII, no ads, deterministic (src/lib/courses.ts). Medical/aesthetic
+ * items stay info-only (no clinic steering — Korean medical law).
  */
 
-interface Persona {
-  match: RegExp;
-  label: string;
-  emoji: string;
-  intro: string;
-  courses: string[];
-  chips: Choice[];
-}
-
-// Reusable bridging chips → the sibling tool a course most naturally continues into.
+// Bridging chips → the sibling tool a stop most naturally continues into.
 const C = {
   now: { emoji: "🕒", cmdEn: "Is one of these open right now?", descEn: "live hours + weather" },
-  route: { emoji: "🚇", cmdEn: "How do I get to one of these?", descEn: "public-transit route" },
+  route: { emoji: "🚇", cmdEn: "How do I get between these stops?", descEn: "public-transit route" },
   area: { emoji: "🗺️", cmdEn: "Guide me around one of these areas", descEn: "neighborhood overview" },
-  find: { emoji: "🔎", cmdEn: "Find specific places for this", descEn: "real spots to visit" },
-  menu: { emoji: "🍜", cmdEn: "Explain a Korean dish from this course", descEn: "what's in it + allergens" },
-  service: { emoji: "🧭", cmdEn: "Get past a Korean app for this (tickets/booking)", descEn: "foreigner workaround" },
-  pay: { emoji: "💳", cmdEn: "How do I pay for these as a foreigner?", descEn: "cards, cash, T-money" },
+  find: { emoji: "🔎", cmdEn: "Find specific places for a stop", descEn: "real spots (salon, café…)" },
+  menu: { emoji: "🍜", cmdEn: "Explain a dish from the food stops", descEn: "what's in it + allergens" },
+  service: { emoji: "🧭", cmdEn: "Get past a Korean app (tickets/booking)", descEn: "foreigner workaround" },
+  remix: { emoji: "🎛️", cmdEn: "Remix this — different persona, days, or theme", descEn: "e.g. 'couple, 2-day, nature'" },
 } satisfies Record<string, Choice>;
 
-const PERSONAS: Persona[] = [
-  {
-    match: /(20s?|twenties|young)\s*(wom[ae]n|girl|female|lady)|k-?beauty|beauty|skincare|make ?up|hair ?(salon)?|nail|photo ?studio|profile ?photo|인생네컷|이십대\s*여|뷰티|화장|미용/i,
-    label: "K-beauty & photo (popular with 20s women)",
-    emoji: "💄",
-    intro: "What a lot of 20-something visitors come to Korea to do — the K-beauty, salon and photo-studio run, plus hanbok and café-hopping:",
-    courses: [
-      "📸 **Profile / 인생네컷 photo studio** — a self-photo booth (인생네컷) or a pro profile-photo studio; many do hair & makeup first for the full look. Walk-in or same-day booking is common.",
-      "💇 **Hair & makeup salon (미용실)** — Hongdae/Gangnam salons; some run English-friendly tourist styling packages.",
-      "💅 **Nail art** — Korean nail studios are world-class; book same-day or walk in.",
-      "🧴 **K-beauty shopping** — Olive Young flagships (Myeongdong/Hongdae) + Seongsu pop-ups; tax-free for tourists with a passport.",
-      "👘 **Hanbok + palace photos** — rent a hanbok by Gyeongbokgung/Bukchon (palace entry is free in hanbok).",
-      "☕ **Aesthetic café-hopping** — Seongsu, Yeonnam, and Ikseon-dong.",
-      "💉 **K-beauty derma/aesthetic clinics (info only)** — 'glass-skin' facials, laser and lifting are popular; bigger clinics have foreigner consultations in English. _I can explain the options and how a consultation works, but I can't book a medical procedure (Korean law)._",
-    ],
-    chips: [C.find, C.area, C.now],
-  },
-  {
-    match: /(famil|kids?|children|child|toddler|parents?|with my (kid|son|daughter)|가족|아이|아기|어린이)/i,
-    label: "Family with kids",
-    emoji: "👨‍👩‍👧",
-    intro: "The crowd-pleasers that work for kids and parents together:",
-    courses: [
-      "👘 **Hanbok + Gyeongbokgung** — free palace entry in hanbok; catch the changing-of-the-guard.",
-      "🎢 **Lotte World or Everland** — Lotte World is indoor+outdoor (great on a rainy/cold day); Everland has the safari and panda twins.",
-      "🐠 **COEX Aquarium + Starfield Library** — easy indoor combo in Gangnam.",
-      "🚡 **Namsan cable car + N Seoul Tower** — city views; the plaza is open even when the deck isn't.",
-      "🚲 **Han River park** — rent bikes/a mat, order fried chicken to the park, watch the bridge fountain.",
-      "🦖 **National Museum of Korea / War Memorial** — free, big, with outdoor tanks & planes kids love.",
-    ],
-    chips: [C.now, C.route, C.pay],
-  },
-  {
-    match: /(couple|honeymoon|romantic|date|anniversary|girlfriend|boyfriend|partner|커플|연인|데이트|신혼)/i,
-    label: "Couple / romantic",
-    emoji: "💑",
-    intro: "The classic Seoul date-course mix of views, walks and food:",
-    courses: [
-      "🌉 **N Seoul Tower at sunset** — cable car up, 'love locks', night skyline.",
-      "🧺 **Han River picnic + chimaek** — mat + fried chicken and beer delivered to the park; Banpo Bridge rainbow-fountain show (Apr–Oct evenings).",
-      "🏯 **Bukchon & Samcheong-dong stroll** — hanok alleys, galleries, quiet cafés; pair with hanbok at the palace.",
-      "🌃 **Lotte World Tower – Seoul Sky** — the city's highest night view.",
-      "☕ **Ikseon-dong hanok cafés** — pretty courtyards, small-plate bistros (book ahead on weekends).",
-    ],
-    chips: [C.now, C.route, C.area],
-  },
-  {
-    match: /(k-?pop|kpop|hallyu|idol|fan|fancafe|concert|bts|blackpink|stray|seventeen|연예|아이돌|팬|콘서트|굿즈)/i,
-    label: "K-pop / Hallyu fan",
-    emoji: "🎤",
-    intro: "The fan pilgrimage — agencies, photo spots, concerts and goods:",
-    courses: [
-      "🏢 **Entertainment-agency streets** — HYBE (Yongsan), SM (SMTOWN COEX), JYP (Seongsu); cafés and goods nearby.",
-      "🎫 **Concerts / fan-sign tickets** — sales gate on Korean ID; use **Interpark Global** or Klook (ask me to walk you through it).",
-      "📍 **MV / drama filming spots** — pilgrimage stops around Seoul + Nami Island.",
-      "🛍️ **K-pop goods** — Myeongdong, Hongdae, and the Seoul-station/online album shops.",
-      "🍢 **Gwangjang Market food run** — the classic Korea food-vlog experience.",
-      "👘 **Hanbok + palace** — the photo set everyone posts.",
-    ],
-    chips: [C.service, C.find, C.route],
-  },
-  {
-    match: /(food(ie)?|eat|eating|cuisine|gourmet|street ?food|bbq|barbecue|미식|맛집|먹방|먹거리)/i,
-    label: "Foodie",
-    emoji: "🍜",
-    intro: "Eat your way through Korea — markets, BBQ, chimaek and regional specialties:",
-    courses: [
-      "🏪 **Market street food** — Gwangjang & Tongin markets (bindaetteok, mayak gimbap, the coin lunchbox).",
-      "🥩 **Korean BBQ** — samgyeopsal/galbi grilled at the table, with soju-beer (somaek).",
-      "🍗 **Chimaek** — Korean fried chicken + beer, the national pairing.",
-      "🍲 **Regional runs** — Busan dwaeji-gukbap & milmyeon; Jeju black-pork & galchi; Jeonju bibimbap.",
-      "🌃 **Night-market & pojangmacha** — Myeongdong carts, Euljiro 'Hipjiro' alleys.",
-      "☕ **Dessert & café tour** — Seongsu/Yeonnam specialty coffee and bingsu.",
-    ],
-    chips: [C.menu, C.find, C.pay],
-  },
-  {
-    match: /(history|historic|culture|cultural|tradition|heritage|palace|temple|museum|senior|elder(ly)?|older|역사|문화|전통|시니어|어르신)/i,
-    label: "Culture & history",
-    emoji: "🏛️",
-    intro: "A slower, deeper route through old Korea:",
-    courses: [
-      "🏯 **The five grand palaces** — Gyeongbokgung & Changdeokgung (book the Secret Garden), plus Deoksugung's stone-wall walk.",
-      "⛩️ **Jongmyo Shrine & Bongeunsa/Jogyesa temples** — UNESCO shrine + working Zen temples.",
-      "🏺 **National Museum of Korea** — free, world-class; the gold crowns and Pensive Bodhisattva.",
-      "🏘️ **Bukchon & Insadong** — hanok lanes, crafts, teahouses; Namsangol Hanok Village.",
-      "🌿 **Day trip: Jeonju Hanok Village or Gyeongju** — Korea's heritage towns.",
-    ],
-    chips: [C.now, C.route, C.area],
-  },
-];
+function normalizeDuration(raw: string): { dur: Duration; over: boolean } {
+  const q = raw.toLowerCase();
+  if (/half|반나절|아침|morning|few hours|몇\s*시간/.test(q)) return { dur: "half-day", over: false };
+  if (/\b3\b|three|3\s*day|삼일|사흘|3일|이상|week|일주일|더\s*길/.test(q)) return { dur: "2-day", over: true }; // 3+ day = Phase 2 → give 2-day base
+  if (/\b2\b|two|2\s*day|이틀|이일|2일|양일/.test(q)) return { dur: "2-day", over: false };
+  return { dur: "1-day", over: false };
+}
 
-// First-timer / solo / generic fallback.
-const GENERIC: Persona = {
-  match: /.*/,
-  label: "First-timer in Seoul",
-  emoji: "🧭",
-  intro: "The classic first-timer loop that almost everyone does — a solid Seoul starter:",
-  courses: [
-    "👘 **Gyeongbokgung + hanbok** — free entry in hanbok; changing-of-the-guard.",
-    "🌉 **N Seoul Tower (Namsan)** — city views, cable car, sunset.",
-    "🛍️ **Myeongdong** — shopping + an evening street-food run.",
-    "🏘️ **Bukchon Hanok Village & Insadong** — old-Korea alleys and crafts.",
-    "🍢 **Gwangjang Market** — classic street eats (bindaetteok, mayak gimbap).",
-    "🧺 **Han River park** — picnic, bikes, and the bridge fountain.",
-    "🚆 **Day trip** — Nami Island/Garden of Morning Calm, or Everland.",
-  ],
-  chips: [C.find, C.now, C.route],
+const THEME_SYNONYM: Record<string, string> = {
+  drinks: "nightlife", bar: "nightlife", club: "nightlife", eat: "food", dining: "food",
+  coffee: "cafe", cafes: "cafe", sightseeing: "history", palace: "history", museum: "history",
+  scenery: "nature", hike: "nature", hiking: "nature", views: "view", shop: "shopping",
+  makeup: "beauty", skincare: "beauty", spa: "experience", templestay: "experience",
 };
+function parseThemes(raw: string): string[] {
+  return raw
+    .split(/[,&+/]| and /i)
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean)
+    .map((t) => THEME_SYNONYM[t] ?? t);
+}
 
-function render(p: Persona, matched: boolean, interest?: string): string {
-  const head = matched
-    ? `${p.emoji} **Popular in Korea — ${p.label}**`
-    : [
-        `${p.emoji} **${p.label}**`,
-        "",
-        `_(Tell me a traveler profile — e.g. "20s woman", "family with kids", "K-pop fan", "foodie", "couple", "history lover" — for a tailored set.)_`,
-      ].join("\n");
-  const lines = [head, "", p.intro, "", ...p.courses];
-  if (interest) {
-    lines.push("", `_You mentioned **${interest.slice(0, 40)}** — tap "Find specific places" below and I'll narrow to that._`);
+const NON_SEOUL = /busan|부산|jeju|제주|gyeongju|경주|incheon|인천|daegu|대구|gangneung|강릉|jeonju|전주|sokcho|속초/i;
+
+function personaTitle(personas: PersonaDef[]): string {
+  if (!personas.length) return "first-timer";
+  return personas.map((p) => `${p.emoji} ${p.label}`).join(" + ");
+}
+
+function renderDay(d: DayPlan): string[] {
+  const lines = [`**${d.title}**`];
+  for (const s of d.stops) {
+    lines.push(`${s.block}`);
+    lines.push(`- **${s.spot.name}** _(${s.spot.area})_ — ${s.spot.note}`);
+    if (s.alt) lines.push(`  ↔ _or:_ **${s.alt.name}** _(${s.alt.area})_`);
   }
-  lines.push(
-    "",
-    "_These are popular patterns, not ads — pick one and I'll help with hours, directions, the area, menus, or getting past any Korean-only app._",
-  );
-  return lines.join("\n");
+  return lines;
 }
 
 export const recommendTripCourse: ToolDef = {
   name: "recommendTripCourse",
   description:
-    "Recommends popular Korea trip courses tailored to a foreign visitor's profile/persona — e.g. 20s women " +
-    "(K-beauty, hair/nail salons, photo studios, hanbok), families (hanbok + palace, theme parks), couples, " +
-    "K-pop/Hallyu fans (agency streets, concerts), foodies (markets, BBQ, chimaek), and culture/history lovers — " +
-    "as a curated set of what visitors like them actually do, with chips into hours, routes, areas, menus and " +
-    `app workarounds. Curated knowledge, no booking or ads. Part of ${SERVICE_NAME}.`,
+    "Recommends rich, customizable Korea trip courses for a foreign visitor's profile — personas COMBINE " +
+    "(e.g. '20s woman, foodie') and you can set duration (half-day / 1-day / 2-day), theme (beauty, photo, food, " +
+    "history, nature, shopping, nightlife, K-pop, hanbok…), and location. Returns a day-by-day itinerary with " +
+    "swap alternatives and chips into hours, routes, areas, menus and app workarounds. Curated, no booking or " +
+    `ads; medical/aesthetic items are info-only. Part of ${SERVICE_NAME}.`,
   inputSchema: {
     persona: z
       .string()
       .optional()
-      .describe(
-        "Traveler profile, e.g. '20s woman', 'family with kids', 'couple', 'K-pop fan', 'foodie', 'history lover', " +
-          "'first-timer'. Omit for the classic first-timer course.",
-      ),
-    interest: z.string().optional().describe("Optional extra focus, e.g. 'photography', 'shopping', 'nightlife'."),
+      .describe("Traveler profile(s), combinable — e.g. '20s woman', 'family', 'couple', 'K-pop fan', 'foodie', 'history lover', or '20s woman, foodie'. Omit for first-timer."),
+    duration: z.string().optional().describe("Trip length: 'half-day', '1-day', '2-day' (3+ days returns a 2-day base for now)."),
+    themes: z.string().optional().describe("Optional focus, comma-separated — e.g. 'beauty, photo' or 'nature, nightlife'."),
+    location: z.string().optional().describe("Optional city/area (Seoul courses for now; other cities are coming)."),
   },
   annotations: {
     title: "Recommend Trip Courses by Traveler Profile",
@@ -191,11 +100,57 @@ export const recommendTripCourse: ToolDef = {
     openWorldHint: false,
   },
   handler: (args) => {
-    const persona = String(args.persona ?? "").trim();
-    const interest = args.interest ? String(args.interest) : undefined;
-    const q = `${persona} ${interest ?? ""}`.trim();
-    const matched = q ? PERSONAS.find((p) => p.match.test(q)) : undefined;
-    const p = matched ?? GENERIC;
-    return ok(render(p, Boolean(matched), interest), p.chips);
+    const personaRaw = String(args.persona ?? "").trim();
+    const durationRaw = String(args.duration ?? "").trim();
+    const themesRaw = String(args.themes ?? "").trim();
+    const location = String(args.location ?? "").trim();
+
+    const personas = resolvePersonas(personaRaw);
+    const explicitThemes = parseThemes(themesRaw);
+    const { dur, over } = normalizeDuration(durationRaw);
+
+    // Phase 1 is Seoul; for a named non-Seoul city, steer to the right tool honestly.
+    if (NON_SEOUL.test(location) || NON_SEOUL.test(personaRaw) || NON_SEOUL.test(themesRaw)) {
+      const where = (location || personaRaw || themesRaw).match(NON_SEOUL)?.[0] ?? "there";
+      return ok(
+        [
+          `🗺️ **Trip courses outside Seoul — coming soon**`,
+          "",
+          `Full day-by-day courses are Seoul-first for now. For **${where}**, I can still help right away:`,
+          "",
+          "- Ask **getAreaGuide** for a city/neighbourhood overview + top spots",
+          "- Ask **searchPlaceForeigner** for 'things to see in " + where + "' (it leads with the must-see sights)",
+          "- For Jeju, **getJejuInfo** has attractions/food/festivals",
+        ].join("\n"),
+        [
+          { emoji: "🗺️", cmdEn: `Guide me around ${where}`, descEn: "area overview + top spots" },
+          { emoji: "🔎", cmdEn: `Things to see in ${where}`, descEn: "must-see sights" },
+          { emoji: "🧭", cmdEn: "Show me a Seoul course instead", descEn: "persona day-by-day itinerary" },
+        ],
+      );
+    }
+
+    const course = composeCourse(personas, dur, explicitThemes);
+    const durLabel = dur === "half-day" ? "Half-day" : dur === "2-day" ? "2-day" : "1-day";
+    const head = `🗺️ **${durLabel} Seoul course — for a ${personaTitle(personas)}**`;
+    const lines = [head];
+    if (course.themes.length) lines.push(`_Themes: ${course.themes.slice(0, 5).join(" · ")}_`);
+    if (over) lines.push("", "_(3+ days? Here's a strong 2-day base — extend by repeating a day with a fresh persona/theme.)_");
+    for (const d of course.days) {
+      lines.push("", ...renderDay(d));
+    }
+    lines.push(
+      "",
+      "_Tap any stop and I'll do hours, directions, the area, menus, or getting past a Korean-only app. These are popular patterns, not ads._",
+    );
+
+    // Chips: tailor a couple to the course content (food stops → menu; K-pop/ticketed → service).
+    const allThemes = course.days.flatMap((d) => d.stops.flatMap((s) => s.spot.themes));
+    const chips: Choice[] = [C.now, C.route];
+    if (allThemes.includes("food") || allThemes.includes("market")) chips.push(C.menu);
+    else if (allThemes.includes("kpop")) chips.push(C.service);
+    else chips.push(C.find);
+    chips.push(C.remix);
+    return ok(lines.join("\n"), chips.slice(0, 4));
   },
 };

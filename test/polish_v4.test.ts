@@ -11,6 +11,7 @@ import { resolveLineName } from "../src/lib/sources/seoulSubway.js";
 import { getJejuInfo } from "../src/tools/getJejuInfo.js";
 import { findForeignerFriendlyStore } from "../src/tools/findForeignerFriendlyStore.js";
 import { recommendTripCourse } from "../src/tools/recommendTripCourse.js";
+import { resolvePersonas, wantedThemes, composeCourse, SEOUL_SPOTS } from "../src/lib/courses.js";
 
 const text = (r: { content: { text: string }[] }) => r.content[0].text;
 
@@ -223,24 +224,55 @@ describe("v5 fixes (D-022)", () => {
 });
 
 // ── recommendTripCourse (13th tool, persona courses, D-025) ───────────────────
-describe("recommendTripCourse personas (D-025)", () => {
-  const t13 = (persona?: string, interest?: string) => text(recommendTripCourse.handler({ persona, interest }));
-  it("routes each persona to its curated course set", () => {
+describe("recommendTripCourse — combinable persona courses (D-025)", () => {
+  const t13 = (persona?: string, duration?: string, themes?: string, location?: string) =>
+    text(recommendTripCourse.handler({ persona, duration, themes, location }));
+  it("routes personas to labels and COMBINES them", () => {
     expect(t13("20s woman")).toMatch(/K-beauty & photo/);
-    expect(t13("family with kids")).toMatch(/Family with kids/);
-    expect(t13("K-pop fan")).toMatch(/K-pop \/ Hallyu/);
-    expect(t13("foodie")).toMatch(/Foodie/);
-    expect(t13("couple")).toMatch(/Couple/);
-    expect(t13("history lover")).toMatch(/Culture & history/);
+    expect(t13("K-pop fan")).toMatch(/K-pop fan/);
+    expect(t13("family")).toMatch(/Family/);
+    const combo = t13("20s woman, foodie");
+    expect(combo).toMatch(/K-beauty & photo/);
+    expect(combo).toMatch(/Foodie/);
   });
-  it("falls back to the first-timer course with no persona", () => {
-    expect(t13()).toMatch(/First-timer/);
+  it("scales by duration", () => {
+    const two = t13("foodie", "2-day");
+    expect(two).toMatch(/Day 1/);
+    expect(two).toMatch(/Day 2/);
+    expect(t13("couple", "half-day")).toMatch(/Half-day/);
   });
-  it("K-beauty derma item stays info-only (no clinic booking — medical law)", () => {
-    expect(t13("20s woman")).toMatch(/can't book a medical procedure/i);
+  it("falls back to first-timer with no persona", () => {
+    expect(t13()).toMatch(/first-timer/i);
+  });
+  it("steers a non-Seoul location to the right tool (Phase 1 = Seoul)", () => {
+    expect(t13("foodie", "1-day", "", "Busan")).toMatch(/coming soon/i);
   });
   it("never reads as an ad", () => {
     expect(t13("foodie")).toMatch(/not ads/i);
+  });
+});
+
+describe("courses engine (D-025)", () => {
+  it("combines personas → blended themes", () => {
+    const ps = resolvePersonas("20s woman, foodie");
+    expect(ps.map((p) => p.key)).toEqual(expect.arrayContaining(["beauty", "foodie"]));
+    const th = wantedThemes(ps, []);
+    expect(th).toEqual(expect.arrayContaining(["beauty", "food"]));
+  });
+  it("composes a 1-day course with several stops", () => {
+    const c = composeCourse(resolvePersonas("20s woman"), "1-day", []);
+    expect(c.days.length).toBe(1);
+    expect(c.days[0].stops.length).toBeGreaterThanOrEqual(3);
+  });
+  it("2-day course has two days with no repeated spot", () => {
+    const c = composeCourse(resolvePersonas("family"), "2-day", []);
+    expect(c.days.length).toBe(2);
+    const ids = c.days.flatMap((d) => d.stops.map((s) => s.spot.id));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+  it("derma/aesthetic spot stays info-only (medical law)", () => {
+    const derma = SEOUL_SPOTS.find((s) => s.id === "dermainfo")!;
+    expect(derma.note).toMatch(/info only|no booking|medical law/i);
   });
 });
 

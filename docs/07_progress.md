@@ -112,11 +112,12 @@ src/server.ts            Streamable HTTP stateless 진입점 (loadEnv 최초 imp
 src/lib/                 constants, env, loadEnv(.env), naming, markdown(24k), footer(칩), http(timeout), cache(TTL), responses, romanize(지명 KO→EN)
 src/lib/                 constants, env, naming, markdown, footer, http, cache, responses, romanize, fuzzy, places, intercity, **landmarks(getNowInfo 큐레이션 영업시간 오버레이, D-014)**
 src/lib/sources/         TourAPI, TAGO(버스), ODsay(경로), VisitJeju, weatherair(기상청+에어코리아), seoulSubway(지하철)
-src/tools/               13개 툴 (types, index, *.ts) — 지식툴5 즉시동작 + API툴8 실연동. getNowInfo=랜드마크 오버레이→VisitSeoul→TourAPI 폴백, getAreaGuide=35 동네, landmarks ~55 명소(D-017/018/020/021), explainKoreanService 12서비스, searchPlaceForeigner=다도시 must-see 시딩(D-021), **recommendTripCourse=페르소나 코스(D-025)**
+src/tools/               13개 툴 (types, index, *.ts) — 지식툴5 즉시동작 + API툴8 실연동. getNowInfo=랜드마크 오버레이→VisitSeoul→TourAPI 폴백, getAreaGuide=35 동네, landmarks ~55 명소(D-017/018/020/021), explainKoreanService 12서비스, searchPlaceForeigner=다도시 must-see 시딩(D-021), **recommendTripCourse=조합페르소나 코스(D-025, `src/lib/courses.ts` 조합엔진+시그니처)**
+src/lib/courses.ts       페르소나 코스 데이터/엔진(D-025) — 태깅 서울 스팟 35 + 7페르소나 테마맵 + 조합엔진(반나절/1일/2일·존클러스터·스왑대안) + 1-day 시그니처 골든코스 5. 순수·결정적·테스트락.
 src/server.ts            +툴별 타이밍 로그(S1), 헬스 키요약(S5)
 scripts/lint-naming.ts   빌드 게이트 (kakao 토큰/charset/중복/개수, 3~20)
 scripts/verify-live.ts   실 API 호출 점검 (키 필요)
-test/                    vitest 232개 (헬퍼 + 로마자 + 퍼지 + 랜드마크 + 다국어 + 폴리시 v4 + 콘텐츠 + 지오코딩 + 다도시 must-see + 완성도 + v5/v6수정 + 페르소나코스 + 전체 툴 계약 + 핸들러 스모크 + 소스 파서)
+test/                    vitest 237개 (헬퍼 + 로마자 + 퍼지 + 랜드마크 + 다국어 + 폴리시 v4 + 콘텐츠 + 지오코딩 + 다도시 must-see + 완성도 + v5/v6수정 + 페르소나코스/조합엔진 + 전체 툴 계약 + 핸들러 스모크 + 소스 파서)
 Dockerfile               linux/amd64, 루트
 ```
 
@@ -128,7 +129,7 @@ Dockerfile               linux/amd64, 루트
 - **권장 경로**: ①공모전 단계=MCP 순수 큐레이션 유지(대상 노리는 데 유리) — 페르소나 코스(D-025)가 그 일환. ②BM=별도 트랙(예약/후기/광고/커미션은 별도 앱·웹, 의료는 의료법 준수). MCP는 funnel/쇼케이스.
 
 ## 세션 로그
-- 2026-06-29 (신툴 페르소나 코스 + BM 분석, D-025): 사용자 아이디어("외국인 페르소나별 인기 코스 추천 UX" + 예약/광고 BM)에서 **㉮ 신툴 `recommendTripCourse`(13번째)** 구현 — 20대여성(K-뷰티/사진관/한복)·가족·커플·K-pop팬·푸디·문화/역사·첫방문 7페르소나, 각 코스가 기존 툴로 칩 연결. 순수 큐레이션(규칙안전), 시술/의료는 정보수준만(의료법). **+5 tests(232 green)**, 13툴 빌드OK. **㉯ BM 컴플라이언스 결론**=위 "수익화/BM 로드맵" 섹션에 기록(MCP 내 광고·예약커미션=규칙위반, 의료=의료법, BM은 별도 트랙). ⏳ 재배포 대기.
+- 2026-06-29 (신툴 페르소나 코스 + BM 분석, D-025): 사용자 아이디어("외국인 페르소나별 인기 코스 추천 UX" + 예약/광고 BM)에서 **㉮ 신툴 `recommendTripCourse`(13번째)** 구현 — 20대여성(K-뷰티/사진관/한복)·가족·커플·K-pop팬·푸디·문화/역사·첫방문 7페르소나, 각 코스가 기존 툴로 칩 연결. 순수 큐레이션(규칙안전), 시술/의료는 정보수준만(의료법). **㉯ BM 컴플라이언스 결론**=위 "수익화/BM 로드맵" 섹션 기록. **이어 대폭 강화(사용자 요청)**: `src/lib/courses.ts` 신설 — **조합 가능 페르소나**("20s woman, foodie")·**기간**(반나절/1일/2일)·테마·위치 입력 → 태깅 서울스팟 35 + 7페르소나 테마맵 기반 **조합엔진**(존클러스터 동선·시간블록·스왑대안) + **1-day 시그니처 골든코스 5**(하이브리드). 비서울/3일+는 graceful 안내(Phase 2). **+10 tests(237 green)**, 13툴 빌드OK. ⏳ 재배포 대기. (Phase 2: 부산/제주 스팟·3일+·시그니처 확장.)
 - 2026-06-28 (v6 완주 GO + 마이너 마무리, D-024): 고친 빌드(b1d927c) 재배포·라이브확인(7/0) 후 v6 300 재실행. 에이전트가 끝물 프로세스 종료됐으나 **§1 "GO for submission" + 버킷 A(150)·C(60) 완성**(docs/24): 🔴0, v6·v1~v5 회귀 유지, 안전 클린. 잔여 수정: N13(findStore area optional=마지막 -32602 제거), N14(getNowInfo not-found 에코 slice=PII 위생), 🟢(what-to-see·繁 景點 시딩). **+2 tests(224 green)**. ⏳ 재배포 후 라이브 확인.
 - 2026-06-28 (v6 최종게이트 partial 수정, D-023): 사용자 지시로 **최종 제출 전 300시나리오 테스트** 분기 → 에이전트가 프로세스 종료로 중단(partial docs/24). 그 전 실발견 3종 수정: V6-1(냉면 소고기육수→채식플래그, broth→bone 부작용), V6-2(简 济州·繁 觀光·简 观光 CJK 시딩 완성), V6-3(getJejuInfo limit union+클램프, 마지막 -32602 제거). **+3 tests(222 green)**. ⚠️ Agent 분기가 분류기 transient로 한때 막혔다 복구. **고친 빌드 재배포 후 v6 300 재실행 예정.**
 - 2026-06-28 (v5 테스트 수정, D-022): v5 분기 에이전트(build 9d35679, ~70콜)="**PASS, ship-ready**"(🔴0/🟡3/🟢4, 회귀0, 안전클린, P-V1 수정확인). 발견 5종 수정: V1(online 매처 자기칩 라우팅), V2(콜드 타임아웃 must-see 시드 유지), V3(CJK/가나 도시 인식·지오코딩), V4(getAreaGuide 도시개요 Busan/Seoul), V5(한글 노선명). docs/23. **+4 tests(219 green)**, tsc·빌드 클린. ⚠️ 도중 안전분류기 일시다운으로 Agent/Bash 한때 막혔다 복구(인프라 transient). 배포·검증 대기.
