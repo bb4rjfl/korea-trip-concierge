@@ -7,6 +7,7 @@ import {
   type Duration,
   type DayPlan,
   type PersonaDef,
+  type City,
 } from "../lib/courses.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
@@ -39,10 +40,21 @@ const C = {
 function normalizeDuration(raw: string): { dur: Duration; over: boolean } {
   const q = raw.toLowerCase();
   if (/half|반나절|아침|morning|few hours|몇\s*시간/.test(q)) return { dur: "half-day", over: false };
-  if (/\b3\b|three|3\s*day|삼일|사흘|3일|이상|week|일주일|더\s*길/.test(q)) return { dur: "2-day", over: true }; // 3+ day = Phase 2 → give 2-day base
+  if (/\b[4-9]\b|four|five|week|일주일|[4-9]\s*day|[4-9]일|닷새|장기|더\s*길/.test(q)) return { dur: "3-day", over: true }; // 4+ → 3-day base + extend note
+  if (/\b3\b|three|3\s*day|삼일|사흘|3일|이상/.test(q)) return { dur: "3-day", over: false };
   if (/\b2\b|two|2\s*day|이틀|이일|2일|양일/.test(q)) return { dur: "2-day", over: false };
   return { dur: "1-day", over: false };
 }
+
+/** Resolve a supported course city (Seoul/Busan/Jeju) from any text, else undefined. */
+function resolveCity(s: string): City | undefined {
+  if (/busan|부산/i.test(s)) return "Busan";
+  if (/jeju|제주/i.test(s)) return "Jeju";
+  if (/seoul|서울/i.test(s)) return "Seoul";
+  return undefined;
+}
+// Recognised cities we don't have curated course spots for yet → steer to other tools.
+const OTHER_CITY = /daegu|대구|gyeongju|경주|incheon|인천|gangneung|강릉|jeonju|전주|sokcho|속초|suwon|수원|gwangju|광주|daejeon|대전/i;
 
 const THEME_SYNONYM: Record<string, string> = {
   drinks: "nightlife", bar: "nightlife", club: "nightlife", eat: "food", dining: "food",
@@ -57,8 +69,6 @@ function parseThemes(raw: string): string[] {
     .filter(Boolean)
     .map((t) => THEME_SYNONYM[t] ?? t);
 }
-
-const NON_SEOUL = /busan|부산|jeju|제주|gyeongju|경주|incheon|인천|daegu|대구|gangneung|강릉|jeonju|전주|sokcho|속초/i;
 
 function personaTitle(personas: PersonaDef[]): string {
   if (!personas.length) return "first-timer";
@@ -79,18 +89,18 @@ export const recommendTripCourse: ToolDef = {
   name: "recommendTripCourse",
   description:
     "Recommends rich, customizable Korea trip courses for a foreign visitor's profile — personas COMBINE " +
-    "(e.g. '20s woman, foodie') and you can set duration (half-day / 1-day / 2-day), theme (beauty, photo, food, " +
-    "history, nature, shopping, nightlife, K-pop, hanbok…), and location. Returns a day-by-day itinerary with " +
-    "swap alternatives and chips into hours, routes, areas, menus and app workarounds. Curated, no booking or " +
-    `ads; medical/aesthetic items are info-only. Part of ${SERVICE_NAME}.`,
+    "(e.g. '20s woman, foodie'), with duration (half-day / 1-day / 2-day / 3-day), theme (beauty, photo, food, " +
+    "history, nature, shopping, nightlife, K-pop, hanbok…), and location (Seoul, Busan, Jeju). Returns a day-by-day " +
+    "itinerary with swap alternatives and chips into hours, routes, areas, menus and app workarounds. Curated, no " +
+    `booking or ads; medical/aesthetic items are info-only. Part of ${SERVICE_NAME}.`,
   inputSchema: {
     persona: z
       .string()
       .optional()
       .describe("Traveler profile(s), combinable — e.g. '20s woman', 'family', 'couple', 'K-pop fan', 'foodie', 'history lover', or '20s woman, foodie'. Omit for first-timer."),
-    duration: z.string().optional().describe("Trip length: 'half-day', '1-day', '2-day' (3+ days returns a 2-day base for now)."),
+    duration: z.string().optional().describe("Trip length: 'half-day', '1-day', '2-day', '3-day' (4+ returns a 3-day base)."),
     themes: z.string().optional().describe("Optional focus, comma-separated — e.g. 'beauty, photo' or 'nature, nightlife'."),
-    location: z.string().optional().describe("Optional city/area (Seoul courses for now; other cities are coming)."),
+    location: z.string().optional().describe("City: Seoul, Busan, or Jeju (default Seoul). Other cities steer to getAreaGuide."),
   },
   annotations: {
     title: "Recommend Trip Courses by Traveler Profile",
@@ -109,33 +119,34 @@ export const recommendTripCourse: ToolDef = {
     const explicitThemes = parseThemes(themesRaw);
     const { dur, over } = normalizeDuration(durationRaw);
 
-    // Phase 1 is Seoul; for a named non-Seoul city, steer to the right tool honestly.
-    if (NON_SEOUL.test(location) || NON_SEOUL.test(personaRaw) || NON_SEOUL.test(themesRaw)) {
-      const where = (location || personaRaw || themesRaw).match(NON_SEOUL)?.[0] ?? "there";
+    // Seoul/Busan/Jeju have curated course spots; another named city steers out.
+    const blob = `${location} ${personaRaw} ${themesRaw}`;
+    const city: City = resolveCity(blob) ?? "Seoul";
+    if (resolveCity(blob) === undefined && OTHER_CITY.test(blob)) {
+      const where = blob.match(OTHER_CITY)?.[0] ?? "there";
       return ok(
         [
-          `🗺️ **Trip courses outside Seoul — coming soon**`,
+          `🗺️ **Day-by-day courses for ${where} — coming soon**`,
           "",
-          `Full day-by-day courses are Seoul-first for now. For **${where}**, I can still help right away:`,
+          `Full curated courses cover **Seoul, Busan, and Jeju** for now. For **${where}**, I can still help right away:`,
           "",
-          "- Ask **getAreaGuide** for a city/neighbourhood overview + top spots",
-          "- Ask **searchPlaceForeigner** for 'things to see in " + where + "' (it leads with the must-see sights)",
-          "- For Jeju, **getJejuInfo** has attractions/food/festivals",
+          `- **getAreaGuide** — a ${where} overview + top spots`,
+          `- **searchPlaceForeigner** — 'things to see in ${where}' (it leads with the must-see sights)`,
         ].join("\n"),
         [
           { emoji: "🗺️", cmdEn: `Guide me around ${where}`, descEn: "area overview + top spots" },
           { emoji: "🔎", cmdEn: `Things to see in ${where}`, descEn: "must-see sights" },
-          { emoji: "🧭", cmdEn: "Show me a Seoul course instead", descEn: "persona day-by-day itinerary" },
+          { emoji: "🧭", cmdEn: "Seoul / Busan / Jeju course instead", descEn: "persona day-by-day itinerary" },
         ],
       );
     }
 
-    const course = composeCourse(personas, dur, explicitThemes);
-    const durLabel = dur === "half-day" ? "Half-day" : dur === "2-day" ? "2-day" : "1-day";
-    const head = `🗺️ **${durLabel} Seoul course — for a ${personaTitle(personas)}**`;
+    const course = composeCourse(personas, dur, explicitThemes, city);
+    const durLabel = dur === "half-day" ? "Half-day" : dur === "2-day" ? "2-day" : dur === "3-day" ? "3-day" : "1-day";
+    const head = `🗺️ **${durLabel} ${city} course — for a ${personaTitle(personas)}**`;
     const lines = [head];
     if (course.themes.length) lines.push(`_Themes: ${course.themes.slice(0, 5).join(" · ")}_`);
-    if (over) lines.push("", "_(3+ days? Here's a strong 2-day base — extend by repeating a day with a fresh persona/theme.)_");
+    if (over) lines.push("", "_(Longer trip? Here's a strong 3-day base — extend by repeating a day with a fresh persona, theme, or city.)_");
     for (const d of course.days) {
       lines.push("", ...renderDay(d));
     }

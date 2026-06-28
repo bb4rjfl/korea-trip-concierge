@@ -12,7 +12,8 @@
  */
 
 export type Block = "morning" | "afternoon" | "evening" | "any";
-export type Duration = "half-day" | "1-day" | "2-day";
+export type Duration = "half-day" | "1-day" | "2-day" | "3-day";
+export type City = "Seoul" | "Busan" | "Jeju";
 
 export interface Spot {
   id: string;
@@ -22,6 +23,7 @@ export interface Spot {
   themes: string[]; // beauty/photo/hanbok/history/food/market/cafe/nature/view/shopping/nightlife/kpop/family/experience
   blocks: Block[]; // best time-of-day
   note: string;
+  city?: City; // defaults to Seoul (most spots); Busan/Jeju set explicitly
 }
 
 // ── Curated Seoul spots (Phase 1) ───────────────────────────────────────────
@@ -69,6 +71,38 @@ export const SEOUL_SPOTS: Spot[] = [
   { id: "jjimjilbang", name: "Jjimjilbang (Korean spa)", area: "anywhere", zone: "any", themes: ["experience", "nightlife"], blocks: ["evening"], note: "Sauna + sleeping rooms; bring cash, settle the wristband on the way out." },
   { id: "chimaek", name: "Chimaek (fried chicken + beer)", area: "anywhere", zone: "any", themes: ["food", "nightlife"], blocks: ["evening"], note: "The national pairing — order to your hotel or a pub." },
 ];
+
+// ── Busan spots (Phase 2) ───────────────────────────────────────────────────
+export const BUSAN_SPOTS: Spot[] = [
+  { id: "b_haeundae", name: "Haeundae Beach", area: "Haeundae", zone: "haeundae", themes: ["nature", "view", "family"], blocks: ["morning", "afternoon", "evening"], note: "Busan's flagship beach; the Blue Line Park beach train & sky capsule nearby.", city: "Busan" },
+  { id: "b_gwangalli", name: "Gwangalli Beach & Gwangan Bridge", area: "Gwangalli", zone: "gwangalli", themes: ["view", "nightlife", "cafe"], blocks: ["evening"], note: "Café-and-bar strip facing the lit bridge; weekend drone shows.", city: "Busan" },
+  { id: "b_gamcheon", name: "Gamcheon Culture Village", area: "Saha", zone: "saha", themes: ["photo", "history", "view"], blocks: ["morning", "afternoon"], note: "Pastel hillside art village ('Korea's Santorini') — go by day, be respectful.", city: "Busan" },
+  { id: "b_jagalchi", name: "Jagalchi Market & Nampo (BIFF)", area: "Nampo", zone: "nampo", themes: ["food", "market"], blocks: ["afternoon", "evening"], note: "Korea's biggest fish market + BIFF Square street food (ssiat-hotteok).", city: "Busan" },
+  { id: "b_haedong", name: "Haedong Yonggungsa Temple", area: "Gijang", zone: "gijang", themes: ["history", "view"], blocks: ["morning"], note: "A rare seaside temple on the rocks above the waves — sunrise is magical.", city: "Busan" },
+  { id: "b_taejongdae", name: "Taejongdae cliffs + Danubi tram", area: "Yeongdo", zone: "yeongdo", themes: ["nature", "view"], blocks: ["morning", "afternoon"], note: "Coastal cliffs and pine forest; ride the tram between viewpoints.", city: "Busan" },
+  { id: "b_oryukdo", name: "Oryukdo Skywalk", area: "Namgu", zone: "namgu", themes: ["view", "nature"], blocks: ["morning", "afternoon"], note: "Glass-floored cliff walkway over the sea; pair with the Igidae trail.", city: "Busan" },
+  { id: "b_seomyeon", name: "Seomyeon eats & nightlife", area: "Seomyeon", zone: "seomyeon", themes: ["food", "nightlife", "shopping"], blocks: ["evening"], note: "Downtown crossroads — dwaeji-gukbap, bars, and shopping.", city: "Busan" },
+  { id: "b_dwaeji", name: "Dwaeji-gukbap (Busan pork soup)", area: "anywhere", zone: "any", themes: ["food"], blocks: ["any"], note: "Busan's signature pork-and-broth rice; add salted shrimp & chives.", city: "Busan" },
+  { id: "b_milmyeon", name: "Milmyeon / fresh hoe by the bay", area: "anywhere", zone: "any", themes: ["food"], blocks: ["afternoon", "evening"], note: "Busan cold wheat noodles, or raw fish (hoe) by the sea.", city: "Busan" },
+];
+
+// ── Jeju spots (Phase 2) ────────────────────────────────────────────────────
+export const JEJU_SPOTS: Spot[] = [
+  { id: "j_seongsan", name: "Seongsan Ilchulbong (Sunrise Peak)", area: "Seongsan", zone: "east", themes: ["nature", "view"], blocks: ["morning"], note: "UNESCO tuff cone; a ~25-min climb, famous for sunrise.", city: "Jeju" },
+  { id: "j_manjanggul", name: "Manjanggul Cave", area: "Gujwa", zone: "east", themes: ["nature"], blocks: ["morning", "afternoon"], note: "A walkable UNESCO lava tube — a steady 11°C, bring a jacket.", city: "Jeju" },
+  { id: "j_udo", name: "Udo (Cow Island)", area: "Udo", zone: "east", themes: ["nature", "view"], blocks: ["afternoon"], note: "Bike or scooter the islet's white-sand beaches; ferry from Seongsan.", city: "Jeju" },
+  { id: "j_seopjikoji", name: "Seopjikoji", area: "Seongsan", zone: "east", themes: ["view", "nature"], blocks: ["afternoon"], note: "Grassy coastal cape with a lighthouse and drama set.", city: "Jeju" },
+  { id: "j_cheonjiyeon", name: "Cheonjiyeon Falls", area: "Seogwipo", zone: "seogwipo", themes: ["nature"], blocks: ["afternoon"], note: "Lush Seogwipo waterfall, floodlit in the evening.", city: "Jeju" },
+  { id: "j_jusangjeolli", name: "Jusangjeolli Cliffs", area: "Seogwipo", zone: "seogwipo", themes: ["view", "nature"], blocks: ["afternoon"], note: "Hexagonal basalt columns pounded by the surf.", city: "Jeju" },
+  { id: "j_osulloc", name: "O'sulloc Tea Museum", area: "Seogwang", zone: "west", themes: ["cafe", "nature"], blocks: ["afternoon"], note: "Green-tea museum & café among the west-Jeju tea fields.", city: "Jeju" },
+  { id: "j_hyeopjae", name: "Hyeopjae Beach", area: "Hallim", zone: "west", themes: ["nature", "view"], blocks: ["afternoon"], note: "Turquoise west-coast beach facing Biyangdo islet.", city: "Jeju" },
+  { id: "j_hallasan", name: "Hallasan day hike", area: "Central", zone: "central", themes: ["nature"], blocks: ["morning"], note: "Korea's highest peak; strict trail cutoffs — start early.", city: "Jeju" },
+  { id: "j_dongmun", name: "Dongmun Market + black-pork street", area: "Jeju City", zone: "jeju-city", themes: ["food", "market"], blocks: ["evening"], note: "Night market + heuk-dwaeji (black pork) BBQ.", city: "Jeju" },
+  { id: "j_galchi", name: "Jeju black pork / galchi / abalone", area: "anywhere", zone: "any", themes: ["food"], blocks: ["any"], note: "Heuk-dwaeji BBQ, braised cutlassfish, abalone porridge.", city: "Jeju" },
+];
+
+export const ALL_SPOTS: Spot[] = [...SEOUL_SPOTS, ...BUSAN_SPOTS, ...JEJU_SPOTS];
+const cityOf = (s: Spot): City => s.city ?? "Seoul";
 
 // ── Personas → preferred themes (ordered = weight) ──────────────────────────
 export interface PersonaDef {
@@ -169,17 +203,17 @@ const HALF_DAY_TEMPLATE: { key: string; block: Block; food?: boolean }[] = [
   { key: "afternoon", block: "any" },
 ];
 
-/** Top zones by total theme score (so each day clusters to minimise travel). */
-function rankZones(themes: string[]): string[] {
+/** Top zones in a city by total theme score (so each day clusters to minimise travel). */
+function rankZones(themes: string[], city: City): string[] {
   const byZone = new Map<string, number>();
-  for (const s of SEOUL_SPOTS) {
-    if (s.zone === "any") continue;
+  for (const s of ALL_SPOTS) {
+    if (cityOf(s) !== city || s.zone === "any") continue;
     byZone.set(s.zone, (byZone.get(s.zone) ?? 0) + score(s, themes));
   }
   return [...byZone.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([z]) => z);
 }
 
-const SPOT_BY_ID = new Map(SEOUL_SPOTS.map((s) => [s.id, s]));
+const SPOT_BY_ID = new Map(ALL_SPOTS.map((s) => [s.id, s]));
 
 // Hand-tuned "golden" 1-day courses for the marquee single personas (the
 // signature half of the hybrid). Combos and other durations use the engine.
@@ -216,6 +250,13 @@ const SIGNATURES: Record<string, { block: string; id: string }[]> = {
     { block: "☀️ Afternoon", id: "insadong" },
     { block: "🏺 Evening", id: "nationalmuseum" },
   ],
+  "couple:1-day": [
+    { block: "🌅 Morning", id: "bukchon" },
+    { block: "👘 Then", id: "gyeongbokgung" },
+    { block: "🍜 Lunch / market", id: "gwangjang" },
+    { block: "☕ Afternoon", id: "ikseon" },
+    { block: "🌃 Evening", id: "nseoultower" },
+  ],
 };
 
 export interface Course {
@@ -223,28 +264,32 @@ export interface Course {
   themes: string[];
 }
 
-/** Compose a course for the (personas, duration, themes) request, Seoul. */
-export function composeCourse(personas: PersonaDef[], duration: Duration, explicitThemes: string[]): Course {
+/** Compose a course for the (personas, duration, themes, city) request. */
+export function composeCourse(personas: PersonaDef[], duration: Duration, explicitThemes: string[], city: City = "Seoul"): Course {
   const themes = wantedThemes(personas, explicitThemes);
-  const zones = rankZones(themes);
+  const zones = rankZones(themes, city);
   const used = new Set<string>();
-  const anywhere = SEOUL_SPOTS.filter((s) => s.zone === "any");
-  const inZones = (zs: string[]) => SEOUL_SPOTS.filter((s) => zs.includes(s.zone)).concat(anywhere);
+  const inZones = (zs: string[]) => ALL_SPOTS.filter((s) => cityOf(s) === city && (zs.includes(s.zone) || s.zone === "any"));
+  const band = (i: number) => (zones.slice(i, i + 2).length ? zones.slice(i, i + 2) : zones.slice(0, 2)); // a day's 1-2 adjacent zones
   const days: DayPlan[] = [];
 
   if (duration === "half-day") {
-    days.push(buildDay("Half-day", inZones(zones.slice(0, 1)), themes, HALF_DAY_TEMPLATE, used));
+    days.push(buildDay("Half-day", inZones(zones.slice(0, 1).length ? zones.slice(0, 1) : zones), themes, HALF_DAY_TEMPLATE, used));
   } else if (duration === "2-day") {
-    days.push(buildDay("Day 1", inZones(zones.slice(0, 2)), themes, ONE_DAY_TEMPLATE, used));
-    days.push(buildDay("Day 2", inZones(zones.slice(2, 4).length ? zones.slice(2, 4) : zones.slice(0, 2)), themes, ONE_DAY_TEMPLATE, used));
+    days.push(buildDay("Day 1", inZones(band(0)), themes, ONE_DAY_TEMPLATE, used));
+    days.push(buildDay("Day 2", inZones(band(2)), themes, ONE_DAY_TEMPLATE, used));
+  } else if (duration === "3-day") {
+    days.push(buildDay("Day 1", inZones(band(0)), themes, ONE_DAY_TEMPLATE, used));
+    days.push(buildDay("Day 2", inZones(band(2)), themes, ONE_DAY_TEMPLATE, used));
+    days.push(buildDay("Day 3", inZones(band(4)), themes, ONE_DAY_TEMPLATE, used));
   } else {
-    // Signature golden course for a single marquee persona; engine otherwise.
-    const sig = personas.length === 1 ? SIGNATURES[`${personas[0].key}:1-day`] : undefined;
+    // 1-day: Seoul single-persona signature (golden), else engine.
+    const sig = city === "Seoul" && personas.length === 1 ? SIGNATURES[`${personas[0].key}:1-day`] : undefined;
     if (sig) {
       const stops = sig.map((x) => ({ block: x.block, spot: SPOT_BY_ID.get(x.id)! })).filter((st) => st.spot);
       days.push({ title: "1-day", stops });
     } else {
-      days.push(buildDay("1-day", inZones(zones.slice(0, 2)), themes, ONE_DAY_TEMPLATE, used));
+      days.push(buildDay("1-day", inZones(band(0)), themes, ONE_DAY_TEMPLATE, used));
     }
   }
   return { days, themes };

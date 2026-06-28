@@ -244,8 +244,16 @@ describe("recommendTripCourse — combinable persona courses (D-025)", () => {
   it("falls back to first-timer with no persona", () => {
     expect(t13()).toMatch(/first-timer/i);
   });
-  it("steers a non-Seoul location to the right tool (Phase 1 = Seoul)", () => {
-    expect(t13("foodie", "1-day", "", "Busan")).toMatch(/coming soon/i);
+  it("supports Busan & Jeju courses; steers other cities (Phase 2)", () => {
+    expect(t13("foodie", "1-day", "", "Busan")).toMatch(/Busan course/);
+    expect(t13("couple", "2-day", "", "Jeju")).toMatch(/Jeju course/);
+    expect(t13("foodie", "1-day", "", "Daegu")).toMatch(/coming soon/i);
+  });
+  it("supports 3-day (and 4+ → 3-day base)", () => {
+    const three = t13("history lover", "3-day");
+    expect(three).toMatch(/Day 1/);
+    expect(three).toMatch(/Day 3/);
+    expect(t13("foodie", "5-day")).toMatch(/Day 3/);
   });
   it("never reads as an ad", () => {
     expect(t13("foodie")).toMatch(/not ads/i);
@@ -273,6 +281,19 @@ describe("courses engine (D-025)", () => {
   it("derma/aesthetic spot stays info-only (medical law)", () => {
     const derma = SEOUL_SPOTS.find((s) => s.id === "dermainfo")!;
     expect(derma.note).toMatch(/info only|no booking|medical law/i);
+  });
+  it("composes Busan & Jeju courses with the right city's spots (Phase 2)", () => {
+    const b = composeCourse(resolvePersonas("foodie"), "1-day", [], "Busan");
+    expect(b.days[0].stops.length).toBeGreaterThanOrEqual(2);
+    expect(b.days[0].stops.every((s) => (s.spot.city ?? "Seoul") === "Busan")).toBe(true);
+    const j = composeCourse(resolvePersonas("couple"), "1-day", [], "Jeju");
+    expect(j.days[0].stops.every((s) => (s.spot.city ?? "Seoul") === "Jeju")).toBe(true);
+  });
+  it("3-day course has three days with no repeated spot", () => {
+    const c = composeCourse(resolvePersonas("history"), "3-day", []);
+    expect(c.days.length).toBe(3);
+    const ids = c.days.flatMap((d) => d.stops.map((s) => s.spot.id));
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
 
