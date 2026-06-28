@@ -54,6 +54,7 @@ describe("handlers return guarded text content", () => {
     getNowInfo: { place: "Gyeongbokgung Palace" },
     getJejuInfo: { category: "attraction" },
     getWeatherAndAir: { city: "Seoul" },
+    recommendTripCourse: { persona: "20s woman" },
   };
 
   for (const tool of ALL_TOOLS) {

@@ -11,6 +11,7 @@ import { getNowInfo } from "./getNowInfo.js";
 import { getJejuInfo } from "./getJejuInfo.js";
 import { getWeatherAndAir } from "./getWeatherAndAir.js";
 import { trackSubwayArrival } from "./trackSubwayArrival.js";
+import { recommendTripCourse } from "./recommendTripCourse.js";
 
 /** All registered tools (max 20 per Kakao policy). */
 export const ALL_TOOLS: ToolDef[] = [
@@ -26,6 +27,7 @@ export const ALL_TOOLS: ToolDef[] = [
   getNowInfo,
   getJejuInfo,
   getWeatherAndAir,
+  recommendTripCourse,
 ];
 
 export const TOOL_NAMES = ALL_TOOLS.map((t) => t.name);

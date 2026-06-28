@@ -10,6 +10,7 @@ import { isSeoulText } from "../src/lib/sources/visitseoul.js";
 import { resolveLineName } from "../src/lib/sources/seoulSubway.js";
 import { getJejuInfo } from "../src/tools/getJejuInfo.js";
 import { findForeignerFriendlyStore } from "../src/tools/findForeignerFriendlyStore.js";
+import { recommendTripCourse } from "../src/tools/recommendTripCourse.js";
 
 const text = (r: { content: { text: string }[] }) => r.content[0].text;
 
@@ -218,6 +219,28 @@ describe("v5 fixes (D-022)", () => {
     expect(resolveLineName("경의중앙선")).toBe("경의중앙선");
     expect(resolveLineName("분당선")).toBe("수인분당선");
     expect(resolveLineName("2호선")).toBe("2호선"); // numbered still works
+  });
+});
+
+// ── recommendTripCourse (13th tool, persona courses, D-025) ───────────────────
+describe("recommendTripCourse personas (D-025)", () => {
+  const t13 = (persona?: string, interest?: string) => text(recommendTripCourse.handler({ persona, interest }));
+  it("routes each persona to its curated course set", () => {
+    expect(t13("20s woman")).toMatch(/K-beauty & photo/);
+    expect(t13("family with kids")).toMatch(/Family with kids/);
+    expect(t13("K-pop fan")).toMatch(/K-pop \/ Hallyu/);
+    expect(t13("foodie")).toMatch(/Foodie/);
+    expect(t13("couple")).toMatch(/Couple/);
+    expect(t13("history lover")).toMatch(/Culture & history/);
+  });
+  it("falls back to the first-timer course with no persona", () => {
+    expect(t13()).toMatch(/First-timer/);
+  });
+  it("K-beauty derma item stays info-only (no clinic booking — medical law)", () => {
+    expect(t13("20s woman")).toMatch(/can't book a medical procedure/i);
+  });
+  it("never reads as an ad", () => {
+    expect(t13("foodie")).toMatch(/not ads/i);
   });
 });
 

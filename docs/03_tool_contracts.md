@@ -111,6 +111,15 @@
 - annotations: readOnly true / idempotent false (실시간) / openWorld true
 - 검증: parseArrivals/parsePositions/parseStationIds/resolveStationName/resolveLineName 테스트 락(103). **여정 모드 운행外**: statnId는 실시간 도착에서만 얻으므로 01:00~05:30엔 ids 없음 → "라이브 데이터 없음(운행 05:30~01:00)" 안내(≠"다른 노선"). **알려진 한계**: 순환 2호선 statnId 차 짧은/긴쪽 구분 약함, 방면필터 미적용(MVP).
 
+## 12. `recommendTripCourse`  (페르소나별 인기 코스 — D-025, 13번째 툴)
+- **title**: "Recommend Trip Courses by Traveler Profile"
+- **description(영문)**: 페르소나별 인기 한국 여행코스 추천 — 20s women(K-beauty·salon·photo studio·hanbok)·families·couples·K-pop fans·foodies·culture/history. 큐레이션, 예약·광고 없음. `Part of Korea Trip Concierge(코리아 트립 컨시어지).`
+- **inputSchema**: `{ persona?: string, interest?: string }` — z.string(enum 미사용), 핸들러 정규식 매칭 + GENERIC(첫방문) 폴백.
+- **데이터/로직**: 순수 큐레이션(API無·PII無·**광고無**, D-009 안전·키 불필요). 7 페르소나(20대여성/가족/커플/K-pop팬/푸디/문화역사/GENERIC), 각 4~7 코스 항목. 출력 끝 **칩이 기존 툴로 브릿지**(getNowInfo 시간/route 길찾기/getAreaGuide 동네/translateMenuContext 메뉴/explainKoreanService 티켓팅·앱우회). ⚠️ **시술/의료 항목은 카테고리·상담흐름 정보수준만**(특정병원 지목·예약대행 X = 의료법 유인·알선 회피). "_not ads_" 명시.
+- **output**: `{이모지} **Popular in Korea — {persona}**` + intro + 코스 불릿 + 면책라인 + 칩 3개. 매칭 실패 시 페르소나 예시 되묻기.
+- annotations: readOnly true / destructive false / idempotent true / openWorld false
+- **수익화 주의**: 이 툴(및 전 툴)은 **광고/예약커미션/랭킹조작 절대 금지**(규칙·의료법). BM은 docs/07 "수익화/BM 로드맵" 참조 — MCP 바깥 별도 트랙.
+
 ---
 
 ## 공통 에러 처리
