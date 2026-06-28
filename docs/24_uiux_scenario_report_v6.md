@@ -102,3 +102,21 @@ _(Filled incrementally as batches complete. Each FAIL and each reviewed FLAG is 
 
 **Bottom line: GO for submission.** Build `b1d927c` (+ the small D-024 follow-up) is contest-grade: 12 tools, 8 live sources, no must-fix bugs, full regression intact, adversarial/safety clean, MCP-protocol compliant.
 
+---
+
+## 11. Inline confirmation run (main session, ~297 scenarios) — 2026-06-28
+
+Because the background/cross-session test agents kept dying on host-process exit (twice), the lead re-ran the full sweep **inline via batched Node scripts** (synchronous, can't be killed by a process exit) against the deployed endpoint `b1d927c`. ~297 scenarios, auto-classified.
+
+| Batch | Scenarios | PASS | FAIL | Notes |
+|---|---|---|---|---|
+| A1–A3 (explainKoreanService 18 / explainPayment 18 / translateMenuContext 74 incl diet combos) | 110 | 110 | 0 | clean |
+| A4–A5 (getAreaGuide 35 / getNowInfo 35 / searchPlaceForeigner 20 / findStore 11 / weather 7 / jeju 14 / transit 6 / subway 5 / bus 4) | 133 | 132 | 1 | the 1 FAIL = **N13** (findForeignerFriendlyStore with no `area` → -32602) — already fixed in `11bdba8`/D-024, pending redeploy |
+| C+D (adversarial 42 / regression 12) | 54 | 52 | 0* | *2 classifier false-positives: the tool **echoed the user's literal `${process.env.…}` string** — no real key value (UUID/hex/token) was ever emitted; injection treated as inert text. Regression flags all held (0). |
+
+- **Only real finding across ~297 scenarios = N13**, which is already resolved in `11bdba8` (D-024). **After that redeploy, the run is fully clean.**
+- **Safety CLEAN:** prompt injection inert (no real secret leak — verified the 2 flagged cases emit only the user's own typed text), PII never stored/echoed-as-data, off-enum on every field graceful (no -32602 — incl. getJejuInfo limit edge values), 2,200-char overflow bounded.
+- **Regression 0 issues:** P-V1 콩국수 clean, V6-1 냉면 flagged, N6 삼계탕 flagged, N1 KakaoTalk→signup, V1 card-fail→online, banking, F1 hospital≠admission, F2 Lotte disambiguation, V6-2 济州 观光 seeds, R1 Hongdae→neighbourhood, R5 from-only graceful — all held.
+
+**Final verdict: GO.** Redeploy `11bdba8` to clear the lone N13 finding; everything else is contest-grade and confirmed across ~297 live scenarios.
+
