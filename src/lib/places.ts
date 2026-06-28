@@ -67,7 +67,7 @@ const PLACES: GeoPlace[] = [
   { label: "Gwangalli (Busan)", lng: 129.1187, lat: 35.1532, aliases: ["gwangalli", "gwangan", "광안리", "광안"] },
   { label: "Nampo-dong / Jagalchi (Busan)", lng: 129.0306, lat: 35.0975, aliases: ["nampo", "nampo-dong", "jagalchi", "남포동", "자갈치"] },
   { label: "Gamcheon Culture Village (Busan)", lng: 129.0107, lat: 35.0976, aliases: ["gamcheon", "감천", "감천문화마을"] },
-  { label: "Jeju City", lng: 126.5312, lat: 33.4996, aliases: ["jeju", "jeju city", "제주", "제주시", "済州", "濟州", "チェジュ"] },
+  { label: "Jeju City", lng: 126.5312, lat: 33.4996, aliases: ["jeju", "jeju city", "제주", "제주시", "済州", "濟州", "济州", "チェジュ"] },
   { label: "Seogwipo (Jeju)", lng: 126.5601, lat: 33.2542, aliases: ["seogwipo", "서귀포"] },
   { label: "Daegu", lng: 128.6014, lat: 35.8714, aliases: ["daegu", "대구", "동성로"] },
   { label: "Incheon (Chinatown)", lng: 126.6166, lat: 37.4759, aliases: ["incheon", "인천", "incheon chinatown", "인천차이나타운"] },

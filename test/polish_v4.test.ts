@@ -8,6 +8,7 @@ import { resolvePlaceCoord, findPlaceInText } from "../src/lib/places.js";
 import { cityMustSeeLead } from "../src/tools/searchPlaceForeigner.js";
 import { isSeoulText } from "../src/lib/sources/visitseoul.js";
 import { resolveLineName } from "../src/lib/sources/seoulSubway.js";
+import { getJejuInfo } from "../src/tools/getJejuInfo.js";
 
 const text = (r: { content: { text: string }[] }) => r.content[0].text;
 
@@ -216,6 +217,23 @@ describe("v5 fixes (D-022)", () => {
     expect(resolveLineName("경의중앙선")).toBe("경의중앙선");
     expect(resolveLineName("분당선")).toBe("수인분당선");
     expect(resolveLineName("2호선")).toBe("2호선"); // numbered still works
+  });
+});
+
+// ── v6 final-gate findings (D-023) ────────────────────────────────────────────
+describe("v6 fixes (D-023)", () => {
+  it("V6-1: naengmyeon (beef broth) flagged for vegetarians", () => {
+    expect(text(translateMenuContext.handler({ menuText: "냉면", allergyConcerns: ["vegetarian"] }))).toMatch(/not veg/i);
+    // kongguksu must STAY clean (the broth→bone fix isn't undone)
+    expect(text(translateMenuContext.handler({ menuText: "콩국수", allergyConcerns: ["vegan"] }))).not.toMatch(/not veg/i);
+  });
+  it("V6-2: simplified 济州 + traditional 觀光 seed the Jeju must-see", () => {
+    expect(cityMustSeeLead("济州 观光", "")).toMatch(/Jeju must-see/);
+    expect(cityMustSeeLead("濟州 觀光", "")).toMatch(/Jeju must-see/);
+  });
+  it("V6-3: getJejuInfo out-of-range limit doesn't throw (clamped)", async () => {
+    await expect(getJejuInfo.handler({ category: "nature", limit: 99 })).resolves.toBeDefined();
+    await expect(getJejuInfo.handler({ category: "nature", limit: "abc" })).resolves.toBeDefined();
   });
 });
 

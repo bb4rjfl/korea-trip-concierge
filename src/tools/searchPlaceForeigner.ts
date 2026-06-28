@@ -211,14 +211,14 @@ const CITY_MUSTSEE: Record<string, string[]> = {
   ],
 };
 const SEOUL_GENERIC_RE =
-  /things?\s*to\s*(see|do)|worth\s*(see|visit)|sightsee|what\s*to\s*do|must.?see|attraction|landmark|명소|관광|볼거리|가\s*볼|観光|名所|景点|景區|景区/i;
+  /things?\s*to\s*(see|do)|worth\s*(see|visit)|sightsee|what\s*to\s*do|must.?see|attraction|landmark|명소|관광|볼거리|가\s*볼|観光|觀光|观光|名所|景点|景區|景区/i;
 
 /** Detect the headline city named in a generic query, for must-see seeding. */
 function detectMustSeeCity(query: string, area: string): keyof typeof CITY_MUSTSEE | null {
   const t = `${area} ${query}`;
   if (/\bseoul\b|서울|ソウル|首爾|首尔/i.test(t)) return "Seoul";
   if (/busan|부산|釜山|プサン/i.test(t)) return "Busan";
-  if (/jeju|제주|済州|濟州|チェジュ/i.test(t)) return "Jeju";
+  if (/jeju|제주|济州|済州|濟州|チェジュ/i.test(t)) return "Jeju";
   if (/gyeongju|경주|慶州/i.test(t)) return "Gyeongju";
   return null;
 }

@@ -63,7 +63,9 @@ export const getJejuInfo: ToolDef = {
       .string()
       .optional()
       .describe(`What to show: ${CATEGORIES.join(", ")} (synonyms understood; unknown shows highlights).`),
-    limit: z.number().int().min(1).max(10).optional().describe("How many results (default 6)."),
+    // Accept number or string and clamp in the handler — a min/max schema leaked a
+    // raw -32602 on out-of-range/wrong-type, the one non-z.string field left (V6-3).
+    limit: z.union([z.number(), z.string()]).optional().describe("How many results, 1–10 (default 6; out-of-range is clamped)."),
   },
   annotations: {
     title: "Jeju Island Info",
@@ -74,7 +76,8 @@ export const getJejuInfo: ToolDef = {
   },
   handler: async (args) => {
     const category = normalizeJejuCategory(args.category ? String(args.category) : undefined);
-    const limit = typeof args.limit === "number" ? args.limit : 6;
+    const n = Math.floor(Number(args.limit));
+    const limit = Number.isFinite(n) ? Math.min(10, Math.max(1, n)) : 6;
     const label = category ?? "highlights";
 
     if (!hasKey("JEJU_API_KEY")) {

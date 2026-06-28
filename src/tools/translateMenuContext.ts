@@ -26,7 +26,7 @@ const DISHES: Dish[] = [
   { match: /삼겹살|samgyeopsal/i, en: "Grilled pork belly", desc: "DIY-grilled pork belly, wrapped in lettuce with garlic and ssamjang.", spice: 0, allergens: ["soy", "pork", "sesame"] },
   { match: /떡볶이|tteokbokki/i, en: "Tteokbokki", desc: "Chewy rice cakes in a sweet-spicy gochujang sauce.", spice: 3, allergens: ["gluten", "soy"] },
   { match: /순두부|sundubu/i, en: "Soft-tofu stew", desc: "Silky soft tofu in a spicy seafood-or-pork broth, served bubbling.", spice: 2, allergens: ["soy", "egg", "shellfish", "fish"] },
-  { match: /냉면|naengmyeon/i, en: "Cold buckwheat noodles", desc: "Chilled noodles in icy broth (mul) or spicy sauce (bibim).", spice: 1, allergens: ["gluten", "egg", "soy"] },
+  { match: /냉면|naengmyeon/i, en: "Cold buckwheat noodles", desc: "Chilled buckwheat noodles in an icy beef broth (mul) or a spicy-sweet sauce (bibim); the mul broth is beef-based, and both are often topped with a slice of meat and egg.", spice: 1, allergens: ["gluten", "egg", "soy"] },
   { match: /김밥|kimbap|gimbap/i, en: "Kimbap", desc: "Seaweed rice rolls with vegetables, egg, and often ham or tuna.", spice: 0, allergens: ["egg", "sesame", "fish", "soy"] },
   { match: /제육|jeyuk/i, en: "Spicy stir-fried pork", desc: "Pork stir-fried in a spicy gochujang marinade.", spice: 2, allergens: ["soy", "pork", "sesame"] },
   { match: /삼계탕|samgyetang/i, en: "Ginseng chicken soup", desc: "Whole young chicken stuffed with rice, ginseng, and garlic in a mild broth — a summer health dish.", spice: 0, allergens: [] },
