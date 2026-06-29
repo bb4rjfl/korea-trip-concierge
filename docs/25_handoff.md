@@ -5,7 +5,7 @@
 ---
 
 ## 0. 한 줄 상태
-**Korea Trip Concierge** — 방한 외국인용 **13-tool MCP 서버**(TS+Node22, Streamable HTTP, stateless). 카카오 Agentic Player 10 출품작, 목표=대상. **KC 배포 Active, 현재 라이브 빌드 `97bd63d`(Phase 2 트립코스). v6 최종 300-시나리오 게이트 = "GO for submission"(🔴0, 회귀0, 안전 클린).** 🚌 **서울버스 키가 드디어 해금되어 `seoul.ts` 구현·커밋·빌드 완료(`7fd81c2`) — 단 아직 KC 미배포 → 새 세션 첫 할 일 = 7fd81c2 재배포 + KC경로 검증.** 247 tests green. 심사요청은 합의대로 보류(사용자 결정 대기).
+**Korea Trip Concierge** — 방한 외국인용 **13-tool MCP 서버**(TS+Node22, Streamable HTTP, stateless). 카카오 Agentic Player 10 출품작, 목표=대상. **KC 배포 Active, 현재 라이브 빌드 `7fd81c2`(서울버스 + Phase2 트립코스 포함). v6 최종 300-시나리오 게이트 = "GO for submission"(🔴0, 회귀0, 안전 클린).** 🚌 ✅ **서울버스 해금·구현·배포·검증 전부 완료(2026-06-29 새 세션): `koreatrip-trackBusArrival {Seoul,143,신사역}` → 실시간 "Arriving now" 동작**(로컬IP throttle과 달리 KC egress 정상 = 몇 주 블로커 완전 종결). **recommendTripCourse Phase2도 라이브 확인.** 247 tests green. 심사요청은 합의대로 보류(사용자 결정 대기). **새 세션 첫 할 일은 더 이상 "재배포"가 아니라 §10 후속 작업**(서울버스 통합 / 코스 Phase3 / 잔여 폴리시).
 
 ---
 
@@ -21,7 +21,7 @@
 - Endpoint: `https://korea-trip-concierge.playmcp-endpoint.kakaocloud.io/mcp` · 헬스: 끝의 `/`(JSON `build`/`version`/`tools`/`sources`).
 - **`build` = 배포된 커밋 SHA 앞 7자**(GIT_SHA 빌드주입). 재배포마다 `GET /`의 `build`를 `git rev-parse --short HEAD`(또는 해당 커밋)와 비교해 신선도 1초 확인. version 0.1.0·tools 수는 신선도 신호 아님.
 - **재배포 흐름**: ① 로컬 수정→커밋→`git push origin main`(= Actions `deploy-image` 자동 빌드, src/scripts/package/Dockerfile 변경 시; docs-only는 빌드 트리거하되 코드 무변경) ② 빌드 성공 후 **사용자가 KC 콘솔 → 서버 상세 → 중지 → 시작**(새 `latest` 재pull) ③ `GET /`의 `build` 확인.
-- **🔴 지금 상태**: 라이브 `97bd63d`. **`7fd81c2`(서울버스) 빌드 성공했으나 KC 미배포** → 새 세션이 **중지→시작 + `build:7fd81c2` 확인**부터.
+- **✅ 지금 상태**: 라이브 `7fd81c2`(서울버스 포함) **배포·검증 완료**. 헬스 `build:7fd81c2`, 13툴, sources 전부 true. (이전 핸드오프의 "97bd63d 라이브 / 7fd81c2 미배포"는 해소됨.) 다음 재배포는 새 코드 푸시 후에만 필요.
 - **⚠️ ODsay egress IP**: getTransitRoute(ODsay)는 등록 IP 제한. KC egress=`210.109.82.101`를 lab.odsay.com에 등록해 동작 중. 재시작으로 egress IP 바뀌면 getTransitRoute 타임아웃 → `src/server.ts`에 임시 `/egress-ip` 진단 심어 새 IP 확인→ODsay 갱신. (지금까진 재시작해도 유지.) 재배포 후 getTransitRoute 한 번 돌려 확인.
 - **⚠️ getTransitRoute 콜드스타트**: 재시작 직후 첫 호출 1회 타임아웃 가능(재시도 칩이 받침).
 - **⚠️ 도구함 "Tools 11" 표시 지연**: 콘솔 카드가 11로 보여도 커넥터/실서버는 13. "정보 불러오기" 새로고침하면 갱신.
@@ -85,7 +85,7 @@ docs/21(D-016까지) 넘겨받아 **폴리시 마감 → v4/v5/v6 테스트 3사
 - **몇 주간 블로커였던 ws.bus.go.kr error30(키 전파지연)이 2026-06-29 해금**(headerCd=0). 같은 `BUS_API_KEY`(=TOUR_API_KEY, data.go.kr 64hex)로 동작.
 - **구현(`7fd81c2`)**: `src/lib/sources/seoul.ts` — TOPIS 체인 **getBusRouteList(번호→busRouteId) → getStaionByRoute(routeId→정류소순서, `station`필드=stId) → getLowArrInfoByStId(stId→`arrmsg1` "15분11초후[8번째 전]" 파싱→stops/eta)**. route/stops **1h 캐시**(정적). trackBusArrival 서울분기 채움(route_not_found/stop_not_found/no_arrival+가용노선/ok). 응답=XML(itemList 래퍼, CDATA strip).
 - **⚠️ 빈-itemList throttle**: ws.bus.go.kr는 **IP별 레이트리밋** — 반복호출 시 headerCd=0이지만 itemList가 빈값으로 옴. `fetchRecords`가 **빈/에러 시 3회 재시도**(빈 바디는 빠르게 와 지연 적음, route/stops 캐시 후엔 콜드만).
-- **🔴 다음 세션 첫 할 일**: ① **`7fd81c2` KC 재배포 + `build` 확인** ② **KC경로(연결된 MCP `koreatrip-trackBusArrival`)로 서울버스 검증** — 내 로컬 IP는 probe로 throttle 걸렸지만 **KC egress IP는 별개**라 정상일 가능성. 예: `{city:"Seoul", busNumber:"143", dropOffStop:"신사역"}` → 실시간 도착. no_arrival/빈응답이면 재시도가 받치는지, 정류소명 매칭(matchSeoulStop fuzzy) 확인. ③ 잘 되면 docs/03·07·CLAUDE의 "배포대기"를 "검증완료"로.
+- **✅ 배포·검증 완료(2026-06-29 새 세션)**: 라이브 `build:7fd81c2`에서 **KC경로(연결된 MCP `koreatrip-trackBusArrival`)로 서울버스 검증** — `{city:"Seoul", busNumber:"143", dropOffStop:"신사역"}` → **"🛑 Arriving now — get ready to get off!" 실시간 동작**. 예측대로 **로컬 IP throttle과 달리 KC egress IP는 정상**. 키 미재잠금(getStationByName 강남 headerCd 0). docs/03·07·CLAUDE "배포대기"→"검증완료" 갱신함.
 - **앞으로 개선/통합**: ① **getTransitRoute ↔ trackBusArrival 통합**(경로에서 버스 선택 시 바로 추적 — 여정 UX 완성) ② getArrInfoByRoute(per-route, 더 정확한 arrprevStnCnt/traTime1)로 교체 검토 ③ getBusPosByRtid(sectOrd)로 노선 전체 버스 위치 모드 추가(지하철 line 모드처럼) ④ 정류소명 영문/로마자화(arsId 5자리로 안내) ⑤ **키 재잠금 위험** — 매 세션 재탐침(`curl ".../getStationByName?ServiceKey=$BUS&stSrch=%EA%B0%95%EB%82%A8"` headerCd 0 확인).
 
 ---
@@ -120,7 +120,7 @@ docs/21(D-016까지) 넘겨받아 **폴리시 마감 → v4/v5/v6 테스트 3사
 ## 9. LAUNCH-CRITICAL 현황
 | # | 항목 | 상태 |
 |---|---|---|
-| 1 | KC 재배포 신선도 | ✅ build-SHA. **단 7fd81c2 미배포(다음 첫 할 일)** |
+| 1 | KC 재배포 신선도 | ✅ build-SHA. **라이브 `7fd81c2` 배포·검증 완료(서울버스 포함)** |
 | 2 | MCP Inspector 정식통과 | ✅ **프로토콜 컴플라이언스 라이브 충족**(initialize·tools/list·tools/call·에러형식·SSE를 실경로로 반복 검증). 별도 GUI 불필요 |
 | 3 | 노출키 재발급 | ⏭️ 사용자 "안 함" 결정(스킵) |
 | 4 | PlayMCP 심사요청 | 🛑 **보류**(사용자 신호 대기 — 재촉 금지) |
@@ -181,8 +181,8 @@ docs/21(D-016까지) 넘겨받아 **폴리시 마감 → v4/v5/v6 테스트 3사
 
 ## 16. 새 대화창 직후 할 일 (요약)
 1. 이 문서 + `docs/07`(SSOT) + `docs/06`(D-026까지) 읽기.
-2. **🔴 7fd81c2(서울버스) KC 재배포 + `build:7fd81c2` 확인 + KC경로(연결MCP)로 서울버스 라이브 검증**(§6). 잘 되면 docs "배포대기"→"검증완료".
-3. **서울버스 키 재탐침**(재잠금 위험) — `getStationByName?stSrch=강남` headerCd 0 확인.
-4. 재배포 후 getTransitRoute egress IP 스팟체크(§2).
-5. 그다음: 서울버스 후속/통합(§6), recommendTripCourse Phase 3(§5), (사용자 결정 시)심사·비즈폼.
+2. ✅ **서울버스 배포·검증 완료**(2026-06-29 새 세션, §6). 재배포는 새 코드 푸시 후에만.
+3. **서울버스 키 재탐침**(매 세션, 재잠금 위험) — `getStationByName?stSrch=강남` headerCd 0 확인.
+4. 새 코드 배포 시 getTransitRoute egress IP 스팟체크(§2).
+5. **본 작업**(택1, 사용자와 합의): ① 서울버스 후속/통합(getTransitRoute↔trackBusArrival, §6) ② recommendTripCourse Phase 3(§5) ③ 저우선 잔여 폴리시. (사용자 결정 시)심사·비즈폼.
 6. **R-DOC 준수**, **심사요청 재촉 금지**, **시나리오 테스트 전 허용요청**, 측정 후 구현.

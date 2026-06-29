@@ -31,15 +31,15 @@
 - **title**: "Get Public Transit Route"
 - **description(영문)**: "Returns public-transit routes (subway/bus) between two points in Korea with fares, transfers, and time, explained in English for foreign visitors. Korea Trip Concierge(코리아 트립 컨시어지)."
 - **inputSchema**: `{ to: string (required), from?: string, departAt?: string }` — `from` 미지정(칩에서 목적지만 온 경우)이면 "출발지 알려달라" 정중 안내로 폴백(U3).
-- **output**: 1~3개 경로, 각 경로 단계·요금·소요·환승. 끝에 선택지(지하철 실시간/결제/도착지 동네).
+- **output**: 1~3개 경로, 각 경로 단계·요금·소요·환승. 끝에 **동적 "track this" 칩**: 지하철 leg→"Track subway at {boarding}", **버스 leg→"Track bus {no} to {alight stop}"**(D-028: 하차 정류소를 실어 trackBusArrival에 원탭 연결, 버스 있으면 transfer칩보다 우선) + 결제/도착지 동네.
 - annotations: readOnly true / idempotent false / openWorld true
 
 ## 4. `trackBusArrival`  (K-Bus Companion, 조회형)
 - **title**: "Track Bus Arrival"
-- **description(영문)**: "Looks up the real-time position of a specific Korean city bus and how many stops remain until the user's drop-off stop, with an English heads-up message. Korea Trip Concierge(코리아 트립 컨시어지)."
-- **inputSchema**: `{ busNumber: string (required), dropOffStop: string (required), city: string (required), currentStop?: string }`
-- **데이터**: 비서울=국토부 **TAGO 전국 버스도착정보**(`BUS_API_KEY`, 정류소명→cityCode+nodeId→도착). **서울=`src/lib/sources/seoul.ts`(TOPIS ws.bus.go.kr, D-026, 키 2026-06-29 해금)**: getBusRouteList→getStaionByRoute(stId)→getLowArrInfoByStId(arrmsg1 파싱). route/stops 1h 캐시, 빈-itemList throttle 3회 재시도. ⚠️ TAGO에 서울 미포함이라 `city`로 분기. ⚠️ ws.bus.go.kr는 IP별 레이트리밋(로컬 반복호출 시 빈 응답).
-- **output**: 남은 정거장·예상시간·하차 안내 문구(영문). **푸시 아님 — 조회**. 끝에 **[🔄 Refresh] [🚏 Am I close?]** 선택지.
+- **description(영문)**: "Tracks a specific Korean city bus in real time. With a drop-off stop: how many stops remain until you get off. By route number alone (Seoul): the live position of every bus on that route. Query-based (refresh to update). Korea Trip Concierge(코리아 트립 컨시어지)."
+- **inputSchema**: `{ busNumber: string (required), city: string (required), dropOffStop?: string, currentStop?: string }` — **dropOffStop optional(D-028)**: 있으면 하차 카운트다운, 서울+생략이면 노선위치 모드, 비서울+생략이면 graceful "어느 정류소?"(-32602 무).
+- **데이터**: 비서울=국토부 **TAGO 전국 버스도착정보**(`BUS_API_KEY`, 정류소명→cityCode+nodeId→도착). **서울=`src/lib/sources/seoul.ts`(TOPIS ws.bus.go.kr, D-026/D-028, 키 2026-06-29 해금)**: 하차모드=getBusRouteList→getStaionByRoute(stId)→getLowArrInfoByStId(arrmsg1 파싱); **노선위치 모드=getBusPosByRtid**(운행 중 모든 버스 sectOrd·lastStnId→정류소명, 지하철 line 모드 대칭, D-028). route/stops 1h 캐시, 빈-itemList throttle 3회 재시도. ⚠️ TAGO에 서울 미포함이라 `city`로 분기. ⚠️ ws.bus.go.kr는 IP별 레이트리밋(로컬 반복호출 시 빈 응답).
+- **output**: (하차모드) 남은 정거장·예상시간·하차 안내 문구(영문) + 칩 **[🔄 Refresh] [🚍 모든 버스 위치] [🗺️ 하차 후 경로]**; (위치모드) 노선 전체 버스 위치 + **[🔄][🎯 내 정류소로 카운트다운][🗺️ 경로]**. **푸시 아님 — 조회**. **getTransitRoute 버스칩이 하차정류소 실어 원탭 연결(D-028)**.
 - annotations: readOnly true / idempotent false (실시간 변동) / openWorld true
 - ⚠️ 외부 API 타임아웃(예 2.5s)·캐싱으로 p99 3s 사수. 단 TAGO 정류소검색(디렉터리)은 6s 허용+장기캐시. 24k 가드.
 
@@ -111,11 +111,11 @@
 - annotations: readOnly true / idempotent false (실시간) / openWorld true
 - 검증: parseArrivals/parsePositions/parseStationIds/resolveStationName/resolveLineName 테스트 락(103). **여정 모드 운행外**: statnId는 실시간 도착에서만 얻으므로 01:00~05:30엔 ids 없음 → "라이브 데이터 없음(운행 05:30~01:00)" 안내(≠"다른 노선"). **알려진 한계**: 순환 2호선 statnId 차 짧은/긴쪽 구분 약함, 방면필터 미적용(MVP).
 
-## 12. `recommendTripCourse`  (페르소나별 인기 코스 — D-025, 13번째 툴)
+## 12. `recommendTripCourse`  (페르소나별 인기 코스 — D-025/D-029, 13번째 툴)
 - **title**: "Recommend Trip Courses by Traveler Profile"
-- **description(영문)**: 페르소나별 인기 한국 여행코스 추천 — 20s women(K-beauty·salon·photo studio·hanbok)·families·couples·K-pop fans·foodies·culture/history. 큐레이션, 예약·광고 없음. `Part of Korea Trip Concierge(코리아 트립 컨시어지).`
-- **inputSchema**: `{ persona?, duration?, themes?, location? }` (전부 z.string optional). **persona 조합 가능**("20s woman, foodie" → `,&+/`·and 분리), duration=half-day/1-day/2-day/3-day(4+→3day 베이스), themes=콤마(동의어맵), location=**Seoul/Busan/Jeju**(그 외 대구 등=getAreaGuide/searchPlace로 steer).
-- **데이터/로직**: `src/lib/courses.ts` — 태깅 스팟 **서울35·부산10·제주11**(area/zone/themes/blocks/note/city) + **7 페르소나 테마맵**(조합 시 테마 인터리브) + **도시인식 조합엔진**(도시필터→테마점수 랭킹→존클러스터로 동선 묶음→시간블록[아침/점심/오후/저녁] 채움→슬롯별 **스왑대안**, 멀티데이는 존밴드 분리) + **1-day 시그니처 골든코스 6**(beauty/family/kpop/foodie/culture/couple, 서울 단일페르소나=하이브리드). 순수·결정적(랜덤無)·**빌드타임 큐레이션**(런타임 LLM/웹 아님→D-009 안전)·키 불필요. ⚠️ **시술/의료(dermainfo) 항목은 info-only**(특정병원 지목·예약대행 X = 의료법 유인·알선 회피). "_not ads_" 명시. **Phase 2 완료**(Seoul/Busan/Jeju·half/1/2/3-day). 향후: 시그니처/스팟 더, 코스 원클릭 길찾기.
+- **description(영문)**: 페르소나별 인기 한국 여행코스 추천 — 20s women(K-beauty·salon·photo studio·hanbok)·families·couples·K-pop fans·foodies·culture/history·**nightlife·nature·solo·budget**. 큐레이션, 예약·광고 없음. `Part of Korea Trip Concierge(코리아 트립 컨시어지).`
+- **inputSchema**: `{ persona?, duration?, themes?, location? }` (전부 z.string optional). **persona 조합 가능**("20s woman, foodie" → `,&+/`·and 분리), duration=half-day/1-day/2-day/3-day(4+→3day 베이스), themes=콤마(동의어맵), location=**Seoul/Busan/Jeju/Gyeongju**(D-029, 그 외 대구 등=getAreaGuide/searchPlace로 steer).
+- **데이터/로직**: `src/lib/courses.ts` — 태깅 스팟 **서울35·부산16·제주15·경주11**(D-029, area/zone/themes/blocks/note/city) + **11 페르소나 테마맵**(beauty/family/couple/kpop/foodie/culture + **nightlife/nature/solo/budget** + GENERIC, 조합 시 테마 인터리브) + **도시인식 조합엔진**(도시필터→테마점수 랭킹→존클러스터로 동선 묶음→시간블록[아침/점심/오후/저녁] 채움→슬롯별 **스왑대안**, 멀티데이는 존밴드 분리) + **1-day 시그니처 골든코스 6**(beauty/family/kpop/foodie/culture/couple, 서울 단일페르소나=하이브리드; 그 외 도시·조합·기간은 엔진). 순수·결정적(랜덤無)·**빌드타임 큐레이션**(런타임 LLM/웹 아님→D-009 안전)·키 불필요. ⚠️ **시술/의료(dermainfo) 항목은 info-only**(특정병원 지목·예약대행 X = 의료법 유인·알선 회피). "_not ads_" 명시. **Phase 3**(Seoul/Busan/Jeju/Gyeongju·half/1/2/3-day). 향후: 코스 원클릭 길찾기, 영업시간 인라인, 다국어(ja/zh).
 - **output**: `🗺️ **{기간} Seoul course — for a {조합 페르소나}**` + Themes줄 + 일자(Day 1/2)·시간블록별 스톱(↔ 스왑대안) + 면책 + 칩(now/route/menu·find·service/remix). 비서울→getAreaGuide/searchPlace/getJejuInfo 유도 칩.
 - annotations: readOnly true / destructive false / idempotent true / openWorld false
 - **수익화 주의**: 이 툴(및 전 툴)은 **광고/예약커미션/랭킹조작 절대 금지**(규칙·의료법). BM은 docs/07 "수익화/BM 로드맵" 참조 — MCP 바깥 별도 트랙.
