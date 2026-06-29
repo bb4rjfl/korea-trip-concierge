@@ -9,6 +9,7 @@ import { searchSeoulContent, getSeoulDetail, pickConfidentMatch, seoulHoursVerdi
 import { matchAreaName } from "./getAreaGuide.js";
 import { koreanHolidayToday, holidayBanner } from "../lib/holidays.js";
 import { similarity, normalizeName } from "../lib/fuzzy.js";
+import { mapLinks } from "../lib/maplinks.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -153,6 +154,7 @@ function renderSeoulNow(d: SeoulDetail, now: ReturnType<typeof koreaNow>, weathe
     lines.push("", "_No published hours found — check on arrival. Most attractions run ~09:00–18:00._");
   }
   if (d.subway) lines.push(`🚇 ${d.subway}`);
+  lines.push(mapLinks(d.title));
   if (now.hour >= 21 || now.hour < 6) {
     lines.push("", "⚠️ It's late — many attractions and shops are closed now.");
   }
@@ -207,7 +209,7 @@ export const getNowInfo: ToolDef = {
         `🏛️ Hours: ${landmark.hoursLabel}`,
       ];
       if (landmark.closedLabel) lines.push(`🚫 Closed: ${landmark.closedLabel}`);
-      lines.push("", `📝 ${landmark.note}`);
+      lines.push("", `📝 ${landmark.note}`, mapLinks(landmark.name));
       // Live weather + air for the landmark's city (best-effort; U2).
       const weather = await weatherLine(landmark.city ?? "Seoul");
       if (weather) lines.push("", weather);
@@ -344,7 +346,7 @@ export const getNowInfo: ToolDef = {
         lines.push(`_Closest match for "${place}" — for a specific restaurant or shop, search it by name._`, "");
       }
       if (hbanner) lines.push(hbanner, "");
-      lines.push(`📍 ${top.address}`, `⏰ Current Korea time: **${now.label} KST**`);
+      lines.push(`📍 ${top.address}`, mapLinks(top.title), `⏰ Current Korea time: **${now.label} KST**`);
       if (intro.hours) lines.push(`🏛️ Opening hours: ${intro.hours}`);
       if (intro.closedDays) lines.push(`🚫 Closed: ${intro.closedDays}`);
       if (!intro.hours && !intro.closedDays) {

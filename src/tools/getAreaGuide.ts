@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok } from "../lib/responses.js";
+import { mapLinks } from "../lib/maplinks.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -416,6 +417,7 @@ function renderGuide(a: Area, interest?: string): string {
     ...a.spots.map((s) => `- ${s}`),
     "",
     `**Getting there:** ${a.getThere}`,
+    mapLinks(a.name),
   ];
   if (interest) {
     const note = a.interests[interest as keyof Area["interests"]];

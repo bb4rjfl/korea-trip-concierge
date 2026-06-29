@@ -15,6 +15,20 @@ import { similarity, resolveName } from "../src/lib/fuzzy.js";
 import { resolvePlaceCoord } from "../src/lib/places.js";
 import { LANDMARKS, resolveLandmark, landmarkVerdict } from "../src/lib/landmarks.js";
 
+describe("mapLinks", () => {
+  it("emits Naver + Kakao map links, URL-encoded", async () => {
+    const { mapLinks } = await import("../src/lib/maplinks.js");
+    const m = mapLinks("Seongsu (성수동)");
+    expect(m).toContain("map.naver.com/p/search/");
+    expect(m).toContain("map.kakao.com/?q=");
+    expect(m).toContain(encodeURIComponent("Seongsu (성수동)"));
+  });
+  it("is empty for blank input", async () => {
+    const { mapLinks } = await import("../src/lib/maplinks.js");
+    expect(mapLinks("  ")).toBe("");
+  });
+});
+
 describe("buildChoiceFooter", () => {
   it("renders 2–4 chips with command + description", () => {
     const f = buildChoiceFooter([

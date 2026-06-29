@@ -16,6 +16,7 @@ import {
 } from "../lib/sources/visitseoul.js";
 import { resolvePlaceCoord, findPlaceInText } from "../lib/places.js";
 import { similarity } from "../lib/fuzzy.js";
+import { mapLinks } from "../lib/maplinks.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -120,7 +121,7 @@ function renderPois(query: string, pois: PoiPlace[]): string {
   const lines = pois.map((p, i) => {
     const tel = p.tel ? ` · ☎ ${p.tel}` : "";
     const cat = p.category ? ` · _${p.category}_` : "";
-    return `**${i + 1}. ${p.name}**${cat}\n   📍 ${p.address}${tel}`;
+    return `**${i + 1}. ${p.name}**${cat}\n   📍 ${p.address}${tel}\n   ${mapLinks(p.name)}`;
   });
   const out = [`🔎 **Places for** _"${query}"_ — _live local search_`, "", ...lines];
   // Diet honesty: search can't verify vegan/halal — tell the visitor to confirm (Y2).
@@ -137,8 +138,9 @@ function renderPlaces(query: string, places: Place[]): string {
   const lines = places.map((p, i) => {
     // No inline image markdown: the chat surface renders `![photo](longURL)` as
     // raw noise (and eats the 24k budget), so we keep results text-only (N11).
+    // Map links ARE kept — concrete Naver/Kakao URLs are useful and survive paraphrase.
     const tel = p.tel ? ` · ☎ ${p.tel}` : "";
-    return `**${i + 1}. ${p.title}**\n   📍 ${p.address}${tel}`;
+    return `**${i + 1}. ${p.title}**\n   📍 ${p.address}${tel}\n   ${mapLinks(p.title)}`;
   });
   return [
     `🔎 **Places for** _"${query}"_ — _from Korea Tourism data_`,
@@ -271,7 +273,7 @@ function renderSeoul(query: string, items: SeoulContent[]): string {
     // Text-only (no raw image markdown) — see renderPlaces (N11).
     const cat = p.categoryPath ? ` · _${p.categoryPath.split(">").pop()?.trim()}_` : "";
     const sum = p.summary ? `\n   ${clip(p.summary, 180)}` : "";
-    return `**${i + 1}. ${p.title}**${cat}${sum}`;
+    return `**${i + 1}. ${p.title}**${cat}${sum}\n   ${mapLinks(p.title)}`;
   });
   return [
     `🔎 **Seoul ideas for** _"${query}"_ — _official Seoul Tourism_`,
