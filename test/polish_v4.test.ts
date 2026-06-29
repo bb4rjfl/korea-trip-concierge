@@ -249,6 +249,13 @@ describe("recommendTripCourse — combinable persona courses (D-025)", () => {
     expect(t13("couple", "2-day", "", "Jeju")).toMatch(/Jeju course/);
     expect(t13("foodie", "1-day", "", "Daegu")).toMatch(/coming soon/i);
   });
+  it("supports Gyeongju courses and new personas (Phase 3)", () => {
+    expect(t13("culture", "1-day", "", "Gyeongju")).toMatch(/Gyeongju course/);
+    expect(t13("history lover", "1-day", "", "경주")).toMatch(/Bulguksa|Daereungwon|Cheomseongdae/);
+    expect(t13("nightlife")).toMatch(/Nightlife/);
+    expect(t13("solo backpacker")).toMatch(/Solo traveler/);
+    expect(t13("nature lover")).toMatch(/Nature & healing/);
+  });
   it("supports 3-day (and 4+ → 3-day base)", () => {
     const three = t13("history lover", "3-day");
     expect(three).toMatch(/Day 1/);
@@ -294,6 +301,19 @@ describe("courses engine (D-025)", () => {
     expect(c.days.length).toBe(3);
     const ids = c.days.flatMap((d) => d.stops.map((s) => s.spot.id));
     expect(new Set(ids).size).toBe(ids.length);
+  });
+  it("composes Gyeongju courses with Gyeongju spots (Phase 3)", () => {
+    const g = composeCourse(resolvePersonas("culture"), "1-day", [], "Gyeongju");
+    expect(g.days[0].stops.length).toBeGreaterThanOrEqual(3);
+    expect(g.days[0].stops.every((s) => (s.spot.city ?? "Seoul") === "Gyeongju")).toBe(true);
+  });
+  it("resolves the Phase-3 personas (nightlife/nature/solo/budget)", () => {
+    expect(resolvePersonas("nightlife").map((p) => p.key)).toContain("nightlife");
+    expect(resolvePersonas("nature & healing").map((p) => p.key)).toContain("nature");
+    expect(resolvePersonas("solo traveler").map((p) => p.key)).toContain("solo");
+    expect(resolvePersonas("budget backpacker").map((p) => p.key)).toEqual(
+      expect.arrayContaining(["budget", "solo"]),
+    );
   });
 });
 

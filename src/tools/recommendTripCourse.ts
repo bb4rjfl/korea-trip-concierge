@@ -46,15 +46,16 @@ function normalizeDuration(raw: string): { dur: Duration; over: boolean } {
   return { dur: "1-day", over: false };
 }
 
-/** Resolve a supported course city (Seoul/Busan/Jeju) from any text, else undefined. */
+/** Resolve a supported course city (Seoul/Busan/Jeju/Gyeongju) from any text, else undefined. */
 function resolveCity(s: string): City | undefined {
   if (/busan|부산/i.test(s)) return "Busan";
   if (/jeju|제주/i.test(s)) return "Jeju";
+  if (/gyeongju|경주/i.test(s)) return "Gyeongju";
   if (/seoul|서울/i.test(s)) return "Seoul";
   return undefined;
 }
 // Recognised cities we don't have curated course spots for yet → steer to other tools.
-const OTHER_CITY = /daegu|대구|gyeongju|경주|incheon|인천|gangneung|강릉|jeonju|전주|sokcho|속초|suwon|수원|gwangju|광주|daejeon|대전/i;
+const OTHER_CITY = /daegu|대구|incheon|인천|gangneung|강릉|jeonju|전주|sokcho|속초|suwon|수원|gwangju|광주|daejeon|대전/i;
 
 const THEME_SYNONYM: Record<string, string> = {
   drinks: "nightlife", bar: "nightlife", club: "nightlife", eat: "food", dining: "food",
@@ -90,7 +91,7 @@ export const recommendTripCourse: ToolDef = {
   description:
     "Recommends rich, customizable Korea trip courses for a foreign visitor's profile — personas COMBINE " +
     "(e.g. '20s woman, foodie'), with duration (half-day / 1-day / 2-day / 3-day), theme (beauty, photo, food, " +
-    "history, nature, shopping, nightlife, K-pop, hanbok…), and location (Seoul, Busan, Jeju). Returns a day-by-day " +
+    "history, nature, shopping, nightlife, K-pop, hanbok…), and location (Seoul, Busan, Jeju, Gyeongju). Returns a day-by-day " +
     "itinerary with swap alternatives and chips into hours, routes, areas, menus and app workarounds. Curated, no " +
     `booking or ads; medical/aesthetic items are info-only. Part of ${SERVICE_NAME}.`,
   inputSchema: {
@@ -100,7 +101,7 @@ export const recommendTripCourse: ToolDef = {
       .describe("Traveler profile(s), combinable — e.g. '20s woman', 'family', 'couple', 'K-pop fan', 'foodie', 'history lover', or '20s woman, foodie'. Omit for first-timer."),
     duration: z.string().optional().describe("Trip length: 'half-day', '1-day', '2-day', '3-day' (4+ returns a 3-day base)."),
     themes: z.string().optional().describe("Optional focus, comma-separated — e.g. 'beauty, photo' or 'nature, nightlife'."),
-    location: z.string().optional().describe("City: Seoul, Busan, or Jeju (default Seoul). Other cities steer to getAreaGuide."),
+    location: z.string().optional().describe("City: Seoul, Busan, Jeju, or Gyeongju (default Seoul). Other cities steer to getAreaGuide."),
   },
   annotations: {
     title: "Recommend Trip Courses by Traveler Profile",
@@ -128,7 +129,7 @@ export const recommendTripCourse: ToolDef = {
         [
           `🗺️ **Day-by-day courses for ${where} — coming soon**`,
           "",
-          `Full curated courses cover **Seoul, Busan, and Jeju** for now. For **${where}**, I can still help right away:`,
+          `Full curated courses cover **Seoul, Busan, Jeju, and Gyeongju** for now. For **${where}**, I can still help right away:`,
           "",
           `- **getAreaGuide** — a ${where} overview + top spots`,
           `- **searchPlaceForeigner** — 'things to see in ${where}' (it leads with the must-see sights)`,
@@ -136,7 +137,7 @@ export const recommendTripCourse: ToolDef = {
         [
           { emoji: "🗺️", cmdEn: `Guide me around ${where}`, descEn: "area overview + top spots" },
           { emoji: "🔎", cmdEn: `Things to see in ${where}`, descEn: "must-see sights" },
-          { emoji: "🧭", cmdEn: "Seoul / Busan / Jeju course instead", descEn: "persona day-by-day itinerary" },
+          { emoji: "🧭", cmdEn: "Seoul / Busan / Jeju / Gyeongju instead", descEn: "persona day-by-day itinerary" },
         ],
       );
     }

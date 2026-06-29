@@ -13,7 +13,7 @@
 
 export type Block = "morning" | "afternoon" | "evening" | "any";
 export type Duration = "half-day" | "1-day" | "2-day" | "3-day";
-export type City = "Seoul" | "Busan" | "Jeju";
+export type City = "Seoul" | "Busan" | "Jeju" | "Gyeongju";
 
 export interface Spot {
   id: string;
@@ -84,6 +84,11 @@ export const BUSAN_SPOTS: Spot[] = [
   { id: "b_seomyeon", name: "Seomyeon eats & nightlife", area: "Seomyeon", zone: "seomyeon", themes: ["food", "nightlife", "shopping"], blocks: ["evening"], note: "Downtown crossroads — dwaeji-gukbap, bars, and shopping.", city: "Busan" },
   { id: "b_dwaeji", name: "Dwaeji-gukbap (Busan pork soup)", area: "anywhere", zone: "any", themes: ["food"], blocks: ["any"], note: "Busan's signature pork-and-broth rice; add salted shrimp & chives.", city: "Busan" },
   { id: "b_milmyeon", name: "Milmyeon / fresh hoe by the bay", area: "anywhere", zone: "any", themes: ["food"], blocks: ["afternoon", "evening"], note: "Busan cold wheat noodles, or raw fish (hoe) by the sea.", city: "Busan" },
+  { id: "b_huinnyeoul", name: "Huinnyeoul Culture Village", area: "Yeongdo", zone: "yeongdo", themes: ["photo", "view", "cafe"], blocks: ["afternoon"], note: "Cliffside white-wave village over the sea — film-set alleys and ocean-view cafés.", city: "Busan" },
+  { id: "b_songdo", name: "Songdo Beach & Cloud Trails cable car", area: "Seogu", zone: "songdo", themes: ["view", "nature", "experience"], blocks: ["afternoon"], note: "Korea's first public beach + a sea-crossing cable car with glass-floor cabins.", city: "Busan" },
+  { id: "b_gukje", name: "Gukje Market & BIFF eats", area: "Nampo", zone: "nampo", themes: ["market", "shopping", "food"], blocks: ["afternoon"], note: "Sprawling postwar market next to Jagalchi — bibim-dangmyeon, hotteok, knick-knacks.", city: "Busan" },
+  { id: "b_spaland", name: "Spa Land Centum (jjimjilbang)", area: "Centum", zone: "centum", themes: ["experience", "nightlife"], blocks: ["evening"], note: "Upscale spa with 22 baths & themed sauna rooms inside Shinsegae Centum.", city: "Busan" },
+  { id: "b_yongdusan", name: "Yongdusan Park & Diamond Tower", area: "Nampo", zone: "nampo", themes: ["view", "history"], blocks: ["afternoon", "evening"], note: "Hilltop park above Nampo with the city's observation tower — escalators up from BIFF.", city: "Busan" },
 ];
 
 // ── Jeju spots (Phase 2) ────────────────────────────────────────────────────
@@ -99,9 +104,28 @@ export const JEJU_SPOTS: Spot[] = [
   { id: "j_hallasan", name: "Hallasan day hike", area: "Central", zone: "central", themes: ["nature"], blocks: ["morning"], note: "Korea's highest peak; strict trail cutoffs — start early.", city: "Jeju" },
   { id: "j_dongmun", name: "Dongmun Market + black-pork street", area: "Jeju City", zone: "jeju-city", themes: ["food", "market"], blocks: ["evening"], note: "Night market + heuk-dwaeji (black pork) BBQ.", city: "Jeju" },
   { id: "j_galchi", name: "Jeju black pork / galchi / abalone", area: "anywhere", zone: "any", themes: ["food"], blocks: ["any"], note: "Heuk-dwaeji BBQ, braised cutlassfish, abalone porridge.", city: "Jeju" },
+  { id: "j_camellia", name: "Camellia Hill garden", area: "Andeok", zone: "west", themes: ["nature", "photo", "cafe"], blocks: ["afternoon"], note: "Seasonal flower arboretum — camellias in winter, hydrangeas in summer; very photogenic.", city: "Jeju" },
+  { id: "j_yongduam", name: "Yongduam (Dragon Head Rock) & Iho Tewoo", area: "Jeju City", zone: "jeju-city", themes: ["view", "nature"], blocks: ["afternoon", "evening"], note: "Lava-rock sea cliff + the candy-striped horse lighthouses of Iho beach at sunset.", city: "Jeju" },
+  { id: "j_saryeoni", name: "Saryeoni Forest trail", area: "Jocheon", zone: "central", themes: ["nature", "experience"], blocks: ["morning", "afternoon"], note: "A flat, dreamy cedar-and-cypress forest walk — easy 'healing' stroll, no hike needed.", city: "Jeju" },
+  { id: "j_hamdeok", name: "Hamdeok Seowoo Beach", area: "Jocheon", zone: "east", themes: ["nature", "view", "cafe"], blocks: ["afternoon"], note: "Turquoise east-coast beach with shallow water and seaside cafés (Delmoondo nearby).", city: "Jeju" },
 ];
 
-export const ALL_SPOTS: Spot[] = [...SEOUL_SPOTS, ...BUSAN_SPOTS, ...JEJU_SPOTS];
+// ── Gyeongju spots (Phase 3) — Korea's open-air museum, a culture/history magnet ──
+export const GYEONGJU_SPOTS: Spot[] = [
+  { id: "g_bulguksa", name: "Bulguksa Temple", area: "Tohamsan", zone: "bulguk", themes: ["history", "experience"], blocks: ["morning", "afternoon"], note: "UNESCO Silla masterpiece — stone bridges and twin pagodas; pair with Seokguram.", city: "Gyeongju" },
+  { id: "g_seokguram", name: "Seokguram Grotto", area: "Tohamsan", zone: "bulguk", themes: ["history", "view"], blocks: ["morning"], note: "Hilltop granite Buddha gazing at the sunrise sea — a short walk above Bulguksa.", city: "Gyeongju" },
+  { id: "g_daereungwon", name: "Daereungwon Tomb Complex (Cheonmachong)", area: "Downtown", zone: "downtown", themes: ["history", "photo"], blocks: ["morning", "afternoon"], note: "Grassy royal burial mounds you can walk among; enter one excavated tomb.", city: "Gyeongju" },
+  { id: "g_cheomseongdae", name: "Cheomseongdae Observatory", area: "Downtown", zone: "downtown", themes: ["history", "photo"], blocks: ["afternoon", "evening"], note: "Asia's oldest surviving observatory; flower fields around it in season.", city: "Gyeongju" },
+  { id: "g_wolji", name: "Donggung Palace & Wolji Pond", area: "Downtown", zone: "downtown", themes: ["history", "view", "photo"], blocks: ["evening"], note: "Reflected pavilions floodlit after dark — Gyeongju's iconic night view.", city: "Gyeongju" },
+  { id: "g_woljeonggyo", name: "Woljeonggyo Bridge", area: "Downtown", zone: "downtown", themes: ["history", "photo", "view"], blocks: ["evening"], note: "Reconstructed Silla covered bridge, beautifully lit over the river at night.", city: "Gyeongju" },
+  { id: "g_hwangnidan", name: "Hwangnidan-gil café street", area: "Hwangnam", zone: "downtown", themes: ["cafe", "food", "photo"], blocks: ["afternoon"], note: "Hanok-lined 'Gyeongju's Garosu-gil' — ssambap, tenmun bread, and pretty cafés.", city: "Gyeongju" },
+  { id: "g_museum", name: "Gyeongju National Museum", area: "Downtown", zone: "downtown", themes: ["history", "family"], blocks: ["afternoon"], note: "Free; the Emille Bell and Silla gold crowns — the best primer on the kingdom.", city: "Gyeongju" },
+  { id: "g_bomun", name: "Bomun Lake resort & cherry road", area: "Bomun", zone: "bomun", themes: ["nature", "view", "family"], blocks: ["afternoon", "evening"], note: "Lakeside cycling and Korea's most famous cherry-blossom drive in spring.", city: "Gyeongju" },
+  { id: "g_yangdong", name: "Yangdong Folk Village", area: "Gangdong", zone: "yangdong", themes: ["history", "experience"], blocks: ["morning", "afternoon"], note: "UNESCO living Joseon village of thatched and tiled clan houses.", city: "Gyeongju" },
+  { id: "g_ssambap", name: "Gyeongju ssambap & hwangnam-bread", area: "anywhere", zone: "any", themes: ["food"], blocks: ["any"], note: "Wrap-rice feast of many side dishes; red-bean hwangnam-bbang to take away.", city: "Gyeongju" },
+];
+
+export const ALL_SPOTS: Spot[] = [...SEOUL_SPOTS, ...BUSAN_SPOTS, ...JEJU_SPOTS, ...GYEONGJU_SPOTS];
 const cityOf = (s: Spot): City => s.city ?? "Seoul";
 
 // ── Personas → preferred themes (ordered = weight) ──────────────────────────
@@ -119,6 +143,10 @@ export const PERSONA_DEFS: PersonaDef[] = [
   { key: "kpop", label: "K-pop fan", emoji: "🎤", match: /k-?pop|kpop|hallyu|idol|fan|concert|아이돌|팬|콘서트|굿즈/i, themes: ["kpop", "shopping", "food", "photo", "hanbok"] },
   { key: "foodie", label: "Foodie", emoji: "🍜", match: /food(ie)?|eat|cuisine|gourmet|미식|맛집|먹/i, themes: ["food", "market", "cafe", "nightlife"] },
   { key: "culture", label: "Culture & history", emoji: "🏛️", match: /history|historic|culture|tradition|heritage|temple|palace|museum|senior|역사|문화|전통|시니어/i, themes: ["history", "hanbok", "experience", "market", "nature"] },
+  { key: "nightlife", label: "Nightlife", emoji: "🍻", match: /night ?life|party|partygoer|club(bing)?|pub|bar ?hop|유흥|클럽|술|밤/i, themes: ["nightlife", "food", "view", "cafe"] },
+  { key: "nature", label: "Nature & healing", emoji: "🌿", match: /nature|healing|hiking?|outdoor|forest|mountain|자연|힐링|등산|숲|산/i, themes: ["nature", "view", "experience", "cafe", "food"] },
+  { key: "solo", label: "Solo traveler", emoji: "🎒", match: /solo|alone|by myself|혼자|혼행|nomad|backpack/i, themes: ["cafe", "food", "history", "view", "experience", "nature"] },
+  { key: "budget", label: "Budget", emoji: "💸", match: /budget|cheap|저렴|가성비|shoestring|student|free things/i, themes: ["market", "food", "history", "nature", "view"] },
 ];
 const GENERIC_THEMES = ["history", "view", "food", "market", "shopping", "nature", "hanbok"]; // first-timer classics
 
