@@ -132,7 +132,7 @@ describe("getTransitRoute missing `to` (R5)", () => {
   it("asks where to instead of throwing, with chips", async () => {
     const r = await getTransitRoute.handler({ from: "Seoul Station" });
     expect(text(r)).toContain("Where do you want to go");
-    expect(text(r)).toContain("Tap to continue");
+    expect(text(r)).toContain("You can ask me next");
   });
 });
 
@@ -141,11 +141,11 @@ describe("enum tolerance (R7)", () => {
   it("getAreaGuide maps 'drinks' to nightlife", async () => {
     const r = await getAreaGuide.handler({ area: "Euljiro", interest: "drinks" });
     expect(text(r).toLowerCase()).toContain("nightlife");
-    expect(text(r)).toContain("Tap to continue");
+    expect(text(r)).toContain("You can ask me next");
   });
   it("getJejuInfo tolerates an unknown category (→ highlights, no crash)", async () => {
     const r = await getJejuInfo.handler({ category: "spaceship" });
-    expect(text(r)).toContain("Tap to continue");
+    expect(text(r)).toContain("You can ask me next");
   });
 });
 

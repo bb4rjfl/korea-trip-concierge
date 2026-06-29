@@ -59,14 +59,14 @@ describe("getTransitRoute same origin/destination (Y9)", () => {
   it("returns 'already there' instead of a misleading timeout", async () => {
     const r = await getTransitRoute.handler({ from: "Busan", to: "Busan" });
     expect(text(r).toLowerCase()).toContain("already at");
-    expect(text(r)).toContain("Tap to continue");
+    expect(text(r)).toContain("You can ask me next");
   });
 });
 
 describe("getAreaGuide food chip (Y10)", () => {
   it("offers a direct eat-here chip for the food interest", async () => {
     const r = await getAreaGuide.handler({ area: "Myeongdong", interest: "food" });
-    expect(text(r).toLowerCase()).toContain("places to eat");
+    expect(text(r).toLowerCase()).toContain("where can i eat in myeongdong");
   });
 });
 

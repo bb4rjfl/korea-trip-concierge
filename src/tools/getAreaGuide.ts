@@ -440,24 +440,26 @@ function renderUnknown(areaQuery: string): string {
   ].join("\n");
 }
 
-// Footer for a matched guide — chips chain into the other tools for "here".
-const CHOICES: Choice[] = [
-  { emoji: "🧭", cmdEn: "Find foreigner essentials here", cmdKo: "근처 필수시설", descEn: "ATM, pharmacy, exchange" },
-  { emoji: "🚇", cmdEn: "How do I get here?", cmdKo: "가는 길", descEn: "public-transit route" },
-  { emoji: "🕒", cmdEn: "Is it good to go now?", descEn: "live hours + weather" },
-  { emoji: "🌤️", cmdEn: "Weather & fine dust today", descEn: "forecast + air quality" },
-];
-
-/** Footer for a matched guide; foodies get a direct "eat here" chip (Y10). */
+/** Footer for a matched guide — contextual follow-up questions that name the area
+ *  and chain into the other tools (transit / famous places / persona course /
+ *  what's-on-now), mirroring how a visitor naturally continues. */
 function guideChoices(areaShort: string, interest?: string): Choice[] {
+  const getThere: Choice = { emoji: "🚇", cmdEn: `How do I get to ${areaShort}?`, cmdKo: `${areaShort} 가는 길`, descEn: "public-transit route" };
+  const course: Choice = { emoji: "🗺️", cmdEn: `What's a popular ${areaShort} course for my style?`, cmdKo: "내 취향 추천 코스", descEn: "persona day-by-day itinerary" };
+  const famous: Choice = { emoji: "🔎", cmdEn: `What are ${areaShort}'s famous spots & shops?`, cmdKo: `${areaShort} 유명한 곳`, descEn: "real places to visit" };
   if (interest === "food") {
     return [
-      { emoji: "🍽️", cmdEn: `Find foreigner-friendly places to eat in ${areaShort}`, descEn: "restaurants that take foreign cards" },
-      { emoji: "🚇", cmdEn: "How do I get here?", cmdKo: "가는 길", descEn: "public-transit route" },
-      { emoji: "🧭", cmdEn: "Find foreigner essentials here", descEn: "ATM, pharmacy, exchange" },
+      { emoji: "🍽️", cmdEn: `Where can I eat in ${areaShort} with a foreign card?`, cmdKo: `${areaShort} 맛집`, descEn: "foreigner-friendly dining" },
+      getThere,
+      course,
     ];
   }
-  return CHOICES;
+  return [
+    getThere,
+    famous,
+    course,
+    { emoji: "🕒", cmdEn: `What's good in ${areaShort} right now?`, cmdKo: "지금 가도 돼?", descEn: "live hours + weather" },
+  ];
 }
 
 /** Footer when the area isn't in our curated set — steer to a real search of

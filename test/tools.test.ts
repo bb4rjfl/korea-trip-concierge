@@ -63,7 +63,7 @@ describe("handlers return guarded text content", () => {
       expect(res.content[0].type).toBe("text");
       const text = res.content[0].text;
       expect(text.length).toBeLessThanOrEqual(MAX_RESPONSE_CHARS);
-      expect(text).toContain("Tap to continue");
+      expect(text).toContain("You can ask me next");
     });
   }
 });

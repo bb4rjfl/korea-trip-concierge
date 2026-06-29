@@ -21,9 +21,9 @@ describe("buildChoiceFooter", () => {
       { emoji: "🔄", cmdEn: "Refresh", descEn: "update" },
       { emoji: "🚏", cmdEn: "Am I close?", cmdKo: "거의 다 왔어?", descEn: "re-check" },
     ]);
-    expect(f).toContain("`Refresh`");
+    expect(f).toContain("**Refresh**"); // bolded follow-up question, no `code` styling
     expect(f).toContain("거의 다 왔어?");
-    expect(f).toContain("Tap to continue");
+    expect(f).toContain("You can ask me next");
   });
 
   it("rejects <2 or >4 chips", () => {
@@ -43,7 +43,7 @@ describe("renderMarkdown 24k guard", () => {
     const huge = "x".repeat(50_000);
     const out = renderMarkdown(huge, footer);
     expect(out.length).toBeLessThanOrEqual(MAX_RESPONSE_CHARS);
-    expect(out).toContain("Tap to continue");
+    expect(out).toContain("You can ask me next");
     expect(out).toContain("truncated");
   });
 
