@@ -105,4 +105,4 @@
 - [x] 🚌 **서울버스 키 해금 + 구현(2026-06-29, D-026)**: ws.bus.go.kr headerCd=0(몇 주 error30 전파지연 해소) → `src/lib/sources/seoul.ts`(getBusRouteList→getStaionByRoute→getLowArrInfoByStId arrmsg1) + trackBusArrival 서울분기 + 빈-itemList 3회 재시도. **247 tests green.** ⚠️ 로컬IP throttle로 e2e는 KC 배포 후 검증. ⏳ 재배포 대기.
 - [ ] 대기: 카카오Local 승인 / 저우선 잔여 P3·P4·Jamsil(docs/21 §8) / 노출키 재발급(사용자 스킵)
 
-> 상세 진행은 `docs/07_progress.md`(SSOT). **새 세션 진입점: `docs/21_handoff.md`**(아주 풍부한 맥락판, docs/16 이후 전부 포함).
+> 상세 진행은 `docs/07_progress.md`(SSOT). **새 세션 진입점: `docs/25_handoff.md`**(아주 풍부한 최신 맥락판 — v4/v5/v6 테스트→GO, 페르소나 코스 신툴+Phase2, 서울버스 해금·구현, 실환경 MCP 테스트, BM 분석 전부 포함. docs/21은 D-016까지의 이전판).
