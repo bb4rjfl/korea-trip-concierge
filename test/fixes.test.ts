@@ -5,10 +5,24 @@ import { getNowInfo } from "../src/tools/getNowInfo.js";
 import { getTransitRoute } from "../src/tools/getTransitRoute.js";
 import { getAreaGuide } from "../src/tools/getAreaGuide.js";
 import { getJejuInfo } from "../src/tools/getJejuInfo.js";
-import { searchPlaceForeigner } from "../src/tools/searchPlaceForeigner.js";
+import { searchPlaceForeigner, templeStayLead } from "../src/tools/searchPlaceForeigner.js";
 
 const res = (body: unknown) => ({ ok: true, json: async () => body }) as unknown as Response;
 const text = (r: { content: { text: string }[] }) => r.content[0].text;
+
+// ── P3: templestay is a program, not a place — curated primer leads ───────────
+describe("templeStayLead (P3)", () => {
+  it("leads with the curated primer for templestay queries", () => {
+    const t = templeStayLead("temple stay");
+    expect(t).toMatch(/Templestay/);
+    expect(t).toMatch(/eng\.templestay\.com/);
+    expect(t).toMatch(/Beomeosa|Bongeunsa|Jogyesa/);
+  });
+  it("is empty for unrelated queries (no false lead)", () => {
+    expect(templeStayLead("vegan ramen in Hongdae")).toBe("");
+    expect(templeStayLead("temples to photograph")).toBe(""); // 'temple' alone ≠ templestay
+  });
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();

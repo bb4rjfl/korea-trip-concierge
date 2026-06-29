@@ -236,6 +236,23 @@ export function cityMustSeeLead(query: string, area: string): string {
   );
 }
 
+/** Curated lead for "templestay" queries (P3) — it's a specific cultural program,
+ *  not a place, so a plain place search misses it. Evergreen primer + the official
+ *  nonprofit booking site + foreigner-friendly temples; "" otherwise. Pure/exported. */
+export function templeStayLead(query: string): string {
+  if (!/temple\s*stay|templestay|템플스테이/i.test(query)) return "";
+  return (
+    [
+      "🧘 **Templestay** — an overnight (or day) stay at a Korean Buddhist temple: meditation, a tea ceremony, temple meals (_barugongyong_), and dawn chanting. Many programs run **in English** for foreigners.",
+      "- **Book official:** ~140 temples are listed at **eng.templestay.com** — the official nonprofit program site (not an ad).",
+      "- **Foreigner-friendly picks:** **Jogyesa** & **Bongeunsa** (Seoul, day programs), **Beomeosa** (Busan), **Golgulsa** (Gyeongju, Seonmudo training), **Haeinsa** (the Tripitaka Koreana).",
+      "",
+      "_Specific temples below — tap one for hours, or ask me to route you there:_",
+      "",
+    ].join("\n") + "\n"
+  );
+}
+
 function dedupeByTitle(items: SeoulContent[], limit: number): SeoulContent[] {
   const seen = new Set<string>();
   const out: SeoulContent[] = [];
@@ -377,9 +394,11 @@ export const searchPlaceForeigner: ToolDef = {
     const category = args.category ? String(args.category) : undefined;
     const cat = inferCategory(query, category);
     const language = normalizeLang(args.language as string | undefined);
-    // Curated must-see lead for a generic, city-wide sightseeing query (P-V2/D-021);
-    // "" otherwise. Prepended to whichever result path runs.
-    const mustSee = cat !== "food" ? cityMustSeeLead(query, area) : "";
+    // Templestay is a program, not a place (P3) — its curated primer leads when
+    // asked; otherwise the generic city-wide must-see lead (P-V2/D-021). "" for
+    // dining or specific queries. Prepended to whichever result path runs.
+    const temple = templeStayLead(query);
+    const mustSee = temple || (cat !== "food" ? cityMustSeeLead(query, area) : "");
 
     // No query and no area → ask, instead of letting an empty search run (N3).
     if (!query.trim() && !area.trim()) {
