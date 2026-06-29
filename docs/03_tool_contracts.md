@@ -15,7 +15,7 @@
 - **inputSchema**: `{ query: string (required), area?: string, category?: string, language?: enum(en,ja,zh,ko) }`
 - **다국어(D-008/U4)**: `language`로 TourAPI 영/일/중간/국 서비스 전환 → 장소명·주소가 해당 언어. 키워드도 그 언어로 매칭(자국어 질의). 기본 en.
 - **소스 우선순위(D-015)**: **① 서울 + 비식음** → **VisitSeoul 공식 영어 큐레이션 메인**(`src/lib/sources/visitseoul.ts`; 관광/쇼핑/문화/자연/체험/역사, 지역키워드 narrowing + `inferSeoulCategory` 카테고리, 요약 포함). VisitSeoul 빈약 시 ② 그라운딩으로 폴백. **② 식음(cat=food, 카페 포함)** → 좌표 POI(Naver/Foursquare, dish 정밀). **③ 서울 외 / VisitSeoul 미스** → TourAPI 영문 + 좌표 KorService2 로마자 보강(기존). 서울 판정=`isSeoulText`(이름 'seoul/서울' 또는 좌표 바운딩박스). VisitSeoul 미연결(키 없음) 시 자동으로 ②③만 동작.
-- **output(Markdown)**: 장소 3~6개, 각 항목 한 줄 요약+친화 배지(VisitSeoul은 공식 영어요약+사진). 끝에 선택지.
+- **output(Markdown)**: 장소 3~6개, 각 항목 한 줄 요약+친화 배지 + **🗺️ Naver/Kakao 맵링크**(D-032, 장소별). "temple stay"는 큐레이션 프라이머 리드(D-030). 끝에 맥락 팔로업 칩(D-031). (이미지는 N11로 제거, 맵링크 URL은 유지.)
 - annotations: readOnly true / destructive false / idempotent false / openWorld true
 
 ## 2. `findForeignerFriendlyStore`  (외국인 필수시설 파인더 — D-013)
@@ -64,7 +64,7 @@
 - **description(영문)**: "Gives a concise English one-paragraph guide and top spots for a Korean neighborhood, tailored to foreign visitors. Korea Trip Concierge(코리아 트립 컨시어지)."
 - **inputSchema**: `{ area: string (required), interest?: string }`
 - **데이터**: **큐레이션 동네가이드**(키 불필요·항상 동작). **35개 동네**(D-014로 8→21, D-017로 21→26, D-018로 26→29, D-020로 29→32, D-021로 32→35): 서울 23(명동·홍대·강남·인사동·성수·이태원·북촌·동대문·여의도·잠실/롯데월드·익선동·을지로·삼청동·가로수길/신사·연남·압구정/청담·종로/광화문·합정/망원·서촌·건대·신촌/이대·해방촌/경리단·대학로), **부산 5**, **제주 2**, **강원 1**(강릉), **전북 1**(전주), **경북 1**(경주), **인천 1**(차이나타운/송도), **강원+1**(속초). `keys` 정규식에 한글 별칭 포함, 첫 매칭 우선(순서 주의). *searchPlaceForeigner는 일반 sightseeing query에 다도시 must-see 시딩(D-021, Seoul/Busan/Jeju/Gyeongju).*
-- **output**: 동네 요약 + 스팟 3~5 + 이동 팁 + interest별 노트. 끝에 선택지(근처 필수시설/길찾기/지금가기/날씨 → 다른 툴 연결). 미수록 동네는 "실제 검색" 유도 폴백.
+- **output**: 동네 요약 + 스팟 3~5 + 이동 팁 + **🗺️ Naver/Kakao 맵링크**(D-032) + interest별 노트. 끝에 **맥락 팔로업 칩**(D-031: 동네명 담은 "{area} 가는 길/유명가게/페르소나 코스/지금" → 다른 툴 연결). 미수록 동네는 "실제 검색" 유도 폴백.
 - annotations: readOnly true / idempotent true / openWorld true
 
 ## 7. `translateMenuContext`
@@ -79,7 +79,7 @@
 - **description(영문, 실제 코드와 일치)**: "Tells a foreign visitor whether a place is worth visiting right now using its listed opening hours and the current Korea time, with a clear go/no-go and reasons. Part of Korea Trip Concierge(코리아 트립 컨시어지)."
 - **inputSchema**: `{ place: string (required), language?: enum(en,ja,zh,ko) }`
 - **데이터/로직(D-014)**: **① 큐레이션 랜드마크 오버레이 우선**(`src/lib/landmarks.ts`, ~27개 외국인 인기명소: 5대궁·종묘·N서울타워·롯데월드/타워·COEX아쿠아리움·한강공원(24h)·북촌(주간)·DDP(일부24h)·광장/남대문/명동 시장·전쟁기념관·리움·부산 해운대/광안리/감천/자갈치·제주 성산일출봉(일출)/만장굴/한라산 등). `fuzzy.resolveName` 신뢰매칭 시 **정확 영업시간 + 현재 KST**로 즉시 🟢열림/🔴닫힘 판정(24h/daylight/sunrise/구간 4유형, closedDays 우선). **키 불필요·API콜 0**(p99 보호) → C7(Han River→호텔, Lotte World→매장) 오매칭 해소. **② 서울 임의장소는 VisitSeoul 상세 폴백(D-015)**: 큐레이션 미매칭 시 VisitSeoul 키워드검색→`pickConfidentMatch`(약한 부분일치 거부)→contents/info의 영업시간/휴무/**영문 지하철안내**/도로명주소로 판정(TourAPI보다 영문 시간 풍부, C7 미해소분 메움). **③ 그래도 미스 시 TourAPI 폴백**(기존 흐름: 검색·되묻기·detailIntro2 시간). 셋 다 실시간 날씨·미세먼지 1줄 통합.
-- **output**: 지금 상태(판정 헤드라인 + 영업시간 + 현재 KST 시각 + 닫는요일 + 한줄노트 + 실시간 날씨·미세먼지) + 추천 여부. 끝에 선택지(대안 시간/대안 장소). ⚠️ "crowd level"은 미구현(데이터원 없음) → 설명에서 제외(R-DOC 정합).
+- **output**: 지금 상태(판정 헤드라인 + 영업시간 + 현재 KST 시각 + 닫는요일 + 한줄노트 + **🗺️ Naver/Kakao 맵링크**(D-032) + 실시간 날씨·미세먼지) + 추천 여부. 끝에 선택지(대안 시간/대안 장소). ⚠️ "crowd level"은 미구현(데이터원 없음) → 설명에서 제외(R-DOC 정합).
 - annotations: readOnly true / idempotent false / openWorld true
 
 ## 9. `getJejuInfo`  (제주 특화)
