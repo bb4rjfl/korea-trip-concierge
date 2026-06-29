@@ -38,7 +38,7 @@
 - **title**: "Track Bus Arrival"
 - **description(영문)**: "Looks up the real-time position of a specific Korean city bus and how many stops remain until the user's drop-off stop, with an English heads-up message. Korea Trip Concierge(코리아 트립 컨시어지)."
 - **inputSchema**: `{ busNumber: string (required), dropOffStop: string (required), city: string (required), currentStop?: string }`
-- **데이터**: 국토부 **TAGO 전국 버스도착정보**(`BUS_API_KEY`). 정류소명→cityCode+nodeId 해석 후 도착조회. ⚠️ **TAGO에 서울 미포함** → `city`로 도시 특정 필수. 서울 입력 시 별도 소스(seoul.ts, 활용신청 대기) 연결 전까지 "경로 안내 사용" 폴백.
+- **데이터**: 비서울=국토부 **TAGO 전국 버스도착정보**(`BUS_API_KEY`, 정류소명→cityCode+nodeId→도착). **서울=`src/lib/sources/seoul.ts`(TOPIS ws.bus.go.kr, D-026, 키 2026-06-29 해금)**: getBusRouteList→getStaionByRoute(stId)→getLowArrInfoByStId(arrmsg1 파싱). route/stops 1h 캐시, 빈-itemList throttle 3회 재시도. ⚠️ TAGO에 서울 미포함이라 `city`로 분기. ⚠️ ws.bus.go.kr는 IP별 레이트리밋(로컬 반복호출 시 빈 응답).
 - **output**: 남은 정거장·예상시간·하차 안내 문구(영문). **푸시 아님 — 조회**. 끝에 **[🔄 Refresh] [🚏 Am I close?]** 선택지.
 - annotations: readOnly true / idempotent false (실시간 변동) / openWorld true
 - ⚠️ 외부 API 타임아웃(예 2.5s)·캐싱으로 p99 3s 사수. 단 TAGO 정류소검색(디렉터리)은 6s 허용+장기캐시. 24k 가드.

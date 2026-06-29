@@ -3,6 +3,7 @@ import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
 import { trackBus, resolveCityCode } from "../lib/sources/tago.js";
+import { trackSeoulBus } from "../lib/sources/seoul.js";
 import { romanizeText } from "../lib/romanize.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
@@ -41,7 +42,7 @@ export const trackBusArrival: ToolDef = {
     dropOffStop: z.string().describe("The stop where the user wants to get off."),
     city: z
       .string()
-      .describe("City the bus runs in, e.g. 'Busan', 'Daejeon', 'Incheon'. Required to locate the stop."),
+      .describe("City the bus runs in, e.g. 'Seoul', 'Busan', 'Daejeon', 'Incheon'. Required to locate the stop."),
     currentStop: z.string().optional().describe("Optional current stop to measure from."),
   },
   annotations: {
@@ -64,14 +65,54 @@ export const trackBusArrival: ToolDef = {
       );
     }
 
-    // Seoul is not covered by TAGO — it has its own real-time bus source, which
-    // is wired separately. Until that is connected, steer the user to routing.
+    // Seoul isn't in TAGO — use its own TOPIS real-time feed (src/lib/sources/seoul.ts).
     if (isSeoul(city)) {
-      return fail(
-        "Seoul real-time bus tracking is being connected",
-        "Seoul buses aren't in the nationwide (TAGO) source. Seoul's own live-bus feed is being added — for now, tap **Plan a transit route** for Seoul subway + bus directions.",
-        RETRY,
-      );
+      try {
+        const r = await trackSeoulBus(bus, stop);
+        if (r.status === "route_not_found") {
+          return fail(
+            `I couldn't find Seoul bus "${bus}"`,
+            "Check the bus number (e.g. '143', '4211', 'N16'), or tap **Plan a transit route** and I'll pick the buses for you.",
+            RETRY,
+          );
+        }
+        if (r.status === "stop_not_found") {
+          return fail(
+            `I couldn't find a stop named "${stop}" on Seoul bus ${bus}`,
+            "Korean stop names must match the sign exactly — double-check the name, or plan a transit route instead and I'll choose the stops.",
+            RETRY,
+          );
+        }
+        if (r.status === "no_arrival") {
+          const avail = r.available.length
+            ? `\n\n🚌 Buses showing at **${romanizeText(r.stopName)}** now: **${r.available.slice(0, 12).join(", ")}**.`
+            : "";
+          return fail(
+            `Bus ${bus} isn't showing at ${stop} right now`,
+            `I found the stop on the route, but bus **${bus}** has no live arrival there now — it may be between runs or finished for the night.${avail}`,
+            RETRY,
+          );
+        }
+        const { arrival } = r;
+        const stopsWord = arrival.stopsRemaining === 1 ? "stop" : "stops";
+        const body = [
+          `🚌 **Seoul Bus ${arrival.routeNo} → ${stop}**`,
+          "",
+          arrival.soon
+            ? "🛑 **Arriving now — get ready to get off!**"
+            : `Currently **${arrival.stopsRemaining} ${stopsWord} away**${arrival.etaMinutes ? `, about **${arrival.etaMinutes} min**` : ""}.`,
+          arrival.stopsRemaining > 1 ? "Tap **Refresh** as you ride to keep it live." : "",
+        ]
+          .filter(Boolean)
+          .join("\n");
+        return ok(body, CHOICES);
+      } catch {
+        return fail(
+          "Couldn't reach the Seoul bus service",
+          "The Seoul real-time bus source didn't respond in time. Tap Refresh to try again.",
+          RETRY,
+        );
+      }
     }
 
     if (!city.trim()) {

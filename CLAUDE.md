@@ -102,6 +102,7 @@
 - [x] **실환경 MCP 테스트(2026-06-29)**: 도구함+커넥터 연결 → 이 세션에 `koreatrip-*` 13툴 → **프로덕션 경로(도구함 프록시→KC)로 18콜 전부 PASS**(직접 테스트와 100% 동일). 가장 현실적인 테스트 surface 확보. (메모리=시나리오 테스트 전 허용요청 규칙.)
 - [~] **신툴 페르소나 코스(대폭 강화) + BM 분석(2026-06-29, D-025)**: **`recommendTripCourse`(13번째 툴)** + **`src/lib/courses.ts`**(조합엔진+시그니처). **조합 페르소나**("20s woman, foodie")·**기간**(반나절/1일/2일)·테마·위치 → 태깅 서울스팟 35·7페르소나 테마맵 기반 일자/시간블록 동선 + 스왑대안 + 기존툴 칩연결. **1-day 시그니처 골든코스 5**(하이브리드). 데이터=빌드타임 큐레이션(D-009 안전). 시술/의료 info-only(의료법). **Phase 2 완료**: 부산10·제주11 스팟 + 도시인식 엔진(Seoul/Busan/Jeju) + 3-day(4+→3day) + couple 시그니처(총6); 3대도시 외만 steer. **240 tests green.** **BM 분석**: MCP 내 직접 광고·예약커미션=규칙위반(§3-5/§4)+의료법, BM은 별도 트랙(docs/07 수익화 로드맵). ⏳ 재배포 대기.
 - [ ] **🔥 다음: 재배포(KC 중지→시작)+`build` SHA 검증 → 라이브 probe(폴리시/콘텐츠 + MCP 프로토콜 컴플라이언스 동시) → (검증 끝나면)PlayMCP 심사요청(보류중) → 비즈폼**. 상세 **docs/21 §7~9**. (Inspector 별도 GUI 불필요=재배포 후 라이브 검증에 포함, 노출키 재발급=사용자 결정 스킵)
-- [ ] 대기: 서울버스 키 전파(승인됐으나 ws.bus.go.kr 미전파, 매세션 재탐침) / 카카오Local 승인 / 저우선 잔여 P3·P4·Jamsil(docs/21 §8)
+- [x] 🚌 **서울버스 키 해금 + 구현(2026-06-29, D-026)**: ws.bus.go.kr headerCd=0(몇 주 error30 전파지연 해소) → `src/lib/sources/seoul.ts`(getBusRouteList→getStaionByRoute→getLowArrInfoByStId arrmsg1) + trackBusArrival 서울분기 + 빈-itemList 3회 재시도. **247 tests green.** ⚠️ 로컬IP throttle로 e2e는 KC 배포 후 검증. ⏳ 재배포 대기.
+- [ ] 대기: 카카오Local 승인 / 저우선 잔여 P3·P4·Jamsil(docs/21 §8) / 노출키 재발급(사용자 스킵)
 
 > 상세 진행은 `docs/07_progress.md`(SSOT). **새 세션 진입점: `docs/21_handoff.md`**(아주 풍부한 맥락판, docs/16 이후 전부 포함).
