@@ -164,3 +164,33 @@ export async function trackSeoulBus(busNumber: string, dropOffStop: string): Pro
     arrival: { routeNo: n, stopName: stop.name, stopsRemaining: parsed.stops, etaMinutes: parsed.minutes, soon: parsed.soon, raw: mine.msg },
   };
 }
+
+// ── Route-position mode (parallels the subway line-position mode) ────────────
+export interface SeoulBusPos {
+  plainNo: string; // vehicle plate, e.g. "서울70사1234"
+  sectOrd: number; // section order along the route (lower = nearer the start)
+  lastStopName: string; // most recently passed stop (lastStnId → stop name)
+}
+export type SeoulBusPosResult =
+  | { status: "route_not_found" }
+  | { status: "no_buses" }
+  | { status: "ok"; routeNo: string; total: number; positions: SeoulBusPos[] };
+
+/** Live position of every bus currently running a Seoul route. `buspos/getBusPosByRtid`
+ *  returns each vehicle's sectOrd + lastStnId (stId of the last passed stop), which we
+ *  map to a stop name via the route's ordered stop list. Empty = none running now. */
+export async function getSeoulBusPositions(busNumber: string): Promise<SeoulBusPosResult> {
+  const n = busNumber.trim();
+  const routeId = await resolveSeoulRouteId(n);
+  if (!routeId) return { status: "route_not_found" };
+
+  const stops = await getSeoulRouteStops(routeId);
+  const byId = new Map(stops.map((s) => [s.stId, s.name]));
+  const positions = (await fetchRecords("/buspos/getBusPosByRtid", { busRouteId: routeId }, false))
+    .map((r) => ({ plainNo: field(r, "plainNo"), sectOrd: Number(field(r, "sectOrd")) || 0, lastStnId: field(r, "lastStnId") }))
+    .filter((p) => p.plainNo || p.lastStnId)
+    .map((p) => ({ plainNo: p.plainNo, sectOrd: p.sectOrd, lastStopName: byId.get(p.lastStnId) ?? "" }))
+    .sort((a, b) => a.sectOrd - b.sectOrd);
+  if (!positions.length) return { status: "no_buses" };
+  return { status: "ok", routeNo: n, total: positions.length, positions };
+}

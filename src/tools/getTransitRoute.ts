@@ -89,10 +89,14 @@ function trackChips(routes: TransitRoute[]): Choice[] {
   if (board?.from) {
     chips.push({ emoji: "🚇", cmdEn: `Track the subway at ${romanizeText(board.from)}`, descEn: "live arrivals + train position" });
   }
-  if (transfer?.from) {
+  // Bus tracking is the headline now that Seoul real-time bus is live — carry the
+  // bus number AND the alight stop so the chip lands straight in trackBusArrival
+  // (no follow-up "which stop?"). Prefer it over the transfer chip when a bus exists.
+  if (busLeg?.line) {
+    const alight = busLeg.to ? ` to ${romanizeText(busLeg.to)}` : "";
+    chips.push({ emoji: "🚌", cmdEn: `Track bus ${romanizeText(busLeg.line)}${alight}`, descEn: "live position + stops to your stop" });
+  } else if (transfer?.from) {
     chips.push({ emoji: "🔀", cmdEn: `Track the subway at ${romanizeText(transfer.from)}`, descEn: "your transfer station" });
-  } else if (busLeg?.line) {
-    chips.push({ emoji: "🚌", cmdEn: `Track bus ${romanizeText(busLeg.line)}`, descEn: "where the bus is + when it arrives" });
   }
   chips.push({ emoji: "💳", cmdEn: "How do I pay for this?", descEn: "transit payment guide" });
   // Always offer a recompute; add destination-area only if there's still room.

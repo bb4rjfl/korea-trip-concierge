@@ -3,7 +3,7 @@ import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
 import { trackBus, resolveCityCode } from "../lib/sources/tago.js";
-import { trackSeoulBus } from "../lib/sources/seoul.js";
+import { trackSeoulBus, getSeoulBusPositions, type SeoulBusPosResult } from "../lib/sources/seoul.js";
 import { romanizeText } from "../lib/romanize.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
@@ -26,23 +26,53 @@ const CHOICES: Choice[] = [
   { emoji: "🗺️", cmdEn: "Route after I get off", descEn: "directions from the drop-off stop" },
 ];
 
+// Seoul per-stop footer: also lets the rider see every bus on the route (positions mode).
+const SEOUL_CHOICES: Choice[] = [
+  { emoji: "🔄", cmdEn: "Refresh", cmdKo: "다시 확인", descEn: "update live position" },
+  { emoji: "🚍", cmdEn: "Where are all the buses on this route?", descEn: "every bus, live" },
+  { emoji: "🗺️", cmdEn: "Route after I get off", descEn: "directions from the drop-off stop" },
+];
+
+// Seoul positions-mode footer: pivot to per-stop countdown or to routing.
+const SEOUL_POS_CHOICES: Choice[] = [
+  { emoji: "🔄", cmdEn: "Refresh", cmdKo: "다시 확인", descEn: "update live positions" },
+  { emoji: "🎯", cmdEn: "Count down to my stop", descEn: "tell me your drop-off stop" },
+  { emoji: "🗺️", cmdEn: "Plan a transit route instead", descEn: "subway/bus directions" },
+];
+
 const RETRY: Choice[] = [
   { emoji: "🔄", cmdEn: "Refresh", cmdKo: "다시 확인", descEn: "try the live lookup again" },
   { emoji: "🚇", cmdEn: "Plan a transit route instead", descEn: "subway/bus directions" },
 ];
 
+/** Render Seoul route-position mode (every bus on the route, by section order). */
+function renderSeoulPositions(r: Extract<SeoulBusPosResult, { status: "ok" }>): string {
+  const CAP = 12;
+  const lines = [`🚌 **Seoul Bus ${r.routeNo} — live positions**`, `_${r.total} ${r.total === 1 ? "bus" : "buses"} running now_`, ""];
+  for (const p of r.positions.slice(0, CAP)) {
+    lines.push(`- 🚌 ${p.lastStopName ? `near **${romanizeText(p.lastStopName)}**` : `section ${p.sectOrd}`}`);
+  }
+  if (r.positions.length > CAP) lines.push(`- …and ${r.positions.length - CAP} more`);
+  lines.push("", "_Tell me your drop-off stop and I'll count down the stops as you ride._");
+  return lines.join("\n");
+}
+
 export const trackBusArrival: ToolDef = {
   name: "trackBusArrival",
   description:
-    "Looks up the real-time position of a specific Korean city bus and how many stops remain until the " +
-    "user's drop-off stop, with an English heads-up message. Query-based (refresh to update). " +
+    "Tracks a specific Korean city bus in real time. With a drop-off stop: how many stops remain until you " +
+    "get off, with an English heads-up. By route number alone (Seoul): the live position of every bus on that " +
+    "route. Query-based (refresh to update). " +
     `Part of ${SERVICE_NAME}.`,
   inputSchema: {
     busNumber: z.string().describe("Bus route number, e.g. '143'."),
-    dropOffStop: z.string().describe("The stop where the user wants to get off."),
     city: z
       .string()
       .describe("City the bus runs in, e.g. 'Seoul', 'Busan', 'Daejeon', 'Incheon'. Required to locate the stop."),
+    dropOffStop: z
+      .string()
+      .optional()
+      .describe("The stop where you want to get off — gives stops-remaining. Omit (Seoul) for all live bus positions on the route."),
     currentStop: z.string().optional().describe("Optional current stop to measure from."),
   },
   annotations: {
@@ -67,6 +97,34 @@ export const trackBusArrival: ToolDef = {
 
     // Seoul isn't in TAGO — use its own TOPIS real-time feed (src/lib/sources/seoul.ts).
     if (isSeoul(city)) {
+      // Route-position mode (parallels subway line mode): a bus number but no
+      // drop-off stop → show every bus running the route right now.
+      if (!stop.trim()) {
+        try {
+          const r = await getSeoulBusPositions(bus);
+          if (r.status === "route_not_found") {
+            return fail(
+              `I couldn't find Seoul bus "${bus}"`,
+              "Check the bus number (e.g. '143', '4211', 'N16'), or tap **Plan a transit route** and I'll pick the buses for you.",
+              RETRY,
+            );
+          }
+          if (r.status === "no_buses") {
+            return fail(
+              `No buses are running on Seoul bus ${bus} right now`,
+              "It may be outside service hours or between runs. Tap Refresh in a moment, or plan a transit route instead.",
+              RETRY,
+            );
+          }
+          return ok(renderSeoulPositions(r), SEOUL_POS_CHOICES);
+        } catch {
+          return fail(
+            "Couldn't reach the Seoul bus service",
+            "The Seoul real-time bus source didn't respond in time. Tap Refresh to try again.",
+            RETRY,
+          );
+        }
+      }
       try {
         const r = await trackSeoulBus(bus, stop);
         if (r.status === "route_not_found") {
@@ -105,7 +163,7 @@ export const trackBusArrival: ToolDef = {
         ]
           .filter(Boolean)
           .join("\n");
-        return ok(body, CHOICES);
+        return ok(body, SEOUL_CHOICES);
       } catch {
         return fail(
           "Couldn't reach the Seoul bus service",
@@ -119,6 +177,16 @@ export const trackBusArrival: ToolDef = {
       return fail(
         "Which city is this bus in?",
         "Korean bus stops are looked up per city. Tell me the city (e.g. Busan, Daejeon, Incheon) so I can find the stop.",
+        RETRY,
+      );
+    }
+
+    // Non-Seoul (TAGO) needs the drop-off stop to count down — ask instead of
+    // a confusing "stop not found" on an empty name.
+    if (!stop.trim()) {
+      return fail(
+        `Which stop do you want to get off at on bus ${bus}?`,
+        "For buses outside Seoul I count down to your drop-off stop — tell me its name (as shown on the sign).",
         RETRY,
       );
     }

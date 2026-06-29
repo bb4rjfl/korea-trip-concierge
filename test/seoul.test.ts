@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { parseArrmsg, matchSeoulStop, trackSeoulBus, type SeoulStop } from "../src/lib/sources/seoul.js";
+import { parseArrmsg, matchSeoulStop, trackSeoulBus, getSeoulBusPositions, type SeoulStop } from "../src/lib/sources/seoul.js";
 
 // ── pure: arrival-message parser ──────────────────────────────────────────────
 describe("parseArrmsg", () => {
@@ -75,5 +75,38 @@ describe("trackSeoulBus", () => {
     install();
     const r = await trackSeoulBus("142", "강남역"); // 142 route resolves via fixture's first item (cache-fresh number)
     expect(["no_arrival", "ok"]).toContain(r.status);
+  });
+});
+
+// ── integration: getSeoulBusPositions (route position mode) ───────────────────
+const POSITIONS = `<ServiceResult><msgHeader><headerCd>0</headerCd></msgHeader><msgBody>
+<itemList><plainNo>서울70사5678</plainNo><sectOrd>40</sectOrd><lastStnId>123000001</lastStnId></itemList>
+<itemList><plainNo>서울70사1234</plainNo><sectOrd>5</sectOrd><lastStnId>107000071</lastStnId></itemList></msgBody></ServiceResult>`;
+function installPositions(posBody: string) {
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    const u = String(url);
+    if (u.includes("getBusRouteList")) return xml(ROUTE_LIST);
+    if (u.includes("getStaionByRoute")) return xml(STOPS);
+    if (u.includes("getBusPosByRtid")) return xml(posBody);
+    return xml("<ServiceResult><msgHeader><headerCd>0</headerCd></msgHeader></ServiceResult>");
+  }));
+}
+
+describe("getSeoulBusPositions", () => {
+  it("maps vehicles to last-passed stop names, sorted by section order", async () => {
+    installPositions(POSITIONS);
+    const r = await getSeoulBusPositions("146"); // fresh number → resolves to fixture route
+    expect(r.status).toBe("ok");
+    if (r.status === "ok") {
+      expect(r.total).toBe(2);
+      expect(r.positions[0].sectOrd).toBe(5);
+      expect(r.positions[0].lastStopName).toBe("정릉산장아파트");
+      expect(r.positions[1].lastStopName).toBe("강남역");
+    }
+  });
+  it("returns no_buses when none are running", async () => {
+    installPositions("<ServiceResult><msgHeader><headerCd>0</headerCd></msgHeader><msgBody></msgBody></ServiceResult>");
+    const r = await getSeoulBusPositions("147");
+    expect(r.status).toBe("no_buses");
   });
 });
