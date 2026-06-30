@@ -116,6 +116,18 @@ const NOT_FOUND: Choice[] = [
   { emoji: "🌤️", cmdEn: "Weather & fine dust today", descEn: "forecast + air quality" },
 ];
 
+/** Contextual follow-ups that name the resolved place — consistent with the
+ *  getAreaGuide/searchPlaceForeigner chips (D-035 style). */
+function nowChoices(place: string): Choice[] {
+  const p = place.trim();
+  if (!p) return CHOICES;
+  return [
+    { emoji: "🚇", cmdEn: `How do I get to ${p}?`, cmdKo: `${p} 가는 길`, descEn: "public-transit route" },
+    { emoji: "🗺️", cmdEn: `Guide me around ${p}`, cmdKo: "동네 가이드", descEn: "neighborhood overview" },
+    { emoji: "🕒", cmdEn: "When's a better time to visit?", cmdKo: "언제 가면 좋아?", descEn: "a quieter window" },
+  ];
+}
+
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 /** Current time in Korea (KST), independent of server timezone. */
@@ -213,7 +225,7 @@ export const getNowInfo: ToolDef = {
       // Live weather + air for the landmark's city (best-effort; U2).
       const weather = await weatherLine(landmark.city ?? "Seoul");
       if (weather) lines.push("", weather);
-      return ok(lines.join("\n"), CHOICES);
+      return ok(lines.join("\n"), nowChoices(landmark.name));
     }
 
     // Ambiguous brand/partial ("Lotte") → ask which curated landmark, instead of
@@ -273,7 +285,7 @@ export const getNowInfo: ToolDef = {
           const detail = await getSeoulDetail(hit.cid, language);
           if (detail && (detail.hours || detail.address || detail.subway)) {
             const weather = await weatherLine("Seoul");
-            return ok(renderSeoulNow(detail, koreaNow(), weather, hbanner), CHOICES);
+            return ok(renderSeoulNow(detail, koreaNow(), weather, hbanner), nowChoices(detail.title));
           }
         }
       } catch {
@@ -359,7 +371,7 @@ export const getNowInfo: ToolDef = {
       // Live weather + air for the place's city (U2 — real data, not "coming soon").
       const weather = await weatherLine(top.address);
       if (weather) lines.push("", weather);
-      return ok(lines.join("\n"), CHOICES);
+      return ok(lines.join("\n"), nowChoices(top.title));
     } catch {
       return fail(
         "Couldn't reach the place service",

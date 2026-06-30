@@ -127,6 +127,15 @@ describe("CJK landmark aliases (R6)", () => {
   });
 });
 
+// ── getNowInfo contextual chips name the place (D-035 style) ─────────────────
+describe("getNowInfo contextual chips", () => {
+  it("names the resolved landmark in the follow-up chips", async () => {
+    const r = await getNowInfo.handler({ place: "Gyeongbokgung Palace" });
+    expect(text(r)).toMatch(/How do I get to Gyeongbokgung/);
+    expect(text(r)).toMatch(/Guide me around Gyeongbokgung/);
+  });
+});
+
 // ── R1: getNowInfo on a neighbourhood ───────────────────────────────────────
 describe("getNowInfo area redirect (R1)", () => {
   it("treats a bare neighbourhood as an area, not a venue", async () => {
