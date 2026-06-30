@@ -5,7 +5,7 @@ import { getNowInfo } from "../src/tools/getNowInfo.js";
 import { getTransitRoute } from "../src/tools/getTransitRoute.js";
 import { getAreaGuide } from "../src/tools/getAreaGuide.js";
 import { getJejuInfo } from "../src/tools/getJejuInfo.js";
-import { searchPlaceForeigner, templeStayLead } from "../src/tools/searchPlaceForeigner.js";
+import { searchPlaceForeigner, templeStayLead, guidedTourLead } from "../src/tools/searchPlaceForeigner.js";
 
 const res = (body: unknown) => ({ ok: true, json: async () => body }) as unknown as Response;
 const text = (r: { content: { text: string }[] }) => r.content[0].text;
@@ -21,6 +21,21 @@ describe("templeStayLead (P3)", () => {
   it("is empty for unrelated queries (no false lead)", () => {
     expect(templeStayLead("vegan ramen in Hongdae")).toBe("");
     expect(templeStayLead("temples to photograph")).toBe(""); // 'temple' alone ≠ templestay
+  });
+});
+
+// ── D-034: Seoul free official guided walking tours (도보해설관광) primer ───────
+describe("guidedTourLead (D-034)", () => {
+  it("leads with the dobo primer for guided-tour queries", () => {
+    const g = guidedTourLead("free guided walking tour");
+    expect(g).toMatch(/Seoul Dobo Tour|guided walking tours/i);
+    expect(g).toMatch(/dobo\.visitseoul\.net/);
+    expect(g).toMatch(/free/i);
+    expect(guidedTourLead("도보해설관광 예약")).toMatch(/dobo\.visitseoul\.net/);
+  });
+  it("is empty for unrelated queries", () => {
+    expect(guidedTourLead("ramen near Hongdae")).toBe("");
+    expect(guidedTourLead("walking distance to the station")).toBe(""); // not a guided tour
   });
 });
 

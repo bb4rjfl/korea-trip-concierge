@@ -34,6 +34,7 @@ const C = {
   find: { emoji: "🔎", cmdEn: "Find specific places for a stop", descEn: "real spots (salon, café…)" },
   menu: { emoji: "🍜", cmdEn: "Explain a dish from the food stops", descEn: "what's in it + allergens" },
   service: { emoji: "🧭", cmdEn: "Get past a Korean app (tickets/booking)", descEn: "foreigner workaround" },
+  guided: { emoji: "🚶", cmdEn: "Any free official guided tours for these?", descEn: "free multilingual Seoul walking tours" },
   remix: { emoji: "🎛️", cmdEn: "Remix this — different persona, days, or theme", descEn: "e.g. 'couple, 2-day, nature'" },
 } satisfies Record<string, Choice>;
 
@@ -161,6 +162,7 @@ export const recommendTripCourse: ToolDef = {
     const chips: Choice[] = [C.now, C.route];
     if (allThemes.includes("food") || allThemes.includes("market")) chips.push(C.menu);
     else if (allThemes.includes("kpop")) chips.push(C.service);
+    else if (city === "Seoul") chips.push(C.guided); // Seoul's free official dobo walking tours (D-034)
     else chips.push(C.find);
     chips.push(C.remix);
     return ok(lines.join("\n"), chips.slice(0, 4));

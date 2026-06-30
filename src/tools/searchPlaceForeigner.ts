@@ -255,6 +255,24 @@ export function templeStayLead(query: string): string {
   );
 }
 
+/** Curated lead for "guided tour / 도보해설" queries — Seoul runs an official FREE
+ *  multilingual guided-walking-tour program that a plain place search misses. Like
+ *  the templestay primer (D-030): structured, official, not an ad. "" otherwise. */
+export function guidedTourLead(query: string): string {
+  if (!/guided\s*tour|walking\s*tour|도보\s*해설|해설\s*관광|문화관광해설|free\s*(official\s*)?(guided\s*)?(walking\s*)?tour|dobo|docent/i.test(query)) return "";
+  return (
+    [
+      "🚶 **Seoul's free official guided walking tours (Seoul Dobo Tour)** — the city runs **scores of courses** led by certified cultural-tourism commentators: the **palaces, Bukchon & Namsangol hanok villages, Jeong-dong, Seoul City Wall, night routes**, and more.",
+      "- **100% free**, in **7 languages incl. English / Japanese / Chinese** — reserve **≥3 days ahead** at **dobo.visitseoul.net**.",
+      "- Runs about **twice daily (10:00 & 14:00)**; some barrier-free and sign-language courses too.",
+      "- Palaces (Gyeongbokgung, Changdeokgung…) also have their **own free scheduled English tours** at the gate.",
+      "",
+      "_Specific sights below — tap one for hours, or ask me how to get there:_",
+      "",
+    ].join("\n") + "\n"
+  );
+}
+
 function dedupeByTitle(items: SeoulContent[], limit: number): SeoulContent[] {
   const seen = new Set<string>();
   const out: SeoulContent[] = [];
@@ -396,11 +414,12 @@ export const searchPlaceForeigner: ToolDef = {
     const category = args.category ? String(args.category) : undefined;
     const cat = inferCategory(query, category);
     const language = normalizeLang(args.language as string | undefined);
-    // Templestay is a program, not a place (P3) — its curated primer leads when
-    // asked; otherwise the generic city-wide must-see lead (P-V2/D-021). "" for
-    // dining or specific queries. Prepended to whichever result path runs.
-    const temple = templeStayLead(query);
-    const mustSee = temple || (cat !== "food" ? cityMustSeeLead(query, area) : "");
+    // Programs (not places) lead with a curated primer when asked: templestay (P3)
+    // and Seoul's free official guided walking tours (D-034). Otherwise the generic
+    // city-wide must-see lead (P-V2/D-021). "" for dining/specific. Prepended to
+    // whichever result path runs.
+    const program = guidedTourLead(query) || templeStayLead(query);
+    const mustSee = program || (cat !== "food" ? cityMustSeeLead(query, area) : "");
 
     // No query and no area → ask, instead of letting an empty search run (N3).
     if (!query.trim() && !area.trim()) {
