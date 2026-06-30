@@ -249,6 +249,11 @@ describe("recommendTripCourse — combinable persona courses (D-025)", () => {
     expect(t13("couple", "2-day", "", "Jeju")).toMatch(/Jeju course/);
     expect(t13("foodie", "1-day", "", "Daegu")).toMatch(/coming soon/i);
   });
+  it("offers the free guided-tour chip on a Seoul history/culture course (D-034)", () => {
+    expect(t13("history lover", "1-day", "", "Seoul")).toMatch(/free official guided tours/i);
+    // A Busan course (no Seoul dobo program) should NOT show it.
+    expect(t13("history lover", "1-day", "", "Busan")).not.toMatch(/free official guided tours/i);
+  });
   it("supports Gyeongju courses and new personas (Phase 3)", () => {
     expect(t13("culture", "1-day", "", "Gyeongju")).toMatch(/Gyeongju course/);
     expect(t13("history lover", "1-day", "", "경주")).toMatch(/Bulguksa|Daereungwon|Cheomseongdae/);

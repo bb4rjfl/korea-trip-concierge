@@ -160,9 +160,14 @@ export const recommendTripCourse: ToolDef = {
     // Chips: tailor a couple to the course content (food stops → menu; K-pop/ticketed → service).
     const allThemes = course.days.flatMap((d) => d.stops.flatMap((s) => s.spot.themes));
     const chips: Choice[] = [C.now, C.route];
-    if (allThemes.includes("food") || allThemes.includes("market")) chips.push(C.menu);
+    // Seoul's free dobo walking tours fit history/culture/hanbok courses — offer that
+    // chip first there (nearly every course also has a food stop, so don't let the
+    // menu chip always win) (D-034).
+    const cultural = allThemes.some((t) => t === "history" || t === "hanbok" || t === "experience");
+    if (city === "Seoul" && cultural) chips.push(C.guided);
+    else if (allThemes.includes("food") || allThemes.includes("market")) chips.push(C.menu);
     else if (allThemes.includes("kpop")) chips.push(C.service);
-    else if (city === "Seoul") chips.push(C.guided); // Seoul's free official dobo walking tours (D-034)
+    else if (city === "Seoul") chips.push(C.guided);
     else chips.push(C.find);
     chips.push(C.remix);
     return ok(lines.join("\n"), chips.slice(0, 4));
