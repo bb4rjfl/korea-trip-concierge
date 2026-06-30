@@ -82,4 +82,14 @@ describe("translateMenuContext allergens (Y12/Y13)", () => {
     expect(text(r)).toContain("Couldn't identify");
     expect(text(r)).toContain("산낙지");
   });
+  it("identifies the new curated dishes (content round)", async () => {
+    expect(text(await translateMenuContext.handler({ menuText: "육회" }))).toContain("Beef tartare");
+    expect(text(await translateMenuContext.handler({ menuText: "미역국" }))).toContain("Seaweed soup");
+    expect(text(await translateMenuContext.handler({ menuText: "오징어볶음" }))).toContain("Spicy stir-fried squid");
+  });
+  it("떡갈비 resolves to the patty only, not double-matching plain 갈비", async () => {
+    const r = text(await translateMenuContext.handler({ menuText: "떡갈비" }));
+    expect(r).toContain("Grilled short-rib patty");
+    expect(r).not.toContain("Grilled short ribs");
+  });
 });

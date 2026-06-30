@@ -38,7 +38,7 @@ const DISHES: Dish[] = [
   { match: /부대찌개|budae|army stew/i, en: "Army stew", desc: "Spicy hot-pot of kimchi, sausage, Spam, tofu, and instant noodles — a post-war fusion classic, shared at the table.", spice: 2, allergens: ["gluten", "pork", "soy"] },
   { match: /갈비찜|galbi.?jjim/i, en: "Braised short ribs", desc: "Beef short ribs braised until tender in a sweet soy sauce with vegetables.", spice: 0, allergens: ["soy", "sesame", "gluten"] },
   { match: /갈비탕|galbitang/i, en: "Short-rib soup", desc: "Clear, mild beef short-rib soup with glass noodles — comforting and not spicy.", spice: 0, allergens: ["egg", "soy"] },
-  { match: /(?<![닭돼지])갈비(?![탕찜])|\bgalbi\b|\bkalbi\b/i, en: "Grilled short ribs", desc: "Marinated beef short ribs grilled at the table; sweet-savory and tender.", spice: 0, allergens: ["soy", "sesame", "gluten"] },
+  { match: /(?<![닭돼지떡])갈비(?![탕찜])|\bgalbi\b|\bkalbi\b/i, en: "Grilled short ribs", desc: "Marinated beef short ribs grilled at the table; sweet-savory and tender.", spice: 0, allergens: ["soy", "sesame", "gluten"] },
   { match: /닭갈비|dak.?galbi/i, en: "Spicy stir-fried chicken", desc: "Chicken stir-fried with cabbage, rice cakes, and gochujang on a hot plate — a Chuncheon specialty.", spice: 2, allergens: ["soy", "sesame", "gluten"] },
   { match: /찜닭|jjimdak/i, en: "Braised chicken", desc: "Chicken braised in sweet soy sauce with glass noodles, potato, and carrot — mildly sweet (Andong style can be spicy).", spice: 1, allergens: ["soy", "gluten", "sesame"] },
   { match: /보쌈|bossam/i, en: "Boiled pork wraps", desc: "Thin-sliced boiled pork belly wrapped in cabbage/kimchi with salted shrimp — savory, not spicy.", spice: 0, allergens: ["pork", "shellfish", "soy"] },
@@ -98,6 +98,12 @@ const DISHES: Dish[] = [
   { match: /한정식|hanjeongsik|korean.?(course|set|table).?(meal|menu|course)?/i, en: "Korean table d'hôte (hanjeongsik)", desc: "A multi-course spread of many small dishes — rice, soups, grilled meat or fish, and a parade of banchan side dishes. Set price, shared at the table.", spice: 1, allergens: ["soy", "sesame", "egg", "fish"] },
   { match: /백반|baekban/i, en: "Home-style set meal (baekban)", desc: "A simple, cheap set of rice, a soup or stew, and an assortment of banchan — the everyday Korean comfort meal at small eateries.", spice: 1, allergens: ["soy", "fish"] },
   { match: /수육|suyuk|boiled pork/i, en: "Boiled pork slices (suyuk)", desc: "Tender thin-sliced boiled pork served with salt, ssamjang, and wraps — milder than samgyeopsal, often eaten with rice or as drinking food.", spice: 0, allergens: ["pork", "soy"] },
+  { match: /오징어볶음|ojingeo.?bokk?eum|stir.?fried squid/i, en: "Spicy stir-fried squid", desc: "Squid stir-fried with onion and vegetables in a sweet-spicy gochujang sauce; usually eaten over rice.", spice: 2, allergens: ["shellfish", "soy", "sesame", "gluten"] },
+  { match: /육회|yukhoe|beef tartare/i, en: "Beef tartare (yukhoe)", desc: "Seasoned raw beef strips with sesame oil, often topped with an egg yolk and Korean pear — silky and savory, served chilled.", spice: 0, allergens: ["egg", "soy", "sesame"] },
+  { match: /장어구이|grilled eel|jang-?eo|민물장어/i, en: "Grilled eel", desc: "Freshwater eel grilled over charcoal, brushed with a sweet soy glaze and eaten with ginger — a rich 'stamina' dish.", spice: 0, allergens: ["fish", "soy"] },
+  { match: /떡갈비|tteok.?galbi/i, en: "Grilled short-rib patty", desc: "Minced, marinated short-rib meat pressed into a patty and grilled — tender and sweet-savory, easy to eat (a Gwangju/Damyang specialty).", spice: 0, allergens: ["soy", "sesame", "gluten"] },
+  { match: /북엇국|북어국|bugeo.?guk|dried.?pollock soup/i, en: "Dried-pollock soup", desc: "A mild, milky soup of dried pollock with egg and tofu — gentle on the stomach, a classic hangover and breakfast soup.", spice: 0, allergens: ["fish", "egg", "soy"] },
+  { match: /미역국|miyeok.?guk|seaweed soup/i, en: "Seaweed soup", desc: "A mild, savory soup of soft seaweed simmered with beef or seafood — nutritious and traditionally eaten on birthdays.", spice: 0, allergens: ["fish", "shellfish", "soy", "sesame"] },
 ];
 
 const SPICE_LABEL = ["🌶️ none", "🌶️ mild", "🌶️🌶️ medium", "🌶️🌶️🌶️ hot"];
