@@ -8,10 +8,12 @@
  * URLs survive the host LLM's paraphrasing, so they reliably reach the user.
  */
 
-/** A one-line "open in map" link pair for a search term (place or area name). "" if empty. */
+/** A one-line "open in map" link pair for a search term (place or area name). "" if empty.
+ *  Kakao Map is listed FIRST: the host LLM tends to keep only one link when it composes
+ *  (D-033, live-observed), so we lead with Kakao (also the contest-native map). */
 export function mapLinks(query: string): string {
   const raw = (query ?? "").trim();
   if (!raw) return "";
   const q = encodeURIComponent(raw);
-  return `🗺️ Map: [Naver](https://map.naver.com/p/search/${q}) · [Kakao](https://map.kakao.com/?q=${q})`;
+  return `🗺️ Map: [Kakao Map](https://map.kakao.com/?q=${q}) · [Naver Map](https://map.naver.com/p/search/${q})`;
 }
