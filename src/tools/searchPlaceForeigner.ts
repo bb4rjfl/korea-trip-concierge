@@ -37,6 +37,30 @@ const RETRY: Choice[] = [
   { emoji: "🗺️", cmdEn: "Guide me around this area", descEn: "neighborhood overview instead" },
 ];
 
+// City names (don't name them in a "get to {x}?" chip — the user is already in the city).
+const SEARCH_CITY_RE = /^(seoul|busan|jeju|incheon|daegu|daejeon|gwangju|ulsan|gyeongju|jeonju|gangneung|sokcho|suwon|서울|부산|제주|인천|대구|대전|광주|울산|경주|전주|강릉|속초|수원)$/i;
+
+/** Contextual follow-up chips for a result list — name the area when we know it
+ *  (like getAreaGuide), and refer to "one of these" for the list. `areaLabel` is the
+ *  resolved neighbourhood/city; isFood swaps the food chip for a transit one. (D-035) */
+export function searchChoices(areaLabel?: string, isFood?: boolean): Choice[] {
+  const a = areaLabel?.trim();
+  const named = a && !SEARCH_CITY_RE.test(a) ? a : undefined; // neighbourhood → name it; bare city → generic
+  const now: Choice = { emoji: "🕒", cmdEn: "Is one of these open right now?", cmdKo: "지금 열려 있어?", descEn: "live hours + weather" };
+  const route: Choice = named
+    ? { emoji: "🚇", cmdEn: `How do I get to ${named}?`, cmdKo: `${named} 가는 길`, descEn: "public-transit route" }
+    : { emoji: "🚇", cmdEn: "How do I get to one of these?", descEn: "public-transit route" };
+  const guide: Choice = a
+    ? { emoji: "🗺️", cmdEn: `Guide me around ${a}`, cmdKo: `${a} 가이드`, descEn: "neighborhood overview" }
+    : { emoji: "🗺️", cmdEn: "Guide me around this area", cmdKo: "동네 가이드", descEn: "neighborhood overview" };
+  const food: Choice = named
+    ? { emoji: "🍽️", cmdEn: `Where to eat in ${named} with a foreign card?`, descEn: "foreigner-friendly dining" }
+    : { emoji: "💳", cmdEn: "Where do foreign cards work to eat here?", descEn: "foreign-card-friendly food" };
+  // Always offer "how do I get there?" (the user's key follow-up); non-food results
+  // also cross-sell a dining chip (max 4 per footer).
+  return isFood ? [now, route, guide] : [now, route, guide, food];
+}
+
 // Food sub-keywords → the concrete term we hand to the POI search, so "vegan
 // ramen" actually searches ramen instead of the literal word "restaurant".
 const FOOD_TERMS: [RegExp, string][] = [
@@ -150,13 +174,8 @@ function renderPlaces(query: string, places: Place[]): string {
 }
 
 // ── Seoul layer (VisitSeoul) ────────────────────────────────────────────────
-// For Seoul, VisitSeoul's official curation is the primary source; its chips
-// chain straight into "is it open now?" (getNowInfo also reads VisitSeoul).
-const SEOUL_CHOICES: Choice[] = [
-  { emoji: "🕒", cmdEn: "Is it good to go now?", cmdKo: "지금 가도 돼?", descEn: "live hours for a place above" },
-  { emoji: "🚇", cmdEn: "How do I get there?", descEn: "public-transit route" },
-  { emoji: "🗺️", cmdEn: "Guide me around this area", cmdKo: "동네 가이드", descEn: "neighborhood overview" },
-];
+// For Seoul, VisitSeoul's official curation is the primary source; its result
+// chips are built contextually by searchChoices() (D-035).
 
 const SEOUL_AREAS = [
   "Myeongdong", "Hongdae", "Gangnam", "Insadong", "Itaewon", "Bukchon", "Dongdaemun",
@@ -414,6 +433,9 @@ export const searchPlaceForeigner: ToolDef = {
     const category = args.category ? String(args.category) : undefined;
     const cat = inferCategory(query, category);
     const language = normalizeLang(args.language as string | undefined);
+    // A neighbourhood/city label for contextual follow-up chips (D-035): the given
+    // area, else a place name extracted from the query ("cafes in Seongsu" → Seongsu).
+    const areaLabel = area.trim() || findPlaceInText(query)?.label || undefined;
     // Programs (not places) lead with a curated primer when asked: templestay (P3)
     // and Seoul's free official guided walking tours (D-034). Otherwise the generic
     // city-wide must-see lead (P-V2/D-021). "" for dining/specific. Prepended to
@@ -445,7 +467,7 @@ export const searchPlaceForeigner: ToolDef = {
     // national grounding sources (TourAPI/POI).
     if (cat !== "food" && hasKey("VISITSEOUL_API_KEY") && (isSeoulText(area) || isSeoulText(query) || forceSeoulTemple)) {
       const seoul = await trySeoul(query, area, cat, language);
-      if (seoul) return ok(mustSee + seoul, SEOUL_CHOICES);
+      if (seoul) return ok(mustSee + seoul, searchChoices(areaLabel, cat === "food"));
     }
 
     // Dining queries → richer comprehensive POI (Naver/Foursquare, converted to
@@ -460,7 +482,7 @@ export const searchPlaceForeigner: ToolDef = {
           coord: coord ? { lat: coord.lat, lng: coord.lng } : undefined,
           limit: 6,
         });
-        if (pois.length) return ok(renderPois(query, pois), CHOICES);
+        if (pois.length) return ok(renderPois(query, pois), searchChoices(areaLabel, true));
       } catch {
         /* fall through to TourAPI */
       }
@@ -504,14 +526,14 @@ export const searchPlaceForeigner: ToolDef = {
           }
         }
       }
-      return ok(mustSee + renderPlaces(query, places), CHOICES);
+      return ok(mustSee + renderPlaces(query, places), searchChoices(areaLabel, cat === "food"));
     } catch {
       // Even when live data is slow, still serve the curated must-see lead so the
       // fallback doesn't vanish exactly when the API fails (P-V2 cold case).
       if (mustSee) {
         return ok(
           mustSee + "_Live results are slow right now — the must-see picks above are a solid start; tap one to check it, or try again._",
-          CHOICES,
+          searchChoices(areaLabel, cat === "food"),
         );
       }
       return fail(

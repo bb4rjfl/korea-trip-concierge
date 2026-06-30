@@ -5,7 +5,7 @@ import { getNowInfo } from "../src/tools/getNowInfo.js";
 import { getTransitRoute } from "../src/tools/getTransitRoute.js";
 import { getAreaGuide } from "../src/tools/getAreaGuide.js";
 import { getJejuInfo } from "../src/tools/getJejuInfo.js";
-import { searchPlaceForeigner, templeStayLead, guidedTourLead } from "../src/tools/searchPlaceForeigner.js";
+import { searchPlaceForeigner, templeStayLead, guidedTourLead, searchChoices } from "../src/tools/searchPlaceForeigner.js";
 
 const res = (body: unknown) => ({ ok: true, json: async () => body }) as unknown as Response;
 const text = (r: { content: { text: string }[] }) => r.content[0].text;
@@ -21,6 +21,25 @@ describe("templeStayLead (P3)", () => {
   it("is empty for unrelated queries (no false lead)", () => {
     expect(templeStayLead("vegan ramen in Hongdae")).toBe("");
     expect(templeStayLead("temples to photograph")).toBe(""); // 'temple' alone ≠ templestay
+  });
+});
+
+// ── D-035: contextual search result chips (name the area, like getAreaGuide) ──
+describe("searchChoices (D-035)", () => {
+  const cmds = (cs: { cmdEn: string }[]) => cs.map((c) => c.cmdEn).join(" | ");
+  it("names a neighbourhood in the route + guide chips", () => {
+    const c = cmds(searchChoices("Seongsu"));
+    expect(c).toMatch(/How do I get to Seongsu\?/);
+    expect(c).toMatch(/Guide me around Seongsu/);
+  });
+  it("does not say 'get to {city}' for a bare city, but still guides it", () => {
+    const c = cmds(searchChoices("Seoul"));
+    expect(c).not.toMatch(/get to Seoul/);
+    expect(c).toMatch(/Guide me around Seoul/);
+  });
+  it("falls back to generic chips with no area", () => {
+    const c = cmds(searchChoices(undefined));
+    expect(c).toMatch(/one of these|this area/);
   });
 });
 
