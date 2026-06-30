@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { buildChoiceFooter } from "../src/lib/footer.js";
 import { renderMarkdown } from "../src/lib/markdown.js";
 import { assertNamingOk, checkToolName } from "../src/lib/naming.js";
@@ -14,6 +14,26 @@ import {
 import { similarity, resolveName } from "../src/lib/fuzzy.js";
 import { resolvePlaceCoord } from "../src/lib/places.js";
 import { LANDMARKS, resolveLandmark, landmarkVerdict } from "../src/lib/landmarks.js";
+
+describe("warmUpSources (D-036)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("fires one throwaway request per external origin", async () => {
+    const { warmUpSources, WARM_URLS } = await import("../src/lib/warmup.js");
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        calls.push(String(url));
+        return { arrayBuffer: async () => new ArrayBuffer(0) } as Response;
+      }),
+    );
+    warmUpSources();
+    await new Promise((r) => setTimeout(r, 0)); // flush the fetch promises + clearTimeout
+    expect(calls.length).toBe(WARM_URLS.length);
+    expect(calls.some((u) => u.includes("openapi.naver.com"))).toBe(true);
+    expect(calls.some((u) => u.includes("places-api.foursquare.com"))).toBe(true);
+  });
+});
 
 describe("mapLinks", () => {
   it("emits Naver + Kakao map links, URL-encoded", async () => {
