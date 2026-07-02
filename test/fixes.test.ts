@@ -127,6 +127,16 @@ describe("CJK landmark aliases (R6)", () => {
   });
 });
 
+// ── D-037: new curated landmarks resolve for getNowInfo ──────────────────────
+describe("new landmarks (D-037 content round)", () => {
+  it("resolves the added landmarks with hours", () => {
+    expect(resolveLandmark("Namsangol Hanok Village")?.name).toMatch(/Namsangol/);
+    expect(resolveLandmark("서대문형무소")?.name).toMatch(/Seodaemun Prison/);
+    expect(resolveLandmark("Busan Tower")?.name).toMatch(/Busan Tower/);
+    expect(resolveLandmark("석촌호수")?.name).toMatch(/Seokchon/);
+  });
+});
+
 // ── getNowInfo contextual chips name the place (D-035 style) ─────────────────
 describe("getNowInfo contextual chips", () => {
   it("names the resolved landmark in the follow-up chips", async () => {
