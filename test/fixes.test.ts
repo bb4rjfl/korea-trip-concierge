@@ -146,6 +146,25 @@ describe("getNowInfo contextual chips", () => {
   });
 });
 
+// ── D-038 #29: garbage input → clean "not found", no live-lookup timeout ─────
+describe("getNowInfo garbage-input guard (D-038 #29)", () => {
+  it("returns a clean not-found for a markup/injection string without a live lookup", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const r = await getNowInfo.handler({ place: "<script>alert(1)</script>" });
+    const t = text(r);
+    expect(t).toContain("Place not found");
+    expect(t).not.toContain("<script>"); // sanitized echo, no reflection
+    expect(t).not.toContain("didn't respond in time"); // NOT the timeout branch
+    expect(fetchMock).not.toHaveBeenCalled(); // short-circuited before any network call
+  });
+  it("still resolves a normal multi-word place name", async () => {
+    const r = await getNowInfo.handler({ place: "Gyeongbokgung Palace" });
+    expect(text(r)).toContain("Gyeongbokgung");
+    expect(text(r)).not.toContain("Place not found");
+  });
+});
+
 // ── R1: getNowInfo on a neighbourhood ───────────────────────────────────────
 describe("getNowInfo area redirect (R1)", () => {
   it("treats a bare neighbourhood as an area, not a venue", async () => {

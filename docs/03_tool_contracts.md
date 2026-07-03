@@ -31,8 +31,9 @@
 - **title**: "Get Public Transit Route"
 - **description(영문)**: "Returns public-transit routes (subway/bus) between two points in Korea with fares, transfers, and time, explained in English for foreign visitors. Korea Trip Concierge(코리아 트립 컨시어지)."
 - **inputSchema**: `{ to: string (required), from?: string, departAt?: string }` — `from` 미지정(칩에서 목적지만 온 경우)이면 "출발지 알려달라" 정중 안내로 폴백(U3).
-- **output**: 1~3개 경로, 각 경로 단계·요금·소요·환승. 끝에 **동적 "track this" 칩**: 지하철 leg→"Track subway at {boarding}", **버스 leg→"Track bus {no} to {alight stop}"**(D-028: 하차 정류소를 실어 trackBusArrival에 원탭 연결, 버스 있으면 transfer칩보다 우선) + 결제/도착지 동네.
+- **output**: 1~3개 경로, 각 경로 단계·요금·소요·환승 + **🧭 카카오/네이버맵 길찾기 딥링크**(D-038 하드닝: `directionsLinks`, 카카오맵 sName/eName 이름기반 → **성공/미연결/지오코딩실패/무경로/타임아웃 전 경로**에 부착 = ODsay egress-IP 의존 완충). 끝에 **동적 "track this" 칩**: 지하철 leg→"Track subway at {boarding}", **버스 leg→"Track bus {no} to {alight stop}"**(D-028) + 결제/도착지 동네.
 - annotations: readOnly true / idempotent false / openWorld true
+- ⚙️ **운영**: ODsay는 egress-IP 등록제(KC egress `210.109.82.101` = lab.odsay.com 등록). 재시작 시 `GET /egress-ip`로 변경 확인·재등록(D-038). getTransitRoute 실패해도 위 딥링크로 사용자 이동 가능.
 
 ## 4. `trackBusArrival`  (K-Bus Companion, 조회형)
 - **title**: "Track Bus Arrival"
