@@ -70,6 +70,9 @@ export const SEOUL_SPOTS: Spot[] = [
   // Anywhere (experiences)
   { id: "jjimjilbang", name: "Jjimjilbang (Korean spa)", area: "anywhere", zone: "any", themes: ["experience", "nightlife"], blocks: ["evening"], note: "Sauna + sleeping rooms; bring cash, settle the wristband on the way out." },
   { id: "chimaek", name: "Chimaek (fried chicken + beer)", area: "anywhere", zone: "any", themes: ["food", "nightlife"], blocks: ["evening"], note: "The national pairing — order to your hotel or a pub." },
+  { id: "ihwa", name: "Ihwa Mural Village + Naksan Wall", area: "Ihwa-dong", zone: "central", themes: ["photo", "view", "history"], blocks: ["afternoon", "evening"], note: "Hillside murals and the old city wall with a sweeping sunset city view — a short climb above Dongdaemun." },
+  { id: "cheonggyecheon", name: "Cheonggyecheon Stream walk", area: "Jongno", zone: "old-north", themes: ["nature", "view", "experience"], blocks: ["afternoon", "evening"], note: "A restored downtown stream — a cool, lantern-lit evening stroll through the city centre." },
+  { id: "euljirobars", name: "Euljiro 'Hipjiro' bars", area: "Euljiro", zone: "central", themes: ["nightlife", "cafe", "food"], blocks: ["evening"], note: "Speakeasy bars and retro 'newtro' cafés hidden up worn stairwells in the old printing district." },
 ];
 
 // ── Busan spots (Phase 2) ───────────────────────────────────────────────────

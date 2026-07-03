@@ -159,7 +159,15 @@ export const recommendTripCourse: ToolDef = {
 
     // Chips: tailor a couple to the course content (food stops → menu; K-pop/ticketed → service).
     const allThemes = course.days.flatMap((d) => d.stops.flatMap((s) => s.spot.themes));
-    const chips: Choice[] = [C.now, C.route];
+    // One-click routing: name the first two stops so the route chip lands straight in
+    // getTransitRoute (strip the trailing "(...)" / "— ..." so the chip stays short).
+    const short = (n: string) => n.split(/\s\(|\s—|—/)[0].trim();
+    const d0 = course.days[0]?.stops ?? [];
+    const routeChip: Choice =
+      d0.length >= 2
+        ? { emoji: "🚇", cmdEn: `How do I get from ${short(d0[0].spot.name)} to ${short(d0[1].spot.name)}?`, descEn: "route between the first stops" }
+        : C.route;
+    const chips: Choice[] = [C.now, routeChip];
     // Seoul's free dobo walking tours fit history/culture/hanbok courses — offer that
     // chip first there (nearly every course also has a food stop, so don't let the
     // menu chip always win) (D-034).

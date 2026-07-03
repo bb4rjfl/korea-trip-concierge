@@ -63,6 +63,22 @@ app.get("/", (_req: Request, res: Response) => {
   });
 });
 
+// Ops diagnostic: the server's current outbound (egress) IP. ODsay's routing API is
+// IP-allowlisted, so after any KC restart hit this to confirm the egress IP hasn't
+// changed (and re-register it on lab.odsay.com if it has). Never affects tool traffic.
+app.get("/egress-ip", async (_req: Request, res: Response) => {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    const r = await fetch("https://api.ipify.org?format=json", { signal: controller.signal });
+    clearTimeout(timer);
+    const j = (await r.json()) as { ip?: string };
+    res.json({ egressIp: j.ip ?? "unknown", note: "register on lab.odsay.com if changed" });
+  } catch {
+    res.status(502).json({ egressIp: "lookup failed", note: "external IP service unreachable" });
+  }
+});
+
 // Streamable HTTP, stateless: new server + transport per request, no sessions.
 app.post("/mcp", async (req: Request, res: Response) => {
   const server = buildServer();

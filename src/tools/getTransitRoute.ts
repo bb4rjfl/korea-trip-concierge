@@ -8,6 +8,7 @@ import { romanizeText } from "../lib/romanize.js";
 import { resolvePlaceCoord } from "../lib/places.js";
 import { detectIntercity, renderIntercity } from "../lib/intercity.js";
 import { normalizeName } from "../lib/fuzzy.js";
+import { directionsLinks } from "../lib/maplinks.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -185,10 +186,14 @@ export const getTransitRoute: ToolDef = {
       ]);
     }
 
+    // Resilient fallback: a Kakao/Naver Map directions link (routes by place name) so
+    // the visitor can still navigate even if our live routing source is unavailable.
+    const dir = directionsLinks(from, to);
+
     if (!hasKey("TRANSIT_API_KEY") || !hasKey("TOUR_API_KEY")) {
       return notConnected(
         "Get Public Transit Route",
-        `Source: **ODsay routing** + TourAPI geocoding. Route requested: **${from} → ${to}**.`,
+        `Source: **ODsay routing** + TourAPI geocoding. Route requested: **${from} → ${to}**.\n\n${dir}`,
         CHOICES,
       );
     }
@@ -198,13 +203,13 @@ export const getTransitRoute: ToolDef = {
       if (!a || !b) {
         return fail(
           "Couldn't locate one of the places",
-          `I couldn't pin coordinates for ${!a ? `**${from}**` : `**${to}**`}. Try a well-known landmark or station name.`,
+          `I couldn't pin coordinates for ${!a ? `**${from}**` : `**${to}**`}. Try a well-known landmark or station name — or open it directly:\n\n${dir}`,
           RETRY,
         );
       }
       const routes = await routesBetween(a, b);
       if (routes.length === 0) {
-        return fail("No transit route found", `No public-transit path from **${from}** to **${to}** was returned.`, RETRY);
+        return fail("No transit route found", `No public-transit path from **${from}** to **${to}** was returned.\n\n${dir}`, RETRY);
       }
       const top = routes.slice(0, 2).map(renderRoute).join("\n\n");
       // Use the user's own place wording in the header (geocoding may resolve to a
@@ -214,6 +219,7 @@ export const getTransitRoute: ToolDef = {
         "",
         top,
         "",
+        dir,
         `📋 _For the walk to/from the stop, search **${to}** in **Naver Map** — Google Maps walking/driving directions don't work in Korea._`,
       ].join("\n");
       // Dynamic chips: tap a mode to jump into live tracking (journey UX, Phase 1).
@@ -221,7 +227,7 @@ export const getTransitRoute: ToolDef = {
     } catch {
       return fail(
         "Couldn't reach the routing service",
-        "The transit routing source didn't respond in time. Please try again in a moment.",
+        `The transit routing source didn't respond in time — you can still get there:\n\n${dir}\n\nOr tap Refresh to retry.`,
         RETRY,
       );
     }

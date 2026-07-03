@@ -47,6 +47,14 @@ describe("mapLinks", () => {
     const { mapLinks } = await import("../src/lib/maplinks.js");
     expect(mapLinks("  ")).toBe("");
   });
+  it("directionsLinks routes from→to by name (Kakao sName/eName)", async () => {
+    const { directionsLinks } = await import("../src/lib/maplinks.js");
+    const d = directionsLinks("Seoul Station", "Gangnam");
+    expect(d).toContain("map.kakao.com/?sName=");
+    expect(d).toContain("eName=");
+    expect(d).toContain(encodeURIComponent("Gangnam"));
+    expect(directionsLinks("Seoul", "")).toBe("");
+  });
 });
 
 describe("buildChoiceFooter", () => {

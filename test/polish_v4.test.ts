@@ -249,6 +249,10 @@ describe("recommendTripCourse — combinable persona courses (D-025)", () => {
     expect(t13("couple", "2-day", "", "Jeju")).toMatch(/Jeju course/);
     expect(t13("foodie", "1-day", "", "Daegu")).toMatch(/coming soon/i);
   });
+  it("names the first two stops in the route chip (one-click routing)", () => {
+    const out = t13("culture lover", "1-day", "", "Seoul");
+    expect(out).toMatch(/How do I get from .+ to .+\?/);
+  });
   it("offers the free guided-tour chip on a Seoul history/culture course (D-034)", () => {
     expect(t13("history lover", "1-day", "", "Seoul")).toMatch(/free official guided tours/i);
     // A Busan course (no Seoul dobo program) should NOT show it.

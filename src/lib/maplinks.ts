@@ -17,3 +17,13 @@ export function mapLinks(query: string): string {
   const q = encodeURIComponent(raw);
   return `🗺️ Map: [Kakao Map](https://map.kakao.com/?q=${q}) · [Naver Map](https://map.naver.com/p/search/${q})`;
 }
+
+/** A "get directions" link pair for a from→to trip. Kakao Map routes by place NAME
+ *  (sName/eName), so this works even without coordinates — a resilient fallback when
+ *  our live routing (ODsay) is unavailable, and a handy "open in map" on success. */
+export function directionsLinks(from: string, to: string): string {
+  const f = (from ?? "").trim(), t = (to ?? "").trim();
+  if (!f || !t) return "";
+  const ef = encodeURIComponent(f), et = encodeURIComponent(t);
+  return `🧭 Directions: [Kakao Map](https://map.kakao.com/?sName=${ef}&eName=${et}) · [Naver Map](https://map.naver.com/p/search/${et})`;
+}

@@ -187,6 +187,11 @@ describe("getTransitRoute missing `to` (R5)", () => {
     expect(text(r)).toContain("Where do you want to go");
     expect(text(r)).toContain("You can ask me next");
   });
+  it("offers a Kakao/Naver directions fallback when routing is unavailable (hardening)", async () => {
+    const r = await getTransitRoute.handler({ from: "Seoul Station", to: "Gangnam" }); // no keys → notConnected
+    expect(text(r)).toContain("Directions");
+    expect(text(r)).toContain("map.kakao.com/?sName=");
+  });
 });
 
 // ── R7: enum synonyms no longer crash ───────────────────────────────────────
