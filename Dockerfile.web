@@ -1,0 +1,27 @@
+# Korea Trip Concierge — web chat server (mobile web front for the same 13 tools).
+# Separate from the root Dockerfile (MCP server for PlayMCP/KC — do not touch that build).
+# Build:  docker build --platform linux/amd64 -f Dockerfile.web -t ktc-web --build-arg GIT_SHA=$(git rev-parse HEAD) .
+# Run:    docker run -p 8790:8790 --env-file .env ktc-web
+# Keys are injected at RUNTIME via env (not baked into the image).
+
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY tsconfig.json tsconfig.web.json ./
+COPY src ./src
+COPY web ./web
+RUN npx tsc -p tsconfig.web.json && npx vite build -c web/client/vite.config.ts
+
+FROM node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=build /app/dist-web ./dist-web
+COPY --from=build /app/web/client/dist ./web/client/dist
+ARG GIT_SHA=dev
+ENV GIT_SHA=$GIT_SHA
+ENV WEB_PORT=8790
+EXPOSE 8790
+CMD ["node", "dist-web/web/server/index.js"]

@@ -108,4 +108,6 @@
 - [ ] **🔥 다음: ① 최종 시나리오 테스트 결과 반영 ② (사용자 결정 시) PlayMCP 심사요청→전체공개→비즈폼(사업자번호 png) ③ 본선 대비 Kakao Tools Widget(진짜 버튼)·데모 스토리 ④ 저우선: 영업시간 인라인·다국어 코스·getArrInfoByRoute, 2번째 슬롯**. (심사요청=사용자 결정 대기, 재촉 금지. 노출키 재발급=스킵.) 상세 **docs/25 §0.5·§10**.
 - [ ] 대기: 카카오Local 승인 / 저우선 잔여 P3·P4·Jamsil(docs/21 §8) / 노출키 재발급(사용자 스킵)
 
+- [x] **웹 챗 클라이언트(web/)**: 동일 13툴을 모바일 웹 챗으로 노출하는 별도 서버(`web/server`, :8790)+SPA(`web/client`, Vite+Preact). 규칙 라우터(4개 국어)+선택적 LLM 레이어, 칩=진짜 버튼. `npm run build:web`/`dev:web`, `Dockerfile.web`. MCP 서버·KC 배포와 완전 독립(루트 Dockerfile 불변). 302 tests.
+
 > 상세 진행은 `docs/07_progress.md`(SSOT). **새 세션 진입점: `docs/25_handoff.md`**(아주 풍부한 최신 맥락판 — v4/v5/v6 테스트→GO, 페르소나 코스 신툴+Phase2, 서울버스 해금·구현, 실환경 MCP 테스트, BM 분석 전부 포함. docs/21은 D-016까지의 이전판).

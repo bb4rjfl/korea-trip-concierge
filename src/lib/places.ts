@@ -19,7 +19,9 @@ export interface GeoPlace {
   aliases: string[];
 }
 
-const PLACES: GeoPlace[] = [
+// Exported for the web client's on-device "near me" snap (privacy: coordinates
+// never leave the device — the client sends only the matched label text).
+export const PLACES: GeoPlace[] = [
   { label: "Gyeongbokgung Palace", lng: 126.977, lat: 37.5796, aliases: ["gyeongbokgung", "경복궁"] },
   { label: "Changdeokgung Palace", lng: 126.991, lat: 37.5794, aliases: ["changdeokgung", "창덕궁"] },
   { label: "Deoksugung Palace", lng: 126.9751, lat: 37.5658, aliases: ["deoksugung", "덕수궁"] },

@@ -2,7 +2,18 @@ node_modules/
 .env
 .env.local
 dist/
+dist-web/
+web/client/dist/
 *.log
 .DS_Store
 # Local Claude Code settings (per-machine; not for the public repo)
 .claude/settings.local.json
+# Contest submissions with business-registration details (local only, never public)
+submission-ktoa/
+# Tourism-data contest track: strategy docs + official forms + drafts (local only, never public)
+submission-tourism/
+docs/26_tourism_contest_plan.md
+docs/27_tourism_contest_r1_requirements.md
+docs/28_webapp_architecture.md
+# Business strategy docs (local only, not for the public repo)
+biz-local/
