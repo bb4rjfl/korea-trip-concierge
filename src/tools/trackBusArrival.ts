@@ -50,11 +50,18 @@ function renderSeoulPositions(r: Extract<SeoulBusPosResult, { status: "ok" }>): 
   const CAP = 12;
   const lines = [`🚌 **Seoul Bus ${r.routeNo} — live positions**`, `_${r.total} ${r.total === 1 ? "bus" : "buses"} running now_`, ""];
   for (const p of r.positions.slice(0, CAP)) {
-    lines.push(`- 🚌 ${p.lastStopName ? `near **${romanizeText(p.lastStopName)}**` : `section ${p.sectOrd}`}`);
+    lines.push(`- 🚌 ${p.lastStopName ? `near **${stopLabel(p.lastStopName)}**` : `section ${p.sectOrd}`}`);
   }
   if (r.positions.length > CAP) lines.push(`- …and ${r.positions.length - CAP} more`);
   lines.push("", "_Tell me your drop-off stop and I'll count down the stops as you ride._");
   return lines.join("\n");
+}
+
+/** Stop label a visitor can act on: romanized for reading, Korean for matching
+ *  the sign at the stop (the tool asks them to match it — so we must show it). */
+function stopLabel(korean: string): string {
+  const roman = romanizeText(korean);
+  return roman && roman !== korean ? `${roman} (${korean})` : korean;
 }
 
 export const trackBusArrival: ToolDef = {
@@ -137,7 +144,7 @@ export const trackBusArrival: ToolDef = {
         if (r.status === "stop_not_found") {
           return fail(
             `I couldn't find a stop named "${stop}" on Seoul bus ${bus}`,
-            "Korean stop names must match the sign exactly — double-check the name, or plan a transit route instead and I'll choose the stops.",
+            "Try the name as it appears on the stop sign (Korean or romanized), or plan a transit route instead and I'll choose the stops for you.",
             RETRY,
           );
         }

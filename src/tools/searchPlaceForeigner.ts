@@ -158,6 +158,65 @@ function renderPois(query: string, pois: PoiPlace[]): string {
   return out.join("\n");
 }
 
+// City centres, so a bare city name still anchors the reach filter. Without one,
+// "vegetarian food in Seoul" kept matching restaurants NAMED "Seoul" in Suncheon
+// and Mokpo, 300km away.
+interface CityAnchor {
+  lat: number;
+  lng: number;
+  /** How the city appears in an address, so a result can be sanity-checked. */
+  addr: RegExp;
+}
+const CITY_CENTER: [RegExp, CityAnchor][] = [
+  [/\bseoul\b|서울/i, { lat: 37.5665, lng: 126.978, addr: /seoul|서울/i }],
+  [/\bbusan\b|부산/i, { lat: 35.1796, lng: 129.0756, addr: /busan|부산/i }],
+  [/\bjeju\b|제주/i, { lat: 33.4996, lng: 126.5312, addr: /jeju|제주/i }],
+  [/\bincheon\b|인천/i, { lat: 37.4563, lng: 126.7052, addr: /incheon|인천/i }],
+  [/\bdaegu\b|대구/i, { lat: 35.8714, lng: 128.6014, addr: /daegu|대구/i }],
+  [/\bdaejeon\b|대전/i, { lat: 36.3504, lng: 127.3845, addr: /daejeon|대전/i }],
+  [/\bgwangju\b|광주/i, { lat: 35.1595, lng: 126.8526, addr: /gwangju|광주/i }],
+  [/\bgyeongju\b|경주/i, { lat: 35.8562, lng: 129.2247, addr: /gyeongju|경주/i }],
+];
+
+function cityCenter(text: string): CityAnchor | undefined {
+  for (const [re, c] of CITY_CENTER) if (re.test(text)) return c;
+  return undefined;
+}
+
+/**
+ * Drop results that are nowhere near the area the visitor asked about.
+ *
+ * TourAPI keyword search matches the NAME, so "vegetarian food in Seoul" returned
+ * "Seoul Bokjip" in Suncheon and "Seoul Sikdang" in Mokpo — 300km away — and an
+ * ATM "in Myeongdong" came back in Jongno. When we know the anchor coordinates we
+ * keep only what is plausibly reachable; with no anchor we change nothing.
+ */
+function withinReach<T extends { mapx?: number; mapy?: number }>(
+  items: T[],
+  anchor: { lat: number; lng: number } | undefined,
+  km: number,
+  cityAddr?: RegExp,
+): T[] {
+  if (!anchor && !cityAddr) return items;
+  const near = items.filter((p) => {
+    if (typeof p.mapx !== "number" || typeof p.mapy !== "number") {
+      // No coordinates? Fall back to the address — TourAPI's keyword search matches
+      // NAMES, so "Seoul Bokjip" in Suncheon looks like a Seoul result until you
+      // read where it is.
+      const addr = (p as { address?: string }).address ?? "";
+      return !cityAddr || !addr ? true : cityAddr.test(addr);
+    }
+    if (!anchor) return true;
+    const dLat = (p.mapy - anchor.lat) * 111;
+    const dLng = (p.mapx - anchor.lng) * 111 * Math.cos((anchor.lat * Math.PI) / 180);
+    return Math.hypot(dLat, dLng) <= km;
+  });
+  // If everything is far, return nothing rather than the far list: the caller's
+  // coordinate-radius fallback below produces genuinely local results, and a
+  // Suncheon restaurant is not an answer to "in Seoul".
+  return near;
+}
+
 function renderPlaces(query: string, places: Place[]): string {
   if (places.length === 0) {
 return (
@@ -528,6 +587,9 @@ export const searchPlaceForeigner: ToolDef = {
     // A neighbourhood/city label for contextual follow-up chips (D-035): the given
     // area, else a place name extracted from the query ("cafes in Seongsu" → Seongsu).
     const areaLabel = area.trim() || findPlaceInText(query)?.label || undefined;
+    // A bare city name has no curated coordinate; its centre anchors both the POI
+    // search and the reach filter below.
+    const city = cityCenter(`${area} ${query}`);
     // Programs (not places) lead with a curated primer when asked: templestay (P3)
     // and Seoul's free official guided walking tours (D-034). Otherwise the generic
     // city-wide must-see lead (P-V2/D-021). "" for dining/specific. Prepended to
@@ -567,7 +629,11 @@ export const searchPlaceForeigner: ToolDef = {
     if (cat === "food" && hasPoiProvider()) {
       try {
         const what = foodKeyword(query); // concrete term (ramen/sushi/vegan…) not just "restaurant"
-        const coord = resolvePlaceCoord(area) ?? resolvePlaceCoord(query) ?? findPlaceInText(query) ?? findPlaceInText(area);
+        // A bare city name has no curated coordinate, so fall back to its centre —
+        // otherwise 'vegetarian food in Seoul' had nothing to search around once the
+        // out-of-town name matches were filtered out.
+        const coord =
+          resolvePlaceCoord(area) ?? resolvePlaceCoord(query) ?? findPlaceInText(query) ?? findPlaceInText(area) ?? city;
         const pois = await searchForeignerPois({
           area: area || searchTerms(query) || query,
           query: what,
@@ -601,7 +667,16 @@ export const searchPlaceForeigner: ToolDef = {
       query,
     ].filter((c, i, all) => c && all.indexOf(c) === i);
     try {
-      const places = await searchPlacesAny(candidates, { category: cat, limit: 5, language });
+      const named = resolvePlaceCoord(area) ?? findPlaceInText(area) ?? findPlaceInText(query);
+      const anchorCoord = named ? { lat: named.lat, lng: named.lng } : city;
+      // A named neighbourhood means "walkable-ish"; a bare city means the metro area.
+      const reachKm = area.trim() && !isSeoulText(area) ? 12 : 35;
+      const places = withinReach(
+        await searchPlacesAny(candidates, { category: cat, limit: 5, language }),
+        anchorCoord,
+        reachKm,
+        city?.addr,
+      );
       // The English TourAPI is sparse (~15k vs ~50k entries). When it's thin and
       // we know the area's coordinates, broaden with the much larger KOREAN
       // dataset by radius (romanized) — far better national/long-tail coverage.
@@ -611,7 +686,7 @@ export const searchPlaceForeigner: ToolDef = {
           const ko = await searchPlacesNearby({
             lat: coord.lat,
             lng: coord.lng,
-            radius: 2000,
+            radius: named ? 2000 : 6000,
             category: cat,
             limit: 8,
             language: "ko",

@@ -17,6 +17,7 @@ import { ENV } from "../env.js";
 import { fetchWithTimeout, ExternalApiError } from "../http.js";
 import { TtlCache } from "../cache.js";
 import { similarity, normalizeName } from "../fuzzy.js";
+import { romanizeText } from "../romanize.js";
 
 const BASE = "http://ws.bus.go.kr/api/rest";
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -103,11 +104,16 @@ export function matchSeoulStop(stops: SeoulStop[], name: string): SeoulStop | un
   if (!q) return undefined;
   let best: { s: SeoulStop; sc: number } | undefined;
   for (const s of stops) {
-    const t = normalizeName(s.name);
-    let sc: number;
-    if (t === q) sc = 3;
-    else if (t.includes(q) || q.includes(t)) sc = 2;
-    else sc = similarity(name, s.name);
+    // Visitors read the romanized name we printed, not the Korean sign, so "Sinsa"
+    // must match 신사역 — comparing only the Korean form made every romanized stop
+    // request fail with "match the sign exactly", which they cannot do.
+    const forms = [normalizeName(s.name), normalizeName(romanizeText(s.name))];
+    let sc = 0;
+    for (const t of forms) {
+      if (!t) continue;
+      const one = t === q ? 3 : t.includes(q) || q.includes(t) ? 2 : similarity(name, t);
+      if (one > sc) sc = one;
+    }
     if (!best || sc > best.sc) best = { s, sc };
   }
   return best && best.sc >= 1.2 ? best.s : undefined;

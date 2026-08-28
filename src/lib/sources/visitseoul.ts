@@ -91,7 +91,7 @@ export function inferSeoulCategory(text: string): string | undefined {
  * indoor intent must actually change what we return. Detected in en/ko/ja/zh.
  */
 export function isIndoorIntent(text: string): boolean {
-  return /indoor|inside|out of the rain|rainy|raining|rain|shelter|when it rains|실내|비\s*(?:올|오|와|내리)|우천|비가|장마|室内|屋内|雨の日|雨天|室內|下雨|雨天|避雨/i.test(
+  return /indoor|inside|out of the rain|rainy|raining|rain\b|shelter|when it rains|실내|비\s*(?:올|오|와|내리)|우천|비가|장마|室内|屋内|雨の日|雨天|室內|下雨|雨天|避雨/i.test(
     text ?? "",
   );
 }
@@ -99,11 +99,11 @@ export function isIndoorIntent(text: string): boolean {
 // Categories/keywords that mean "you will be standing outside" — excluded when
 // the visitor explicitly wants shelter (parks, gardens, trails, riverside…).
 const OUTDOOR_RE =
-  /natural\s*sites?|parks?|garden|arboretum|hill|trail|hiking|mountain|river|hangang|han\s*river|stream|beach|outdoor|open[-\s]?air|walking\s*(?:course|trail)|picnic|campsite|camping|plaza|square|playground|zoo|공원|정원|수목원|산책|등산|하천|한강|야외|광장|놀이터/i;
+  /natural\s*sites?|\bparks?\b|garden|arboretum|hill\b|trail|hiking|mountain|\briver\b|hangang|han\s*river|stream|beach|outdoor|open[-\s]?air|walking\s*(?:course|trail)|picnic|campsite|camping|plaza|square\b|playground|zoo\b|공원|정원|수목원|산책|등산|하천|한강|야외|광장|놀이터/i;
 
 // Explicitly sheltered venue signals — these win even if a generic word matched.
 const INDOOR_RE =
-  /museum|gallery|galleries|exhibition|aquarium|mall|department\s*store|library|cinema|theat(?:er|re)|indoor|spa|jjimjilbang|sauna|arcade|cafe|café|underground|shopping\s*cent|market\s*hall|박물관|미술관|전시|아쿠아리움|백화점|쇼핑몰|도서관|영화관|극장|실내|찜질방/i;
+  /museum|gallery|galleries|exhibition|aquarium|mall\b|department\s*store|library|cinema|theat(?:er|re)|indoor|spa\b|jjimjilbang|sauna|arcade|cafe|café|underground|shopping\s*cent|market\s*hall|박물관|미술관|전시|아쿠아리움|백화점|쇼핑몰|도서관|영화관|극장|실내|찜질방/i;
 
 /** True if this Seoul content would leave the visitor out in the rain. */
 export function isLikelyOutdoor(c: { title?: string; summary?: string; categoryPath?: string }): boolean {
