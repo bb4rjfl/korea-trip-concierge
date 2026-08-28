@@ -86,6 +86,32 @@ export function inferSeoulCategory(text: string): string | undefined {
   return undefined;
 }
 
+/**
+ * "It's raining — where can I go indoors?" is the flagship task-1 scenario, so
+ * indoor intent must actually change what we return. Detected in en/ko/ja/zh.
+ */
+export function isIndoorIntent(text: string): boolean {
+  return /indoor|inside|out of the rain|rainy|raining|rain|shelter|when it rains|실내|비\s*(?:올|오|와|내리)|우천|비가|장마|室内|屋内|雨の日|雨天|室內|下雨|雨天|避雨/i.test(
+    text ?? "",
+  );
+}
+
+// Categories/keywords that mean "you will be standing outside" — excluded when
+// the visitor explicitly wants shelter (parks, gardens, trails, riverside…).
+const OUTDOOR_RE =
+  /natural\s*sites?|parks?|garden|arboretum|hill|trail|hiking|mountain|river|hangang|han\s*river|stream|beach|outdoor|open[-\s]?air|walking\s*(?:course|trail)|picnic|campsite|camping|plaza|square|playground|zoo|공원|정원|수목원|산책|등산|하천|한강|야외|광장|놀이터/i;
+
+// Explicitly sheltered venue signals — these win even if a generic word matched.
+const INDOOR_RE =
+  /museum|gallery|galleries|exhibition|aquarium|mall|department\s*store|library|cinema|theat(?:er|re)|indoor|spa|jjimjilbang|sauna|arcade|cafe|café|underground|shopping\s*cent|market\s*hall|박물관|미술관|전시|아쿠아리움|백화점|쇼핑몰|도서관|영화관|극장|실내|찜질방/i;
+
+/** True if this Seoul content would leave the visitor out in the rain. */
+export function isLikelyOutdoor(c: { title?: string; summary?: string; categoryPath?: string }): boolean {
+  const hay = [c.title, c.categoryPath, c.summary].filter(Boolean).join(" ");
+  if (INDOOR_RE.test(hay)) return false;
+  return OUTDOOR_RE.test(hay);
+}
+
 // Seoul bounding box (WGS84) — generous enough to cover the city, tight enough to
 // exclude Incheon Airport (126.45), Busan (~129), and Jeju (~126.5/33.4).
 const SEOUL_BBOX = { minLng: 126.76, maxLng: 127.18, minLat: 37.43, maxLat: 37.70 };

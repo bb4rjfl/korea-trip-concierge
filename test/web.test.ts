@@ -4,6 +4,8 @@ import { parseToolMarkdown } from "../web/server/chips.js";
 import { CATALOG, CATALOG_BY_NAME, executeTool } from "../web/server/catalog.js";
 import { detectLang, extractFromTo, findCity, routeText } from "../web/server/router.js";
 import { extractPlaceNames } from "../web/server/orchestrator.js";
+import { isIndoorIntent, isLikelyOutdoor } from "../src/lib/sources/visitseoul.js";
+import { mapLinks, mapLinksAt } from "../src/lib/maplinks.js";
 import { SCENARIOS } from "../web/client/src/i18n.js";
 import { nearestPlace } from "../web/client/src/geo.js";
 import type { Lang } from "../web/server/router.js";
@@ -194,4 +196,50 @@ describe("scenario quick-start cards", () => {
       }
     });
   }
+});
+
+/* --------------------- rain / indoor scenario (task 1 core) ------------------ */
+
+describe("indoor intent (rain scenario)", () => {
+  it("detects indoor/rain phrasing in all four languages", () => {
+    expect(isIndoorIntent("It's raining in Seoul — where can I go indoors?")).toBe(true);
+    expect(isIndoorIntent("서울에 비 오는데 실내로 갈 만한 곳 있어?")).toBe(true);
+    expect(isIndoorIntent("ソウルで雨が降ってきた。室内で行ける場所は？")).toBe(true);
+    expect(isIndoorIntent("首尔下雨了，有什么室内景点推荐？")).toBe(true);
+    expect(isIndoorIntent("best cafes in Hongdae")).toBe(false);
+  });
+
+  it("rejects the outdoor places that were wrongly recommended in the rain", () => {
+    // Real results from the live bug report (2026-08-28).
+    expect(isLikelyOutdoor({ title: "Choansan Hydrangea Hill", categoryPath: "Natural Sites(Parks)" })).toBe(true);
+    expect(
+      isLikelyOutdoor({ title: "Gwangnaru Hangang Park Everyone's Playground", categoryPath: "Leisure/Sports Centers" }),
+    ).toBe(true);
+    expect(isLikelyOutdoor({ title: "Seoul Forest", summary: "A walking trail and picnic lawn" })).toBe(true);
+  });
+
+  it("keeps genuinely sheltered venues", () => {
+    expect(isLikelyOutdoor({ title: "SKETCH 2026 : Aesthetics of Liquidity", categoryPath: "Cultural Facilities" })).toBe(false);
+    expect(isLikelyOutdoor({ title: "COEX Mall & Starfield Library", categoryPath: "Shopping" })).toBe(false);
+    expect(isLikelyOutdoor({ title: "National Museum of Korea", categoryPath: "Cultural Facilities" })).toBe(false);
+    // indoor signal wins even when a generic outdoor word appears in the blurb
+    expect(isLikelyOutdoor({ title: "Seoul Museum of Art", summary: "Next to a small park" })).toBe(false);
+  });
+});
+
+/* ------------------------- map links must be usable -------------------------- */
+
+describe("map links", () => {
+  it("uses the Korean name and exact coordinates so Naver/Kakao actually find it", () => {
+    const out = mapLinksAt("초안산 수국동산", 37.6489, 127.0521);
+    expect(out).toContain("map.kakao.com/link/map/");
+    expect(out).toContain(encodeURIComponent("초안산 수국동산"));
+    expect(out).toContain("37.6489");
+    expect(out).toContain("127.0521");
+    expect(out).toContain("map.naver.com/p/?c=127.0521,37.6489");
+  });
+
+  it("falls back to a name search when coordinates are missing", () => {
+    expect(mapLinksAt("경복궁", Number.NaN, Number.NaN)).toBe(mapLinks("경복궁"));
+  });
 });

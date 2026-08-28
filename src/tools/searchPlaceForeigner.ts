@@ -12,11 +12,14 @@ import {
   currentYearKST,
   clip,
   VS_CATEGORY,
+  isIndoorIntent,
+  isLikelyOutdoor,
+  getSeoulDetail,
   type SeoulContent,
 } from "../lib/sources/visitseoul.js";
 import { resolvePlaceCoord, findPlaceInText } from "../lib/places.js";
 import { similarity } from "../lib/fuzzy.js";
-import { mapLinks } from "../lib/maplinks.js";
+import { mapLinks, mapLinksAt } from "../lib/maplinks.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -305,15 +308,50 @@ function dedupeByTitle(items: SeoulContent[], limit: number): SeoulContent[] {
   return out;
 }
 
-function renderSeoul(query: string, items: SeoulContent[]): string {
+/** A Seoul card enriched with the Korean name + coordinates used for map links. */
+interface SeoulCard extends SeoulContent {
+  koTitle?: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
+}
+
+/**
+ * Korean map services search their Korean place database, so a link built from an
+ * English display name finds nothing. Fetch each shown item's Korean detail
+ * (cached, in parallel) for the Korean name + exact coordinates and link with
+ * those. Fail-soft: a miss falls back to the English-name search link.
+ */
+async function enrichForLinks(items: SeoulContent[]): Promise<SeoulCard[]> {
+  return Promise.all(
+    items.map(async (c): Promise<SeoulCard> => {
+      try {
+        const ko = await getSeoulDetail(c.cid, "ko");
+        return { ...c, koTitle: ko?.title, address: ko?.address, lat: ko?.lat, lng: ko?.lng };
+      } catch {
+        return { ...c };
+      }
+    }),
+  );
+}
+
+function renderSeoul(query: string, items: SeoulCard[], indoor = false): string {
   const lines = items.map((p, i) => {
     // Text-only (no raw image markdown) — see renderPlaces (N11).
     const cat = p.categoryPath ? ` · _${p.categoryPath.split(">").pop()?.trim()}_` : "";
     const sum = p.summary ? `\n   ${clip(p.summary, 180)}` : "";
-    return `**${i + 1}. ${p.title}**${cat}${sum}\n   ${mapLinks(p.title)}`;
+    const addr = p.address ? `\n   📍 ${p.address}` : "";
+    const linkName = p.koTitle || p.title;
+    const link =
+      typeof p.lat === "number" && typeof p.lng === "number"
+        ? mapLinksAt(linkName, p.lat, p.lng)
+        : mapLinks(linkName);
+    return `**${i + 1}. ${p.title}**${cat}${sum}${addr}\n   ${link}`;
   });
   return [
-    `🔎 **Seoul ideas for** _"${query}"_ — _official Seoul Tourism_`,
+    indoor
+      ? `🔎 **Seoul — indoor picks for** _"${query}"_ · _stay dry_ — _official Seoul Tourism_`
+      : `🔎 **Seoul ideas for** _"${query}"_ — _official Seoul Tourism_`,
     "",
     ...lines,
   ].join("\n");
@@ -378,7 +416,11 @@ async function trySeoul(
   cat: string | undefined,
   language: ReturnType<typeof normalizeLang>,
 ): Promise<string | undefined> {
+  // "It's raining — where can I go indoors?" must actually return sheltered
+  // places: target museums/galleries (Cultural Facilities), then drop outdoor ones.
+  const indoor = isIndoorIntent([query, cat, area].filter(Boolean).join(" "));
   const vsCat =
+    (indoor ? VS_CATEGORY.museum : undefined) ??
     inferSeoulCategory([cat, query, area].filter(Boolean).join(" ")) ??
     (cat === "shopping" ? VS_CATEGORY.shopping : cat === "accommodation" ? VS_CATEGORY.accommodation : undefined);
   const kw = seoulKeyword(area, query);
@@ -395,8 +437,19 @@ async function trySeoul(
     vs = rankByIntent(
       vs.filter((c) => !isStalePastEvent(c.title, year)),
       query,
-    ).slice(0, 6);
-    return vs.length ? renderSeoul(query, vs) : undefined;
+    );
+    if (indoor) {
+      // Shelter first; if that leaves too little, top up with malls (also indoor).
+      let sheltered = vs.filter((c) => !isLikelyOutdoor(c));
+      if (sheltered.length < 3) {
+        const malls = await searchSeoulContent({ category: VS_CATEGORY.shopping, keyword: kw, language, limit: 8 });
+        sheltered = dedupeByTitle([...sheltered, ...malls.filter((c) => !isLikelyOutdoor(c))], 8);
+      }
+      vs = sheltered;
+    }
+    vs = vs.slice(0, 6);
+    if (!vs.length) return undefined;
+    return renderSeoul(query, await enrichForLinks(vs), indoor);
   } catch {
     return undefined; // fall through to national grounding
   }

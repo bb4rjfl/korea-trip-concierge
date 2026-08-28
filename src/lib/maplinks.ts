@@ -18,6 +18,27 @@ export function mapLinks(query: string): string {
   return `🗺️ Map: [Kakao Map](https://map.kakao.com/?q=${q}) · [Naver Map](https://map.naver.com/p/search/${q})`;
 }
 
+/**
+ * Coordinate-anchored map links. Korean map services search their **Korean**
+ * place database, so an English display name ("Choansan Hydrangea Hill") finds
+ * nothing. Passing the Korean name AND the exact coordinates makes the pin land
+ * on the right spot regardless of how the name is written.
+ * Kakao's documented link API takes `name,lat,lng`; Naver takes a search term
+ * with a map centre (`c=lng,lat,zoom,...`).
+ */
+export function mapLinksAt(name: string, lat: number, lng: number): string {
+  const raw = (name ?? "").trim();
+  if (!raw || !Number.isFinite(lat) || !Number.isFinite(lng)) return mapLinks(raw);
+  const n = encodeURIComponent(raw);
+  // Kakao's link API drops a pin AT the coordinates and uses the name only as the
+  // label, so an English label still lands on the right place. Naver has no
+  // name-free pin URL, so we centre its map on the coordinates instead of running
+  // a search that an English name would return nothing for.
+  const kakao = `https://map.kakao.com/link/map/${n},${lat},${lng}`;
+  const naver = `https://map.naver.com/p/?c=${lng},${lat},17,0,0,0,dh`;
+  return `🗺️ Map: [Kakao Map](${kakao}) · [Naver Map](${naver})`;
+}
+
 /** A "get directions" link pair for a from→to trip. Kakao Map routes by place NAME
  *  (sName/eName), so this works even without coordinates — a resilient fallback when
  *  our live routing (ODsay) is unavailable, and a handy "open in map" on success. */
