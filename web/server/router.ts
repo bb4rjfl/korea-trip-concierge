@@ -368,6 +368,31 @@ const rulePlaceSearch: Rule = (text, lang) => {
   return { tool: "searchPlaceForeigner", args };
 };
 
+/**
+ * Intents the LLM was observed to misroute in QA, where the wrong answer is
+ * actively harmful: "when is the last train" came back as *next* arrivals (once
+ * listing trains that had already departed), and a lost passport or stolen
+ * wallet came back as a list of emergency rooms. These are decided before the
+ * model gets a say.
+ */
+const LAST_TRAIN = /last\s*train|final\s*train|막차|끝차|終電|最終電車|末班车|末班車/i;
+const LOST_STOLEN =
+  /(?:lost|stole|stolen|theft|pickpocket)\b|left (?:my|it|the) [a-z]+ (?:on|in)\b|분실|잃어버|도난|소매치기|置き忘|なくし|盗まれ|丢了|丢失|被偷/i;
+
+export function criticalRoute(text: string): RouteHit | null {
+  const t = text ?? "";
+  if (LAST_TRAIN.test(t)) {
+    const station = firstMatch(t, [
+      /(?:from|at)\s+(.+?)(?:\s+station)?\s*(?:\?|$)/i,
+      /(.+?)\s*역(?:에서|의|은|는)?/,
+    ]);
+    return { tool: "trackSubwayArrival", args: { station: station ?? "", to: "last train" } };
+  }
+  if (LOST_STOLEN.test(t)) {
+    return { tool: "explainKoreanService", args: { service: t.slice(0, 200) } };
+  }
+  return null;
+}
 /** Ordered rule chain — first hit wins. */
 const RULES: Rule[] = [
   ruleBus,

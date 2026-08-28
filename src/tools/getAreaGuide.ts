@@ -497,7 +497,8 @@ export const getAreaGuide: ToolDef = {
     openWorldHint: true,
   },
   handler: (args) => {
-    const area = String(args.area ?? "").trim();
+    // 明洞 / 弘大 arrive as the argument itself, not only inside free text.
+    const area = cjkToKorean(String(args.area ?? "")).trim();
     const interest = normalizeInterest(args.interest ? String(args.interest) : undefined);
     const a = AREAS.find((x) => x.keys.test(area));
     if (!a) return ok(renderUnknown(area), unknownChoices(area));

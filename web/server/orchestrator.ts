@@ -6,7 +6,7 @@
 import { executeTool, CATALOG_BY_NAME } from "./catalog.js";
 import { parseToolMarkdown, type Chip } from "./chips.js";
 import { llmDecide, llmEnabled, llmTranslate, type ChatTurn } from "./llm.js";
-import { detectLang, routeText, type Lang } from "./router.js";
+import { criticalRoute, detectLang, routeText, type Lang } from "./router.js";
 import { backfillArgs, contextHint, deriveContext } from "./context.js";
 import { searchPlaces } from "../../src/lib/sources/tourapi.js";
 
@@ -340,7 +340,14 @@ ${partial.reply ?? ""}`.trim(),
     let engine: ChatResponse["meta"]["engine"] = "none";
     let toolCall: { name: string; args: Record<string, unknown> } | null = null;
 
-    if (llmEnabled()) {
+    // Safety- and correctness-critical intents are decided before the model.
+    const critical = criticalRoute(text);
+    if (critical) {
+      toolCall = { name: critical.tool, args: critical.args };
+      engine = "rules";
+    }
+
+    if (!toolCall && llmEnabled()) {
       onStatus?.({ stage: "routing" });
       const decision = await llmDecide(history, lang, contextHint(ctx));
       if (decision?.kind === "text") {
