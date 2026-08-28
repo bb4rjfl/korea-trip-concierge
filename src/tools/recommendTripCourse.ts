@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isIndoorIntent } from "../lib/sources/visitseoul.js";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok } from "../lib/responses.js";
 import {
@@ -143,7 +144,10 @@ export const recommendTripCourse: ToolDef = {
       );
     }
 
-    const course = composeCourse(personas, dur, explicitThemes, city);
+    // Honour a stated weather constraint: a rainy-day course must actually be
+    // sheltered, not the same itinerary with an 'indoors' label on it.
+    const indoor = isIndoorIntent(blob);
+    const course = composeCourse(personas, dur, explicitThemes, city, indoor);
     const durLabel = dur === "half-day" ? "Half-day" : dur === "2-day" ? "2-day" : dur === "3-day" ? "3-day" : "1-day";
     const head = `🗺️ **${durLabel} ${city} course — for a ${personaTitle(personas)}**`;
     const lines = [head];

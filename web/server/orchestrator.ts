@@ -117,6 +117,31 @@ function scriptShare(text: string, lang: Lang): number {
   return hits / letters;
 }
 
+/* ------------------------------ safety net --------------------------------- */
+
+/**
+ * Life-threatening phrasing, in the four languages we serve.
+ *
+ * QA found "someone is having a seizure on the subway platform" and "my friend
+ * fainted and is not responding" being answered with a generic "which area?"
+ * card listing ATMs and pharmacies — no ambulance number anywhere. Routing this
+ * through the LLM and hoping it picks the emergency tool is not good enough, so
+ * the number is prepended deterministically before anything else runs.
+ */
+const LIFE_THREATENING_RE =
+  /seizure|convuls|unconscious|not breathing|can.?t breathe|choking|heart attack|cardiac|stroke|overdose|bleeding badly|heavy bleeding|unresponsive|passed out|fainted|collapsed|anaphyla|의식(?:이)?\s*없|쓰러|발작|경련|숨을?\s*(?:안|못)\s*(?:쉬|쉼)|심정지|심장마비|뇌졸중|과다출혈|의식불명|意識(?:が)?な|倒れ|発作|けいれん|呼吸(?:が)?(?:ない|できな)|心臓発作|脳卒中|昏迷|昏倒|不省人事|抽搐|癫痫|呼吸(?:困难|停止)|心脏病发|中风|大出血/i;
+
+export function isLifeThreatening(text: string): boolean {
+  return LIFE_THREATENING_RE.test(text ?? "");
+}
+
+/** Ambulance-first banner, shown above whatever else we found. */
+const EMERGENCY_BANNER: Record<Lang, string> = {
+  en: "🚨 **If this is an emergency, call 119 now** — ambulance & fire, free, with interpretation. Not sure? **1339** for medical advice, **1330** for a 24h English hotline that can interpret for you. Police: **112**.",
+  ko: "🚨 **응급 상황이면 지금 119로 전화하세요** — 구급차·소방(무료, 통역 지원). 판단이 어려우면 **1339**(의료 상담), **1330**(24시간 다국어 통역 연결). 경찰: **112**.",
+  ja: "🚨 **緊急の場合は今すぐ119番へ** — 救急車・消防(無料、通訳あり)。判断に迷うときは **1339**(医療相談)、**1330**(24時間多言語ホットライン・通訳可)。警察は **112**。",
+  zh: "🚨 **如果是紧急情况，请立即拨打 119** — 救护车/消防(免费,可提供翻译)。不确定时可拨 **1339**(医疗咨询)或 **1330**(24小时多语种热线,可代为翻译)。报警：**112**。",
+};
 /** Marker used to carry the chip labels through one translation call with the body. */
 const CHIP_MARKER = "<<<CHIPS>>>";
 
@@ -134,21 +159,24 @@ async function localizeAnswer(
 ): Promise<{ body: string; chips: Chip[] }> {
   if (lang === "en") return { body, chips };
 
-  if (lang === "ko") {
-    const koChips = chips.map((c) => (c.cmdKo ? { ...c, cmdEn: c.cmdKo } : c));
-    return { body: await localizeToolBody(body, lang), chips: koChips };
+  // Korean chips: prefer the tools' hand-written cmdKo. Six tools ship none at
+  // all (40 chips, 27 English-only), so the gaps are translated rather than left
+  // as English buttons under a Korean answer.
+  const base = lang === "ko" ? chips.map((c) => (c.cmdKo ? { ...c, cmdEn: c.cmdKo } : c)) : chips;
+  const needsLabel = base
+    .map((c, i) => ({ c, i }))
+    .filter(({ c }) => (lang === "ko" ? !c.cmdKo : true));
+
+  if (!llmEnabled() || needsLabel.length === 0) {
+    return { body: await localizeToolBody(body, lang), chips: base };
   }
 
-  if (!llmEnabled() || chips.length === 0) {
-    return { body: await localizeToolBody(body, lang), chips };
-  }
-
-  const chipList = chips.map((c, i) => `${i + 1}. ${c.cmdEn}`).join("\n");
+  const chipList = needsLabel.map(({ c }, n) => `${n + 1}. ${c.cmdEn}`).join("\n");
   const packed = `${body}\n\n${CHIP_MARKER}\n${chipList}`;
   const translated = await llmTranslate(packed, lang);
   if (!translated || !translated.includes(CHIP_MARKER)) {
     // Fall back to translating the body alone rather than shipping a mangled mix.
-    return { body: await localizeToolBody(body, lang), chips };
+    return { body: await localizeToolBody(body, lang), chips: base };
   }
 
   const [tBody, tChips] = translated.split(CHIP_MARKER);
@@ -156,7 +184,10 @@ async function localizeAnswer(
     .split("\n")
     .map((l) => l.replace(/^\s*\d+[.)]\s*/, "").trim())
     .filter(Boolean);
-  const merged = chips.map((c, i) => (labels[i] ? { ...c, cmdEn: labels[i] } : c));
+  const merged = [...base];
+  needsLabel.forEach(({ i }, n) => {
+    if (labels[n]) merged[i] = { ...merged[i], cmdEn: labels[n] };
+  });
   return { body: tBody.trimEnd(), chips: merged };
 }
 
@@ -271,10 +302,30 @@ export async function handleChat(req: ChatRequest, onStatus?: (e: StatusEvent) =
   // sent no preference at all.
   const lang: Lang = uiLang ?? detectLang(text) ?? "en";
 
-  const done = (partial: Omit<ChatResponse, "meta"> & { meta?: Partial<ChatResponse["meta"]> }): ChatResponse => ({
-    ...partial,
-    meta: { lang, engine: "none", ms: Date.now() - start, ...(partial.meta ?? {}) },
-  });
+  // Deterministic safety net: if the user described a life-threatening situation,
+  // the ambulance number leads — whatever the router decided to do underneath.
+  const urgent = isLifeThreatening(text);
+  const done = (partial: Omit<ChatResponse, "meta"> & { meta?: Partial<ChatResponse["meta"]> }): ChatResponse => {
+    const withBanner = urgent
+      ? {
+          ...partial,
+          toolMarkdown: partial.toolMarkdown
+            ? `${EMERGENCY_BANNER[lang]}
+
+---
+
+${partial.toolMarkdown}`
+            : undefined,
+          reply: partial.toolMarkdown ? partial.reply : `${EMERGENCY_BANNER[lang]}
+
+${partial.reply ?? ""}`.trim(),
+        }
+      : partial;
+    return {
+      ...withBanner,
+      meta: { lang, engine: "none", ms: Date.now() - start, ...(partial.meta ?? {}) },
+    };
+  };
 
   if (!text) {
     return done({ reply: WELCOME[lang], chips: DEFAULT_CHIPS });

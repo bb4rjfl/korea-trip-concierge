@@ -201,6 +201,22 @@ export interface DayPlan {
 
 const BLOCK_LABEL: Record<string, string> = { morning: "🌅 Morning", afternoon: "☀️ Afternoon", evening: "🌃 Evening", lunch: "🍜 Lunch / market", food: "🍽️ Eat" };
 
+/**
+ * Is this stop somewhere you stay dry?
+ *
+ * QA found the "it's pouring rain all day" course returning a hillside mural
+ * village and a stream walk — the theme label changed, the itinerary did not.
+ * Palaces, hanok villages, parks and street markets are open-air in practice, so
+ * only genuinely sheltered venues qualify.
+ */
+export function isIndoorSpot(spot: Spot): boolean {
+  const hay = `${spot.name} ${spot.note ?? ""}`;
+  if (/palace|village|park|stream|trail|market|street|walk|garden|fortress|tower|bridge|river|island|beach|hanok|해변|공원|시장|거리|산책/i.test(hay)) {
+    return /mall|museum|aquarium|department|indoor|underground|library|실내|박물관|미술관/i.test(hay);
+  }
+  if (/museum|gallery|aquarium|mall|department|library|cafe|café|spa|jjimjilbang|sauna|store|shop|arcade|cinema|theater|theatre|observatory|박물관|미술관|백화점|쇼핑/i.test(hay)) return true;
+  return spot.themes.includes("cafe") || spot.themes.includes("beauty") || spot.themes.includes("shopping");
+}
 function fits(spot: Spot, block: Block): boolean {
   if (block === "any") return true;
   return spot.blocks.includes(block) || spot.blocks.includes("any");
@@ -296,11 +312,18 @@ export interface Course {
 }
 
 /** Compose a course for the (personas, duration, themes, city) request. */
-export function composeCourse(personas: PersonaDef[], duration: Duration, explicitThemes: string[], city: City = "Seoul"): Course {
+export function composeCourse(personas: PersonaDef[], duration: Duration, explicitThemes: string[], city: City = "Seoul", indoor = false): Course {
   const themes = wantedThemes(personas, explicitThemes);
   const zones = rankZones(themes, city);
   const used = new Set<string>();
-  const inZones = (zs: string[]) => ALL_SPOTS.filter((s) => cityOf(s) === city && (zs.includes(s.zone) || s.zone === "any"));
+  const inZones = (zs: string[]) => {
+    const pool = ALL_SPOTS.filter((s) => cityOf(s) === city && (zs.includes(s.zone) || s.zone === "any"));
+    // Raining? Keep only sheltered stops — unless that leaves too few to fill a day,
+    // in which case lead with them and let the rest follow.
+    if (!indoor) return pool;
+    const sheltered = pool.filter(isIndoorSpot);
+    return sheltered.length >= 3 ? sheltered : [...sheltered, ...pool.filter((s) => !isIndoorSpot(s))];
+  };
   const band = (i: number) => (zones.slice(i, i + 2).length ? zones.slice(i, i + 2) : zones.slice(0, 2)); // a day's 1-2 adjacent zones
   const days: DayPlan[] = [];
 
@@ -315,7 +338,8 @@ export function composeCourse(personas: PersonaDef[], duration: Duration, explic
     days.push(buildDay("Day 3", inZones(band(4)), themes, ONE_DAY_TEMPLATE, used));
   } else {
     // 1-day: Seoul single-persona signature (golden), else engine.
-    const sig = city === "Seoul" && personas.length === 1 ? SIGNATURES[`${personas[0].key}:1-day`] : undefined;
+    // Signature days are fixed outdoor sequences — skip them when shelter is the point.
+    const sig = !indoor && city === "Seoul" && personas.length === 1 ? SIGNATURES[`${personas[0].key}:1-day`] : undefined;
     if (sig) {
       const stops = sig.map((x) => ({ block: x.block, spot: SPOT_BY_ID.get(x.id)! })).filter((st) => st.spot);
       days.push({ title: "1-day", stops });
