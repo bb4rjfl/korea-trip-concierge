@@ -160,7 +160,11 @@ function renderPois(query: string, pois: PoiPlace[]): string {
 
 function renderPlaces(query: string, places: Place[]): string {
   if (places.length === 0) {
-    return `🔎 **No places found for** _"${query}"_.\n\nTry a broader term or a nearby landmark.`;
+return (
+      `🔎 **Nothing matched** _"${query}"_\n\n` +
+      "That search was too specific for the tourism data. Try a place type plus an area — " +
+      "_\"cafe in Hongdae\"_, _\"museum near Gyeongbokgung\"_ — or ask me for a neighbourhood guide."
+    );
   }
   const lines = places.map((p, i) => {
     // No inline image markdown: the chat surface renders `![photo](longURL)` as
@@ -189,6 +193,26 @@ const SEOUL_AREAS = [
 
 /** The keyword we hand VisitSeoul to narrow to a neighborhood. "Seoul" itself is
  *  not a useful title keyword, so the bare city → category browse (empty). */
+// Filler that carries no search signal. Visitors type sentences, not keywords —
+// "지금 밤인데 술 말고 실내 갈 데 있어?" was posted verbatim to a keyword API and
+// returned nothing at all. Stripping the question scaffolding leaves the nouns
+// that actually retrieve.
+const QUERY_FILLER =
+  /\b(?:please|can you|could you|i(?:'m| am)?|we(?:'re| are)?|want|would like|looking for|find|show|tell|me|us|any|some|good|nice|best|around|near(?:by)?|here|there|now|today|tonight|right now|is|are|there|a|an|the|to|for|in|at|of|and|or|but|what|where|which|how|do|does|go|going|visit|recommend(?:ation)?s?)\b/gi;
+const QUERY_FILLER_KO =
+  /(?:알려줘|추천(?:해줘|좀|해)?|있어|있나요|있을까|어디|뭐|무슨|좀|해줘|해주세요|하고 ?싶어|가고 ?싶어|갈 ?만한|갈 ?데|괜찮은|지금|오늘|이|가|을|를|에|에서|은|는|의|같은|정도|말고)/g;
+
+/** Compact a free-text request into the terms a keyword search can actually use. */
+export function searchTerms(query: string): string {
+  const compact = (query ?? "")
+    .replace(/[?？!！.,，、]/g, " ")
+    .replace(QUERY_FILLER, " ")
+    .replace(QUERY_FILLER_KO, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  // If stripping ate everything, keep the original — a bad search beats no search.
+  return compact.length >= 2 ? compact : (query ?? "").trim();
+}
 function seoulKeyword(area: string, query: string): string {
   const a = area.trim();
   if (a && !/^seoul(특별시)?$|^서울(특별시)?$/i.test(a)) return a;
@@ -545,7 +569,7 @@ export const searchPlaceForeigner: ToolDef = {
         const what = foodKeyword(query); // concrete term (ramen/sushi/vegan…) not just "restaurant"
         const coord = resolvePlaceCoord(area) ?? resolvePlaceCoord(query) ?? findPlaceInText(query) ?? findPlaceInText(area);
         const pois = await searchForeignerPois({
-          area: area || query,
+          area: area || searchTerms(query) || query,
           query: what,
           coord: coord ? { lat: coord.lat, lng: coord.lng } : undefined,
           limit: 6,
@@ -566,7 +590,16 @@ export const searchPlaceForeigner: ToolDef = {
 
     // Try the combined phrase first, then fall back to area-only / query-only so
     // a literal "cafe Hongdae" miss still surfaces useful results.
-    const candidates = [[query, area].filter(Boolean).join(" "), area, query];
+    // Sentences retrieve badly, so try the compacted terms too — "지금 밤인데 술
+    // 말고 실내 갈 데 있어?" returns nothing verbatim but does resolve on its nouns.
+    const terms = searchTerms(query);
+    const candidates = [
+      [query, area].filter(Boolean).join(" "),
+      [terms, area].filter(Boolean).join(" "),
+      area,
+      terms,
+      query,
+    ].filter((c, i, all) => c && all.indexOf(c) === i);
     try {
       const places = await searchPlacesAny(candidates, { category: cat, limit: 5, language });
       // The English TourAPI is sparse (~15k vs ~50k entries). When it's thin and

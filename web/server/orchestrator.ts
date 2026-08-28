@@ -344,7 +344,17 @@ ${partial.reply ?? ""}`.trim(),
       onStatus?.({ stage: "routing" });
       const decision = await llmDecide(history, lang, contextHint(ctx));
       if (decision?.kind === "text") {
-        return done({ reply: decision.text, chips: DEFAULT_CHIPS, meta: { engine: "llm" } });
+        // A clarifying question is the wrong answer when the conversation already
+        // holds the missing piece: tapping "How do I get to Dongdaemun?" used to
+        // come back as "where are you departing from?". If the rule router can
+        // act on the same text, act — the slots below fill what it leaves empty.
+        const salvage = routeText(text, lang);
+        if (salvage) {
+          toolCall = { name: salvage.tool, args: salvage.args };
+          engine = "rules";
+        } else {
+          return done({ reply: decision.text, chips: DEFAULT_CHIPS, meta: { engine: "llm" } });
+        }
       }
       if (decision?.kind === "tool") {
         // Normalize hallucinated variants (case/underscores) before giving up.

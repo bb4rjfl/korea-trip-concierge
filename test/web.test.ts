@@ -7,6 +7,7 @@ import { extractPlaceNames } from "../web/server/orchestrator.js";
 import { backfillArgs, deriveContext } from "../web/server/context.js";
 import { resolvePlaceCoord } from "../src/lib/places.js";
 import { matchAreaName } from "../src/tools/getAreaGuide.js";
+import { searchTerms } from "../src/tools/searchPlaceForeigner.js";
 import { isIndoorIntent, isLikelyOutdoor } from "../src/lib/sources/visitseoul.js";
 import { mapLinks, mapLinksAt } from "../src/lib/maplinks.js";
 import { SCENARIOS } from "../web/client/src/i18n.js";
@@ -321,5 +322,23 @@ describe("Japanese / Chinese place names", () => {
   it("reaches the curated area guide from Japanese and Chinese", () => {
     expect(matchAreaName("明洞を案内して")).toContain("Myeongdong");
     expect(matchAreaName("弘大怎么玩？")).toContain("Hongdae");
+  });
+});
+
+/* ---------------- natural sentences must still retrieve something ------------ */
+
+describe("search term reduction", () => {
+  it("keeps the nouns and drops the question scaffolding", () => {
+    const t = searchTerms("지금 밤인데 술 말고 실내 갈 데 있어?");
+    expect(t).toContain("실내");
+    expect(t).not.toContain("있어");
+    const e = searchTerms("Can you please find me some good cafes around here?");
+    expect(e.toLowerCase()).toContain("cafes");
+    expect(e.toLowerCase()).not.toContain("please");
+  });
+
+  it("never reduces a query to nothing", () => {
+    expect(searchTerms("the best around here now").length).toBeGreaterThan(0);
+    expect(searchTerms("카페")).toBe("카페");
   });
 });

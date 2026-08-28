@@ -128,11 +128,17 @@ export function backfillArgs(
     case "trackSubwayArrival":
       put("station", ctx.station);
       break;
-    case "getTransitRoute":
+    case "getTransitRoute": {
       put("to", ctx.places[0]);
       // "from here" — the station we were just at, else the area in focus.
       put("from", ctx.station ?? ctx.area);
+      // Asking the way to where you already are is not a route; drop the origin
+      // so the tool asks a sensible question instead of routing X to X.
+      if (typeof out.from === "string" && typeof out.to === "string" && out.from.trim().toLowerCase() === out.to.trim().toLowerCase()) {
+        delete out.from;
+      }
       break;
+    }
     default:
       break;
   }
