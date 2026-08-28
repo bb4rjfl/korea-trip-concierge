@@ -117,6 +117,49 @@ function scriptShare(text: string, lang: Lang): number {
   return hits / letters;
 }
 
+/** Marker used to carry the chip labels through one translation call with the body. */
+const CHIP_MARKER = "<<<CHIPS>>>";
+
+/**
+ * Localize the whole answer — body AND chip labels — in a single LLM call.
+ * Korean already ships with native chip text from the tools, so only ja/zh need
+ * their chips translated. Chips are the primary interaction surface: English
+ * buttons under a Japanese answer are unusable, and tapping one used to throw
+ * the whole session back into English.
+ */
+async function localizeAnswer(
+  body: string,
+  chips: Chip[],
+  lang: Lang,
+): Promise<{ body: string; chips: Chip[] }> {
+  if (lang === "en") return { body, chips };
+
+  if (lang === "ko") {
+    const koChips = chips.map((c) => (c.cmdKo ? { ...c, cmdEn: c.cmdKo } : c));
+    return { body: await localizeToolBody(body, lang), chips: koChips };
+  }
+
+  if (!llmEnabled() || chips.length === 0) {
+    return { body: await localizeToolBody(body, lang), chips };
+  }
+
+  const chipList = chips.map((c, i) => `${i + 1}. ${c.cmdEn}`).join("\n");
+  const packed = `${body}\n\n${CHIP_MARKER}\n${chipList}`;
+  const translated = await llmTranslate(packed, lang);
+  if (!translated || !translated.includes(CHIP_MARKER)) {
+    // Fall back to translating the body alone rather than shipping a mangled mix.
+    return { body: await localizeToolBody(body, lang), chips };
+  }
+
+  const [tBody, tChips] = translated.split(CHIP_MARKER);
+  const labels = tChips
+    .split("\n")
+    .map((l) => l.replace(/^\s*\d+[.)]\s*/, "").trim())
+    .filter(Boolean);
+  const merged = chips.map((c, i) => (labels[i] ? { ...c, cmdEn: labels[i] } : c));
+  return { body: tBody.trimEnd(), chips: merged };
+}
+
 /** Localize an English tool body: LLM translation when available, else a notice line. */
 async function localizeToolBody(body: string, lang: Lang): Promise<string> {
   // Translate unless the body is already overwhelmingly in the target script —
@@ -216,9 +259,17 @@ export async function handleChat(req: ChatRequest, onStatus?: (e: StatusEvent) =
   const start = Date.now();
   const history = (req.messages ?? []).filter((m) => typeof m?.content === "string");
   const lastUser = [...history].reverse().find((m) => m.role === "user");
-  const uiLang: Lang = req.uiLang && ["en", "ja", "zh", "ko"].includes(req.uiLang) ? req.uiLang : "en";
+  const uiLang: Lang | undefined =
+    req.uiLang && ["en", "ja", "zh", "ko"].includes(req.uiLang) ? req.uiLang : undefined;
   const text = (lastUser?.content ?? "").trim();
-  const lang: Lang = detectLang(text) ?? uiLang;
+  // The language the user PICKED wins. Detecting per message looked clever and was
+  // the single biggest defect source: every chip is written in English, so tapping
+  // one threw a Japanese session into English — and an English chip carrying a
+  // kanji place name threw it into Chinese. One Korean dish name inside an English
+  // question ("What is 부대찌개?") flipped the whole answer to Korean, for the very
+  // user who cannot read it. Script detection now only fills in when the client
+  // sent no preference at all.
+  const lang: Lang = uiLang ?? detectLang(text) ?? "en";
 
   const done = (partial: Omit<ChatResponse, "meta"> & { meta?: Partial<ChatResponse["meta"]> }): ChatResponse => ({
     ...partial,
@@ -286,14 +337,16 @@ export async function handleChat(req: ChatRequest, onStatus?: (e: StatusEvent) =
     const { body, chips } = parseToolMarkdown(result.markdown);
     if (lang !== "en" && llmEnabled()) onStatus?.({ stage: "localizing" });
     // Translation and photo lookup run concurrently — photos ride inside the
-    // translation window instead of adding latency.
+    // translation window instead of adding latency. Chips travel with the body so
+    // localizing them costs no extra round-trip: they are the primary interaction
+    // surface, and English buttons under a Japanese answer are unusable.
     const [localized, images] = await Promise.all([
-      localizeToolBody(body, lang),
+      localizeAnswer(body, chips, lang),
       enrichImages(body, toolCall.name, lang),
     ]);
     return done({
-      toolMarkdown: localized,
-      chips,
+      toolMarkdown: localized.body,
+      chips: localized.chips,
       ...(images.length ? { images } : {}),
       meta: { tool: toolCall.name, engine },
     });

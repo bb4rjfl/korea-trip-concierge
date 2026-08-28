@@ -126,8 +126,14 @@ export async function llmTranslate(markdown: string, lang: Lang, timeoutMs = 900
     },
     timeoutMs,
   );
-  const raw = json?.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("").trim();
+  let raw = json?.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("").trim();
   if (!raw) return null;
+  // Strip a chatty preamble ("Here is your translated Markdown:") — one leaked
+  // into a live answer and read as if the service were talking to itself.
+  raw = raw.replace(/^[^\n]{0,120}?(?:markdown|マークダウン|마크다운|Markdown)[^\n]{0,40}[:：]\s*\n+/i, "").trim();
+  // Unwrap a fenced block if the model wrapped the whole answer in one.
+  const fence = /^```[a-z]*\s*\n([\s\S]*?)\n```$/.exec(raw);
+  if (fence) raw = fence[1].trim();
 
   // Restore URLs; if the model mangled a placeholder, fail closed (fallback note).
   const text = raw.replace(/__L(\d+)__/g, (_m, i: string) => urls[Number(i)] ?? "");

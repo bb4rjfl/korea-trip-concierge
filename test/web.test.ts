@@ -243,3 +243,21 @@ describe("map links", () => {
     expect(mapLinksAt("경복궁", Number.NaN, Number.NaN)).toBe(mapLinks("경복궁"));
   });
 });
+
+/* ------------------- session language must survive a chip tap ---------------- */
+
+describe("language selection", () => {
+  it("still detects a language from script when no preference is sent", () => {
+    expect(detectLang("경복궁 지금 열었어?")).toBe("ko");
+    expect(detectLang("明洞を案内して")).toBe("ja");
+  });
+
+  it("documents why the picked language must win over script detection", () => {
+    // The live bug: "What is 부대찌개?" was answered entirely in Korean — to the
+    // one user who cannot read Korean. Script detection alone says "ko" here, so
+    // the orchestrator must prefer the language the user actually selected and
+    // only fall back to detection when the client sent no preference.
+    expect(detectLang("What is 부대찌개?")).toBe("ko");
+    expect(detectLang("Is 明洞 worth visiting?")).toBe("zh");
+  });
+});
