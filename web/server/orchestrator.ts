@@ -7,6 +7,7 @@ import { executeTool, CATALOG_BY_NAME } from "./catalog.js";
 import { parseToolMarkdown, type Chip } from "./chips.js";
 import { llmDecide, llmEnabled, llmTranslate, type ChatTurn } from "./llm.js";
 import { detectLang, routeText, type Lang } from "./router.js";
+import { backfillArgs, contextHint, deriveContext } from "./context.js";
 import { searchPlaces } from "../../src/lib/sources/tourapi.js";
 
 export interface ChatRequest {
@@ -305,6 +306,9 @@ export async function handleChat(req: ChatRequest, onStatus?: (e: StatusEvent) =
   // Deterministic safety net: if the user described a life-threatening situation,
   // the ambulance number leads — whatever the router decided to do underneath.
   const urgent = isLifeThreatening(text);
+  // Slots recovered from what was already said, so a tapped chip or a
+  // "how do I get there from here?" keeps the journey it belongs to.
+  const ctx = deriveContext(history);
   const done = (partial: Omit<ChatResponse, "meta"> & { meta?: Partial<ChatResponse["meta"]> }): ChatResponse => {
     const withBanner = urgent
       ? {
@@ -338,7 +342,7 @@ ${partial.reply ?? ""}`.trim(),
 
     if (llmEnabled()) {
       onStatus?.({ stage: "routing" });
-      const decision = await llmDecide(history, lang);
+      const decision = await llmDecide(history, lang, contextHint(ctx));
       if (decision?.kind === "text") {
         return done({ reply: decision.text, chips: DEFAULT_CHIPS, meta: { engine: "llm" } });
       }
@@ -374,7 +378,8 @@ ${partial.reply ?? ""}`.trim(),
 
     // 4) Execute (zod-validated); missing required args → friendly clarify.
     onStatus?.({ stage: "tool", tool: toolCall.name });
-    const result = await executeTool(toolCall.name, toolCall.args);
+    const filled = backfillArgs(toolCall.name, toolCall.args, ctx);
+    const result = await executeTool(toolCall.name, filled);
     if (!result.ok) {
       const asks = result.invalidArgs
         .map((f) => FIELD_QUESTIONS[`${toolCall!.name}.${f}`]?.[lang])

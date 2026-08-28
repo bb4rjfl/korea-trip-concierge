@@ -10,7 +10,7 @@
  * the nearest stop. Aliases are matched case-insensitively after stripping a
  * trailing "station"/"stn"/"역", then a confident fuzzy fallback.
  */
-import { resolveName } from "./fuzzy.js";
+import { cjkToKorean, resolveName } from "./fuzzy.js";
 
 export interface GeoPlace {
   label: string;
@@ -104,7 +104,9 @@ const ESC_RE = /[.*+?^${}()|[\]\\]/g;
  *  fallback. Prefers the longest alias match; ASCII aliases match on word
  *  boundaries, Korean aliases on substring. Used only as a best-effort anchor. */
 export function findPlaceInText(text: string): GeoPlace | undefined {
-  const t = (text ?? "").toLowerCase();
+  // Japanese/Chinese forms are rewritten to Korean first — otherwise 明洞 or
+  // 首尔站 never matches an alias and the place silently fails to geocode.
+  const t = cjkToKorean(text ?? "").toLowerCase();
   if (!t) return undefined;
   let best: { p: GeoPlace; len: number } | undefined;
   for (const p of PLACES) {
@@ -123,7 +125,7 @@ export function findPlaceInText(text: string): GeoPlace | undefined {
  *  Tolerates typos/spacing/variant phrasings via a confident fuzzy fallback
  *  (e.g. "Incheon International Airport", "Incheon Airport Terminal 1"). */
 export function resolvePlaceCoord(input: string): GeoPlace | undefined {
-  const raw = (input ?? "").trim();
+  const raw = cjkToKorean(input ?? "").trim();
   if (!raw) return undefined;
   const direct = INDEX.get(raw.toLowerCase()) ?? INDEX.get(normalize(raw));
   if (direct) return direct;

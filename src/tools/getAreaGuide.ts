@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cjkToKorean } from "../lib/fuzzy.js";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok } from "../lib/responses.js";
 import { mapLinks } from "../lib/maplinks.js";
@@ -391,7 +392,8 @@ function normalizeInterest(raw?: string): string | undefined {
  *  "open" verdict) — but NOT a specific venue that merely contains an area name
  *  ("Bongchu Jjimdak Myeongdong" is a restaurant, not "Myeongdong"). */
 export function matchAreaName(text: string): string | undefined {
-  const t = (text ?? "").trim();
+  // CJK forms first: "明洞を案内して" must reach the Myeongdong guide.
+  const t = cjkToKorean(text ?? "").trim();
   if (!t) return undefined;
   for (const a of AREAS) {
     if (!a.keys.test(t)) continue;

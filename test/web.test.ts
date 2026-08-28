@@ -4,6 +4,9 @@ import { parseToolMarkdown } from "../web/server/chips.js";
 import { CATALOG, CATALOG_BY_NAME, executeTool } from "../web/server/catalog.js";
 import { detectLang, extractFromTo, findCity, routeText } from "../web/server/router.js";
 import { extractPlaceNames } from "../web/server/orchestrator.js";
+import { backfillArgs, deriveContext } from "../web/server/context.js";
+import { resolvePlaceCoord } from "../src/lib/places.js";
+import { matchAreaName } from "../src/tools/getAreaGuide.js";
 import { isIndoorIntent, isLikelyOutdoor } from "../src/lib/sources/visitseoul.js";
 import { mapLinks, mapLinksAt } from "../src/lib/maplinks.js";
 import { SCENARIOS } from "../web/client/src/i18n.js";
@@ -259,5 +262,64 @@ describe("language selection", () => {
     // only fall back to detection when the client sent no preference.
     expect(detectLang("What is 부대찌개?")).toBe("ko");
     expect(detectLang("Is 明洞 worth visiting?")).toBe("zh");
+  });
+});
+
+/* --------------------- conversation slots (chip context) --------------------- */
+
+describe("conversation slots", () => {
+  const convo = (a: string, u = "ok"): { role: "user" | "assistant"; content: string }[] => [
+    { role: "user", content: "what's around Dongdaemun?" },
+    { role: "assistant", content: a },
+    { role: "user", content: u },
+  ];
+
+  it("recovers the places an answer just listed", () => {
+    const ctx = deriveContext(convo("**1. Gwangjang Market**\n**2. DDP Plaza**"));
+    expect(ctx.places[0]).toBe("Gwangjang Market");
+  });
+
+  it("fills the place for 'is one of these open right now?'", () => {
+    const ctx = deriveContext(convo("**1. Gwangjang Market**\n**2. DDP Plaza**"));
+    const args = backfillArgs("getNowInfo", {}, ctx);
+    expect(args.place).toBe("Gwangjang Market");
+  });
+
+  it("keeps the bus and city so a tapped track-bus chip works", () => {
+    const ctx = deriveContext(convo("🚌 **Seoul Bus 143** — live positions"));
+    const args = backfillArgs("trackBusArrival", {}, ctx);
+    expect(args.busNumber).toBe("143");
+    expect(args.city).toBe("Seoul");
+  });
+
+  it("never overrides something the user actually said", () => {
+    const ctx = deriveContext(convo("**1. Gwangjang Market**"));
+    expect(backfillArgs("getNowInfo", { place: "Gyeongbokgung" }, ctx).place).toBe("Gyeongbokgung");
+  });
+
+  it("treats a bare pronoun as missing", () => {
+    const ctx = deriveContext(convo("**1. Gwangjang Market**"));
+    expect(backfillArgs("getNowInfo", { place: "there" }, ctx).place).toBe("Gwangjang Market");
+  });
+});
+
+/* ------------------------ CJK place names must resolve ----------------------- */
+
+describe("Japanese / Chinese place names", () => {
+  it.each([
+    ["明洞", "Myeongdong"],
+    ["弘大", "Hongik Univ. Station"],
+    ["江南駅", "Gangnam Station"],
+    ["首尔站", "Seoul Station"],
+    ["仁川机场", "Incheon Int'l Airport T1"],
+    ["カロスキル", "Garosu-gil (Sinsa)"],
+    ["東大門", "Dongdaemun (DDP)"],
+  ])("geocodes %s", (input, label) => {
+    expect(resolvePlaceCoord(input)?.label).toBe(label);
+  });
+
+  it("reaches the curated area guide from Japanese and Chinese", () => {
+    expect(matchAreaName("明洞を案内して")).toContain("Myeongdong");
+    expect(matchAreaName("弘大怎么玩？")).toContain("Hongdae");
   });
 });

@@ -48,6 +48,8 @@ function systemInstruction(lang: Lang): string {
     "For search-like tools put the user's full request (minus filler) in `query`, and the neighborhood/area in `area` when mentioned.",
     `When a tool has a 'language' parameter, set it to '${lang}'.`,
     "If the user's message is a follow-up (e.g. 'what about Busan?'), resolve it against the recent conversation before choosing args.",
+    "Resolve pronouns from the conversation: 'here', 'there', 'this place', 'one of these', 'that bus' all refer to something already named above — pass the concrete name, never the pronoun.",
+    "Never ask the user to repeat something the conversation already established (which city, which place, where you are) — take it from the conversation.",
     `Only when no tool fits (greetings, thanks, questions about this service): reply directly in ${LANG_NAMES[lang]}, at most 2 short sentences, warmly, and mention one or two things you can help with.`,
     "Never state facts about Korea from your own knowledge — real facts must come from tools.",
   ].join(" ");
@@ -163,7 +165,12 @@ export async function llmTranslate(markdown: string, lang: Lang, timeoutMs = 900
  * Decide tool-vs-text for the latest user message. `history` is the recent
  * window (user + assistant turns, newest last). Returns null on any failure.
  */
-export async function llmDecide(history: ChatTurn[], lang: Lang, timeoutMs = 4500): Promise<LlmDecision | null> {
+export async function llmDecide(
+  history: ChatTurn[],
+  lang: Lang,
+  contextHint = "",
+  timeoutMs = 4500,
+): Promise<LlmDecision | null> {
   if (!llmEnabled()) return null;
 
   const contents = history.slice(-8).map((t) => ({
@@ -173,7 +180,7 @@ export async function llmDecide(history: ChatTurn[], lang: Lang, timeoutMs = 450
 
   const json = await geminiGenerate(
     {
-      systemInstruction: { parts: [{ text: systemInstruction(lang) }] },
+      systemInstruction: { parts: [{ text: systemInstruction(lang) + (contextHint ? " " + contextHint : "") }] },
       contents,
       tools: [{ functionDeclarations: declarations() }],
       toolConfig: { functionCallingConfig: { mode: "AUTO" } },
