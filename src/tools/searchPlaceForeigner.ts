@@ -362,6 +362,15 @@ function renderSeoul(query: string, items: SeoulCard[], indoor = false): string 
 // lead "things to see in Seoul" (P-V2).
 const EPHEMERAL_RE = /festival|exhibition|concert|performance|\bshow\b|biennale|fair\b|행사|축제|전시|공연|콘서트|페스티벌/i;
 
+// Category paths that denote a standing venue (open year-round) rather than a
+// programme running inside one.
+const PERMANENT_VENUE_RE =
+  /museum|galler|aquarium|library|department\s*store|mall|theme\s*park|palace|박물관|미술관|화랑|아쿠아리움|도서관|백화점|쇼핑몰|테마파크|궁/i;
+
+// Titles that announce a dated, limited run: a year ("SKETCH 2026", "2027 S/S…"),
+// Korean exhibition markers, or the 《》 brackets Korean venues use for show titles.
+const DATED_TITLE_RE = /\b(?:19|20)\d{2}\b|《|》|개인전|기획전|특별전|초대전|展/;
+
 /** Rank Seoul results for the query: float a specific noun (museum/palace/gallery)
  *  up (Y3), and demote ephemeral events/exhibitions for general sightseeing intent
  *  (P-V2) — unless the user explicitly asked for events. */
@@ -380,6 +389,12 @@ function rankByIntent(items: SeoulContent[], query: string): SeoulContent[] {
     let s = 0;
     if (want) s += (want.test(c.title) ? 2 : 0) + (c.categoryPath && want.test(c.categoryPath) ? 1 : 0);
     if (!wantsEvents && (EPHEMERAL_RE.test(c.title) || (c.categoryPath && EPHEMERAL_RE.test(c.categoryPath)))) s -= 2;
+    if (!wantsEvents) {
+      // A visitor asking "where can I go" wants somewhere open next week too, so a
+      // standing venue outranks this month's exhibition run (live-reported).
+      if (PERMANENT_VENUE_RE.test(c.categoryPath ?? "")) s += 2;
+      if (DATED_TITLE_RE.test(c.title)) s -= 2;
+    }
     return s;
   };
   return items

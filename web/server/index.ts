@@ -22,8 +22,10 @@ app.use(express.json({ limit: "64kb" }));
 /* ------------------------------- rate limiting ------------------------------ */
 // Small in-memory token bucket per IP: protects upstream API keys and the LLM
 // quota from abuse; sized generously above any human chat cadence.
-const BUCKET_CAPACITY = 20; // burst
-const REFILL_PER_MS = 20 / 60_000; // 20 req/min
+// Configurable so a QA sweep can be raised temporarily without a code change.
+const RATE_PER_MIN = Number(process.env.RATE_LIMIT_PER_MIN ?? 20) || 20;
+const BUCKET_CAPACITY = RATE_PER_MIN; // burst
+const REFILL_PER_MS = RATE_PER_MIN / 60_000;
 const buckets = new Map<string, { tokens: number; ts: number }>();
 
 function rateLimit(req: Request, res: Response, next: NextFunction): void {
