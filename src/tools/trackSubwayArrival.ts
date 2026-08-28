@@ -152,6 +152,25 @@ function renderJourney(
   return lines.join("\n");
 }
 
+// Night-time phrasing for "when does the last train go?", in the four languages.
+const LAST_TRAIN_RE = /last\s*train|final\s*train|막차|끝차|終電|最終電車|末班车|末班車/i;
+
+/** Honest last-train answer: the rule of thumb, plus where the exact time lives. */
+function lastTrainAnswer(where: string): string {
+  const at = where ? ` from ${where}` : "";
+  return [
+    `🌙 **Last train${at}**`,
+    "",
+    "I get **live train positions**, not the printed timetable — so here is the reliable rule plus where to check the exact minute:",
+    "",
+    "- Seoul subway last trains leave their **terminals around 23:00–00:00**, so a mid-line station is usually **00:00–00:30** — it varies by line and direction.",
+    "- The **exact** last-train time is on the platform sign and in **Kakao Map / Naver Map** (search your station → 시간표 / timetable).",
+    "- Missed it? **N-buses** (night buses, N-prefixed) run ~23:30–06:00 for about ₩2,500, and taxis are plentiful — late-night fares carry a ~20% surcharge after midnight.",
+    "",
+    "_Tell me your station and I will show what is running right now._",
+  ].join("\n");
+}
+
 export const trackSubwayArrival: ToolDef = {
   name: "trackSubwayArrival",
   description:
@@ -184,6 +203,14 @@ export const trackSubwayArrival: ToolDef = {
     const station = String(args.station ?? "").trim();
     const to = String(args.to ?? "").trim();
     const line = String(args.line ?? "").trim();
+
+    // "When is the last train?" is one of the most-asked night questions, and the
+    // realtime feed has no timetable — QA saw it answered with *next* arrivals, and
+    // even with trains that had already departed. Say what is true, and point at
+    // the two things that do answer it.
+    if (LAST_TRAIN_RE.test(`${args.station ?? ""} ${args.line ?? ""} ${args.to ?? ""}`)) {
+      return ok(lastTrainAnswer(station || line), CHOICES);
+    }
 
     if (!hasKey("SUBWAY_API_KEY")) {
       return notConnected(

@@ -19,6 +19,9 @@ interface Dish {
 }
 
 const DISHES: Dish[] = [
+  { match: /짬뽕|jjamppong|jjambbong|champong/i, en: "Jjamppong (spicy seafood noodle soup)", desc: "Fiery red seafood-and-vegetable noodle soup — squid, mussels, shrimp in a chili broth.", spice: 3, allergens: ["shellfish", "seafood", "gluten", "soy"] },
+  { match: /(?<!\S)김치(?!찌개|전|볶)|(?<!\S)kimchi(?!\s*(?:jjigae|jeon|fried))/i, en: "Kimchi", desc: "Fermented napa cabbage with chili, garlic and jeotgal (salted seafood) — served free with almost every meal. Usually NOT vegetarian because of the fish sauce/shrimp, though vegan versions exist.", spice: 2, allergens: ["fish", "shellfish"] },
+  { match: /김밥|gimbap|kimbap/i, en: "Gimbap (seaweed rice roll)", desc: "Seasoned rice, vegetables, egg and ham or tuna rolled in seaweed and sliced — the classic cheap, portable meal.", spice: 0, allergens: ["egg", "sesame", "fish", "soy"] },
   { match: /김치찌개|kimchi.?jjigae/i, en: "Kimchi stew", desc: "Tangy, fermented-cabbage stew, usually with pork and tofu.", spice: 2, allergens: ["soy", "pork", "fish"] },
   { match: /된장찌개|doenjang/i, en: "Soybean-paste stew", desc: "Savory, earthy stew from fermented soybean paste with vegetables and tofu.", spice: 1, allergens: ["soy", "shellfish"] },
   { match: /비빔밥|bibimbap/i, en: "Bibimbap", desc: "Rice topped with seasoned vegetables, egg, and gochujang; mix before eating.", spice: 1, allergens: ["egg", "soy", "sesame"] },
@@ -149,9 +152,18 @@ function phraseCard(concerns: string[], veg: boolean, noPork: boolean): string[]
     rows.push('- No meat/fish: **"저는 고기와 생선을 안 먹어요"** (_jeo-neun gogi-wa saengseon-eul an meogeoyo_ — "I don\'t eat meat or fish")');
   if (noPork)
     rows.push('- No pork: **"돼지고기 빼주세요"** (_dwaeji-gogi ppae-juseyo_ — "please leave out the pork")');
-  const allergyWords = concerns.filter((c) => !/veg|vegan|meat|pork.?free|halal|beef/.test(c));
-  if (allergyWords.length)
-    rows.push(`- Allergy: **"저는 ${allergyWords.join("/")} 알레르기가 있어요"** (_…allergy…_ — say it / show this).`);
+  // 'I can't handle spicy' is a preference, not an allergy — QA found the card
+  // telling staff '저는 spicy 알레르기가 있어요'.
+  const allergyWords = concerns.filter((c) => !/veg|vegan|meat|pork.?free|halal|beef|spic|매운|맵|辛|辣/i.test(c));
+  if (allergyWords.length) {
+    // The card is meant to be SHOWN to Korean staff, so it must read as Korean all
+    // the way through — QA found '저는 spicy 알레르기가 있어요' and '저는 shellfish
+    // 알레르기가 있어요', which staff cannot act on.
+    const koWords = allergyWords.map((w) => ALLERGEN_KO[w.toLowerCase()] ?? w);
+    rows.push(
+      `- Allergy: **"저는 ${koWords.join("/")} 알레르기가 있어요"** (_I have a ${allergyWords.join("/")} allergy_ — say it / show this).`,
+    );
+  }
   rows.push('- Ask: **"이거 안에 뭐 들어가요?"** (_i-geo ane mwo deureoga-yo?_ — "what\'s in this?")');
   return rows.length ? ["", "🪧 **Show this to the staff (Korean):**", ...rows] : [];
 }
@@ -223,6 +235,43 @@ const CHOICES: Choice[] = [
   { emoji: "🌶️", cmdEn: "Show only non-spicy options", descEn: "filter out spicy dishes" },
 ];
 
+// Allergen names in Korean, for the card the visitor shows to restaurant staff.
+const ALLERGEN_KO: Record<string, string> = {
+  shellfish: "갑각류", shrimp: "새우", crab: "게", crustacean: "갑각류",
+  peanut: "땅콩", peanuts: "땅콩", nut: "견과류", nuts: "견과류", treenut: "견과류",
+  gluten: "밀", wheat: "밀", egg: "계란", eggs: "계란", dairy: "유제품", milk: "우유",
+  soy: "콩", soybean: "콩", fish: "생선", seafood: "해산물", pork: "돼지고기",
+  beef: "소고기", chicken: "닭고기", sesame: "참깨", buckwheat: "메밀", shell: "조개",
+};
+// Japanese katakana spellings of Korean dishes. Visitors type トッポッキ, not
+// tteokbokki, and every katakana dish query in QA came back "no known dish".
+const KANA_DISHES: [RegExp, string][] = [
+  [/トッポッキ|トッポギ/g, "tteokbokki"],
+  [/サムギョプサル/g, "samgyeopsal"],
+  [/チヂミ|ジョン/g, "jeon"],
+  [/ビビンバ/g, "bibimbap"],
+  [/キムチチゲ/g, "kimchi jjigae"],
+  [/スンドゥブ/g, "sundubu"],
+  [/プデチゲ/g, "budae jjigae"],
+  [/チャンポン/g, "jjamppong"],
+  [/ジャージャー麺|ジャジャン麺/g, "jjajangmyeon"],
+  [/冷麺|ネンミョン/g, "naengmyeon"],
+  [/カルビ/g, "galbi"],
+  [/キンパ|キンパプ/g, "gimbap"],
+  [/参鶏湯|サムゲタン/g, "samgyetang"],
+  [/ホットク/g, "hotteok"],
+  [/スンデ/g, "sundae"],
+  [/タッカルビ/g, "dakgalbi"],
+  [/ヤンニョムチキン/g, "yangnyeom chicken"],
+  [/キムチ/g, "kimchi"],
+];
+
+/** Rewrite katakana dish names to the romanization the matcher knows. */
+export function normalizeDishText(text: string): string {
+  let out = text ?? "";
+  for (const [re, roman] of KANA_DISHES) out = out.replace(re, roman);
+  return out;
+}
 export const translateMenuContext: ToolDef = {
   name: "translateMenuContext",
   description:
@@ -244,7 +293,7 @@ export const translateMenuContext: ToolDef = {
     openWorldHint: false,
   },
   handler: (args) => {
-    const menuText = String(args.menuText ?? "");
+    const menuText = normalizeDishText(String(args.menuText ?? ""));
     const concerns = Array.isArray(args.allergyConcerns)
       ? (args.allergyConcerns as unknown[]).map((c) => String(c).toLowerCase())
       : [];

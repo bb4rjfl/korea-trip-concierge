@@ -24,6 +24,27 @@ const RETRY: Choice[] = [
   { emoji: "🗺️", cmdEn: "Guide me around the area", descEn: "neighborhood overview" },
 ];
 
+/**
+ * Combine air quality with what the sky is actually doing. The air advisory alone
+ * told visitors to enjoy the outdoors under a heat-wave warning and showers.
+ */
+function outdoorAdvice(
+  airAdvisory: string,
+  weather: { tempC?: number | null; sky?: string; precip?: string; rainProb?: number | null } | undefined,
+  alerts: string[],
+): string {
+  const alertText = alerts.join(" ");
+  const wet =
+    (weather?.rainProb ?? 0) >= 50 ||
+    /rain|shower|snow|storm/i.test(`${weather?.precip ?? ""} ${weather?.sky ?? ""}`) ||
+    /rain|storm|typhoon/i.test(alertText);
+  const hot = (weather?.tempC ?? 0) >= 33 || /heat/i.test(alertText);
+  const cold = (weather?.tempC ?? 99) <= -5 || /cold/i.test(alertText);
+  if (wet) return "☔ Rain is the deciding factor today — plan something indoors, and keep an umbrella for the walk between stops.";
+  if (hot) return "🥵 Heat is the deciding factor — stay indoors 12:00–16:00, drink water, and save outdoor sights for the evening.";
+  if (cold) return "🧊 Bitter cold — keep outdoor stretches short and plan warm-up stops along the way.";
+  return airAdvisory;
+}
 export const getWeatherAndAir: ToolDef = {
   name: "getWeatherAndAir",
   description:
@@ -83,8 +104,11 @@ export const getWeatherAndAir: ToolDef = {
     }
 
     // Safety first: surface any active nationwide weather warnings (typhoon, etc.).
-    if (alerts.length) {
-      lines.push(`🚨 **Weather warnings in effect:** ${alerts.join(", ")} _(nationwide — check your local area)_`, "");
+    // The feed repeats a type at several levels (advisory + warning), which read
+    // as a longer list than reality.
+    const uniqueAlerts = [...new Set(alerts)];
+    if (uniqueAlerts.length) {
+      lines.push(`🚨 **Weather warnings in effect:** ${uniqueAlerts.join(", ")} _(issued nationwide — confirm for your district)_`, "");
     }
 
     const w: string[] = [];
@@ -100,7 +124,10 @@ export const getWeatherAndAir: ToolDef = {
     if (air?.pm25 != null) pm.push(`PM2.5 ${air.pm25}`);
     if (air && pm.length) {
       lines.push(`😷 Air quality: **${air.grade}** (${pm.join(", ")} ㎍/㎥)`);
-      lines.push(air.advisory);
+      // Clean air is not an invitation to go outside during a downpour or a heat
+      // warning — QA caught "Great air, enjoy the outdoors" printed directly under
+      // a heat-wave warning and 60% showers.
+      lines.push(outdoorAdvice(air.advisory, weather, uniqueAlerts));
       if (air.dataTime) lines.push(`\n_Air measured ${air.dataTime} (KST), ${air.stations} stations._`);
     } else {
       lines.push("😷 Air quality: _data unavailable right now._");

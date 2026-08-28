@@ -34,6 +34,24 @@ interface ServiceGuide {
 
 const SERVICES: ServiceGuide[] = [
   {
+    // Lost passport / wallet / phone / bag, theft and scams. QA found every one of
+    // these routed to the medical-emergency card — no embassy, no 112, no lost112.
+    match: /(lost|stole|stolen|theft|pickpocket|missing|left (?:my|it|the)|scam|overcharg|rip(?:ped)? me off|분실|잃어버|도난|소매치기|바가지|사기|置き忘|なくし|盗まれ|丢了|丢失|被偷|被骗)/i,
+    label: "Lost or stolen — passport, wallet, phone, bag",
+    emoji: "🆘",
+    blocker:
+      "Korean lost-property and police systems assume a Korean phone and resident ID, and the reporting sites are Korean-only — so the usual advice ('report it online') doesn't work for a visitor.",
+    workaround: [
+      "**Passport gone** → report to police (**112**, or any 파출소) for a report slip, then contact **your embassy in Seoul** for an emergency travel document. Bring the police slip, a photo, and any ID copy. Most embassies are in Jongno/Yongsan.",
+      "**Left on a train/bus/taxi** → Seoul Metro **Lost & Found** at City Hall (Line 1/2) and Chungmuro (Line 3/4); taxi items via **120 Dasan Call** (press 9 for English). Have the vehicle number, line, time and exit.",
+      "**Anything else** → the national lost-property portal **lost112.go.kr**; items are logged nationwide.",
+      "**Card stolen** → freeze it in your bank's app first, then report to 112.",
+      "**Overcharged or scammed** → keep the receipt/plate number and call **1330** (24h, multilingual) — they mediate and can call the shop or taxi company for you.",
+    ],
+    twin: "**1330** (Korea Travel Hotline) is the practical English front door for all of the above — they interpret and route.",
+    fallback: "Police **112** · Emergency **119** · Travel hotline **1330** · Seoul city **120**.",
+  },
+  {
     // `kakao ?t\b` so "KakaoTalk" (a different service) doesn't match the taxi guide (N1).
     match: /(taxi|kakao ?t\b|cab|\bhail\b|ride.?hail|택시|카카오\s*t\b)/i,
     label: "Taxi apps (Kakao T)",
