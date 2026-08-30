@@ -67,7 +67,11 @@ export function parseRoutes(json: OdsayResponse): TransitRoute[] {
   }));
 }
 
-const cache = new TtlCache<TransitRoute[]>(2 * 60_000);
+// 30 minutes: the route OPTIONS between two points barely change within a
+// session, and ODsay bills a hard daily quota — a QA sweep exhausted it once
+// and took the product's core feature down with it. Live arrival times still
+// come from the realtime tools, which are not cached.
+const cache = new TtlCache<TransitRoute[]>(30 * 60_000);
 
 export interface Coord {
   lng: number;
