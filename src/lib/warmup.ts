@@ -10,6 +10,8 @@
 
 // One URL per external origin. The path may 4xx — we only need the DNS + TLS handshake
 // and a pooled keep-alive socket; the body is drained so the socket returns to the pool.
+import { getGraph } from "./sources/subwayGraph.js";
+
 export const WARM_URLS = [
   "https://openapi.naver.com/v1/search/local.json?query=x&display=1", // Naver POI
   "https://places-api.foursquare.com/places/search?ll=37.57,126.98",  // Foursquare POI
@@ -23,6 +25,8 @@ export const WARM_URLS = [
 
 /** Fire one throwaway request per external origin to warm the connection pool. */
 export function warmUpSources(): void {
+  // Pull the subway graph in the background so the first route request is instant.
+  void getGraph();
   for (const url of WARM_URLS) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);

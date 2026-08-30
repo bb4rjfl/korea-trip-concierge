@@ -8,6 +8,8 @@ import { romanizeText } from "../lib/romanize.js";
 import { resolvePlaceCoord } from "../lib/places.js";
 import { detectIntercity, renderIntercity } from "../lib/intercity.js";
 import { normalizeName } from "../lib/fuzzy.js";
+import { getGraph, lineLabel, planRoute } from "../lib/sources/subwayGraph.js";
+import { getStationArrivals } from "../lib/sources/seoulSubway.js";
 import { directionsLinks } from "../lib/maplinks.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
@@ -106,6 +108,94 @@ function trackChips(routes: TransitRoute[]): Choice[] {
   return chips.slice(0, 4);
 }
 
+/**
+ * Landmarks visitors name that are not themselves stations, mapped to the station
+ * they arrive at. Keeps the rail planner useful for "Gyeongbokgung" or "COEX",
+ * not just for names that happen to match a station.
+ */
+const LANDMARK_STATION: [RegExp, string][] = [
+  [/gyeongbokgung|경복궁|景福宮|景福宫/i, "경복궁"],
+  [/changdeokgung|창덕궁|昌徳宮|昌德宫/i, "안국"],
+  [/bukchon|북촌|北村/i, "안국"],
+  [/insadong|인사동|仁寺洞/i, "안국"],
+  [/gwangjang|광장시장|広蔵市場|广藏市场/i, "종로5가"],
+  [/coex|코엑스/i, "삼성"],
+  [/lotte world|롯데월드|ロッテワールド|乐天世界/i, "잠실"],
+  [/n seoul tower|namsan|남산|南山/i, "명동"],
+  [/ddp|동대문디자인|dongdaemun design/i, "동대문역사문화공원"],
+  [/garosu|가로수길|カロスキル|林荫道/i, "신사"],
+  [/ikseon|익선동/i, "종로3가"],
+  [/myeongdong|명동|明洞|ミョンドン/i, "명동"],
+  [/hongdae|홍대|弘大|ホンデ/i, "홍대입구"],
+  [/itaewon|이태원|梨泰院/i, "이태원"],
+  [/seongsu|성수|聖水|圣水/i, "성수"],
+  [/gangnam|강남|江南/i, "강남"],
+  [/jamsil|잠실|蚕室/i, "잠실"],
+  [/yeouido|여의도|汝矣島|汝矣岛/i, "여의도"],
+  [/namdaemun|남대문|南大門|南大门/i, "회현"],
+  [/express bus terminal|고속터미널/i, "고속터미널"],
+  [/seoul forest|서울숲/i, "서울숲"],
+  [/incheon (?:int|international)?\s*airport|인천공항|仁川空港|仁川机场/i, "인천공항1터미널"],
+  [/gimpo (?:int|international)?\s*airport|김포공항|金浦空港|金浦机场/i, "김포공항"],
+  [/seoul station|서울역|ソウル駅|首尔站|首爾站/i, "서울역"],
+];
+
+/** Map a free-text endpoint to a station name the graph knows, if we can. */
+function toStationName(name: string): string {
+  for (const [re, station] of LANDMARK_STATION) if (re.test(name)) return station;
+  return name;
+}
+
+/**
+ * Plan the trip on the subway graph and dress it with a live first-train time.
+ * Returns undefined when the rails can't serve this pair, so the caller falls
+ * through to the metered routing API.
+ */
+async function trySubwayGraph(from: string, to: string, dir: string) {
+  try {
+    const graph = await getGraph();
+    const route = planRoute(graph, toStationName(from), toStationName(to));
+    if (!route) return undefined;
+
+    const first = route.legs[0];
+    // The live board for the boarding station makes this a real-time answer, not a
+    // timetable lookup — and it is the thing a waiting passenger actually wants.
+    let live = "";
+    try {
+      const arrivals = await getStationArrivals(first.from);
+      const next = arrivals.slice(0, 2);
+      if (next.length) {
+        const board = next
+          .map((a) => `${a.towards || a.destination} — ${a.etaMinutes != null ? `${a.etaMinutes} min` : a.status}`)
+          .join(" · ");
+        live = `\n\n🟢 **Live at ${first.from} now:** ${board}`;
+      }
+    } catch {
+      /* live board is a bonus, never a blocker */
+    }
+
+    const lines = route.legs.map((l, i) => {
+      const label = lineLabel(l.line);
+      return `${i === 0 ? "🚇" : "🔁"} **${label}** ${l.from} → ${l.to} _(${l.stops} stop${l.stops === 1 ? "" : "s"})_`;
+    });
+
+    const head =
+      `🚇 **${from} → ${to}** — by subway\n\n` +
+      `⏱️ about **${route.minutes} min** · ${route.stops} stops · ` +
+      `${route.transfers === 0 ? "no transfers" : `${route.transfers} transfer${route.transfers === 1 ? "" : "s"}`} · ` +
+      `💳 around **₩${route.fareWon.toLocaleString()}**`;
+
+    return ok(
+      [head, "", ...lines, live, "", dir, "", "_Route from Seoul subway network data (ⓒ서울특별시); times are typical._"]
+        .filter(Boolean)
+        .join("\n"),
+      CHOICES,
+    );
+  } catch {
+    return undefined;
+  }
+}
+
 export const getTransitRoute: ToolDef = {
   name: "getTransitRoute",
   description:
@@ -189,6 +279,12 @@ export const getTransitRoute: ToolDef = {
     // Resilient fallback: a Kakao/Naver Map directions link (routes by place name) so
     // the visitor can still navigate even if our live routing source is unavailable.
     const dir = directionsLinks(from, to);
+
+    // Subway first, from our own graph of Seoul Open Data. It has no quota, answers
+    // instantly, and covers the majority of visitor journeys — the metered routing
+    // API below is now only the fallback for anything the rails can't serve.
+    const rail = await trySubwayGraph(from, to, dir);
+    if (rail) return rail;
 
     if (!hasKey("TRANSIT_API_KEY") || !hasKey("TOUR_API_KEY")) {
       return notConnected(

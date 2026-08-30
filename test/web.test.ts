@@ -10,6 +10,8 @@ import { matchAreaName } from "../src/tools/getAreaGuide.js";
 import { searchTerms } from "../src/tools/searchPlaceForeigner.js";
 import { isIndoorIntent, isLikelyOutdoor } from "../src/lib/sources/visitseoul.js";
 import { mapLinks, mapLinksAt } from "../src/lib/maplinks.js";
+import { buildGraph, findStationCodes, lineLabel, planRoute } from "../src/lib/sources/subwayGraph.js";
+import SUBWAY_SNAPSHOT from "../src/lib/data/subwayStations.json" with { type: "json" };
 import { SCENARIOS } from "../web/client/src/i18n.js";
 import { nearestPlace } from "../web/client/src/geo.js";
 import type { Lang } from "../web/server/router.js";
@@ -380,5 +382,63 @@ describe("emergency and safety routing", () => {
     expect(isIllegalRequest("대마 어디서 사?")).toBe(true);
     expect(isIllegalRequest("where can I buy weed killer for my garden")).toBe(true); // conservative: refuse
     expect(isIllegalRequest("where can I buy souvenirs")).toBe(false);
+  });
+});
+
+/* ------------------- our own subway routing (no metered API) ----------------- */
+
+describe("Seoul subway graph", () => {
+  const graph = buildGraph(
+    (SUBWAY_SNAPSHOT as { c: string; k: string; e: string; j: string; z: string; l: string }[]).map((r) => ({
+      STATION_CD: r.c,
+      STATION_NM: r.k,
+      STATION_NM_ENG: r.e,
+      STATION_NM_JPN: r.j,
+      STATION_NM_CHN: r.z,
+      LINE_NUM: r.l,
+    })),
+  );
+
+  it("indexes the whole network", () => {
+    expect(graph.stations.length).toBeGreaterThan(700);
+  });
+
+  it("resolves a station in each language", () => {
+    const ko = (n: string) => findStationCodes(graph, n).map((c) => graph.byCode.get(c)!.ko);
+    expect(ko("Seoul Station")).toContain("서울역");
+    expect(ko("서울역")).toContain("서울역");
+    expect(ko("ソウル駅")).toContain("서울역");
+    expect(ko("首尔站")).toContain("서울역");
+    expect(ko("明洞")).toContain("명동");
+  });
+
+  it("routes Gangnam→Hongik on Line 2 without a transfer", () => {
+    // The ring is the real answer here; an under-priced transfer used to make the
+    // planner prefer a two-change detour.
+    const r = planRoute(graph, "강남", "홍대입구")!;
+    expect(r.transfers).toBe(0);
+    expect(r.stops).toBe(17);
+    expect(lineLabel(r.legs[0].line)).toBe("Line 2");
+  });
+
+  it("routes Seoul Station→Gangnam with one transfer", () => {
+    const r = planRoute(graph, "Seoul Station", "Gangnam")!;
+    expect(r.transfers).toBe(1);
+    expect(r.legs.map((l) => lineLabel(l.line))).toEqual(["Line 4", "Line 2"]);
+  });
+
+  it("does not bridge Line 2's branches onto the ring", () => {
+    // 까치산 sits at the end of the Sinjeong branch; its station code is adjacent to
+    // 시청's, which used to link them as if they were neighbouring stops.
+    const r = planRoute(graph, "시청", "까치산")!;
+    expect(r.stops).toBeGreaterThan(10);
+    const r2 = planRoute(graph, "성수", "신설동")!;
+    expect(r2.stops).toBe(3); // 성수지선
+  });
+
+  it("plans across languages", () => {
+    const r = planRoute(graph, "明洞", "東大門")!;
+    expect(r.legs[0].from).toBe("명동");
+    expect(r.legs[r.legs.length - 1].to).toBe("동대문");
   });
 });
