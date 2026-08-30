@@ -236,11 +236,26 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
       ? `⛔ **The subway isn't running right now** (roughly 05:30–24:00). Until first train, take a night bus (N-routes) or a taxi — Kakao T works with a foreign card.`
       : "";
 
+    // The airport line charges its own fare, well above the metro base — quoting
+    // ₩1,400 for a ride to Incheon is the kind of number someone budgets on.
+    const airportLeg = route.legs.find((l) => /공항철도/.test(l.line) && /인천공항/.test(l.to));
+    const AREX_FARE: [RegExp, number][] = [
+      [/김포공항/, 3750],
+      [/마곡나루|계양|검암/, 4050],
+      [/홍대입구|디지털미디어시티|공덕/, 4450],
+    ];
+    const fareWon = airportLeg
+      ? (AREX_FARE.find(([re]) => re.test(airportLeg.from))?.[1] ?? 4750)
+      : route.fareWon;
+    const arexNote = airportLeg
+      ? "\n✈️ _That fare is the all-stop AREX train. The non-stop Express (Seoul Station → T1, 43 min) is about ₩11,000 and needs a seat reservation._"
+      : "";
+
     const head =
       `🚇 **${from} → ${to}** — by subway\n\n` +
       `⏱️ about **${route.minutes} min** · ${route.stops} stops · ` +
       `${route.transfers === 0 ? "no transfers" : `${route.transfers} transfer${route.transfers === 1 ? "" : "s"}`} · ` +
-      `💳 around **₩${route.fareWon.toLocaleString()}**`;
+      `💳 around **₩${fareWon.toLocaleString()}**${arexNote}`;
 
     return ok(
       [
