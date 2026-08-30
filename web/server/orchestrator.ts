@@ -313,12 +313,32 @@ const ERROR_MSG: Record<Lang, string> = {
 };
 
 /** Default suggestion chips for welcome/unrouted turns (en/ko pair like tools). */
-const DEFAULT_CHIPS: Chip[] = [
-  { emoji: "🌧️", cmdEn: "It's raining in Seoul — where can I go indoors?", cmdKo: "서울에 비 오는데 실내로 갈 만한 곳은?" },
-  { emoji: "🚇", cmdEn: "When is the last train from Hongik University station?", cmdKo: "홍대입구역 막차 언제야?" },
-  { emoji: "🕐", cmdEn: "Is Gyeongbokgung Palace open now?", cmdKo: "경복궁 지금 열었어?" },
-  { emoji: "💳", cmdEn: "My card was declined at a restaurant — what now?", cmdKo: "식당에서 카드가 거절됐어 — 어떡하지?" },
-];
+const DEFAULT_CHIPS_BY_LANG: Record<Lang, Chip[]> = {
+  en: [
+    { emoji: "🌧️", cmdEn: "It's raining in Seoul — where can I go indoors?" },
+    { emoji: "🚇", cmdEn: "When is the last train from Hongik University station?" },
+    { emoji: "🕐", cmdEn: "Is Gyeongbokgung Palace open now?" },
+    { emoji: "💳", cmdEn: "My card was declined at a restaurant — what now?" },
+  ],
+  ko: [
+    { emoji: "🌧️", cmdEn: "서울에 비 오는데 실내로 갈 만한 곳은?" },
+    { emoji: "🚇", cmdEn: "홍대입구역 막차 언제야?" },
+    { emoji: "🕐", cmdEn: "경복궁 지금 열었어?" },
+    { emoji: "💳", cmdEn: "식당에서 카드가 거절됐어 — 어떡하지?" },
+  ],
+  ja: [
+    { emoji: "🌧️", cmdEn: "ソウルで雨が降っています — 室内で行ける場所は？" },
+    { emoji: "🚇", cmdEn: "弘大入口駅の終電は何時ですか？" },
+    { emoji: "🕐", cmdEn: "景福宮は今開いていますか？" },
+    { emoji: "💳", cmdEn: "レストランでカードが使えませんでした — どうすれば？" },
+  ],
+  zh: [
+    { emoji: "🌧️", cmdEn: "首尔下雨了 — 有什么室内的地方可以去？" },
+    { emoji: "🚇", cmdEn: "弘大入口站的末班车是几点？" },
+    { emoji: "🕐", cmdEn: "景福宫现在开门吗？" },
+    { emoji: "💳", cmdEn: "在餐厅刷卡被拒了 — 怎么办？" },
+  ],
+};
 
 /* --------------------------------- pipeline --------------------------------- */
 
@@ -370,12 +390,12 @@ ${partial.reply ?? ""}`.trim(),
   };
 
   if (!text) {
-    return done({ reply: WELCOME[lang], chips: DEFAULT_CHIPS });
+    return done({ reply: WELCOME[lang], chips: DEFAULT_CHIPS_BY_LANG[lang] });
   }
 
   // Answering this with a tourism-branded place list is a legal-exposure risk.
   if (isIllegalRequest(text)) {
-    return done({ reply: ILLEGAL_REPLY[lang], chips: DEFAULT_CHIPS });
+    return done({ reply: ILLEGAL_REPLY[lang], chips: DEFAULT_CHIPS_BY_LANG[lang] });
   }
 
   try {
@@ -403,7 +423,7 @@ ${partial.reply ?? ""}`.trim(),
           toolCall = { name: salvage.tool, args: salvage.args };
           engine = "rules";
         } else {
-          return done({ reply: decision.text, chips: DEFAULT_CHIPS, meta: { engine: "llm" } });
+          return done({ reply: decision.text, chips: DEFAULT_CHIPS_BY_LANG[lang], meta: { engine: "llm" } });
         }
       }
       if (decision?.kind === "tool") {
@@ -433,7 +453,7 @@ ${partial.reply ?? ""}`.trim(),
 
     // 3) Nothing routed → welcome/help.
     if (!toolCall) {
-      return done({ reply: WELCOME[lang], chips: DEFAULT_CHIPS });
+      return done({ reply: WELCOME[lang], chips: DEFAULT_CHIPS_BY_LANG[lang] });
     }
 
     // 4) Execute (zod-validated); missing required args → friendly clarify.
@@ -468,6 +488,6 @@ ${partial.reply ?? ""}`.trim(),
     });
   } catch (err) {
     console.error("[chat] pipeline error:", err);
-    return done({ reply: ERROR_MSG[lang], chips: DEFAULT_CHIPS });
+    return done({ reply: ERROR_MSG[lang], chips: DEFAULT_CHIPS_BY_LANG[lang] });
   }
 }

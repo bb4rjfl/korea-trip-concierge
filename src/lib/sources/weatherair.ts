@@ -247,13 +247,37 @@ const WARN_LEVEL: [RegExp, string][] = [
 ];
 
 /** Parse the t6 "active warnings" text into deduped English "Type level" labels. */
-export function parseAlerts(t6?: string): string[] {
+/**
+ * Korean names of the cities we serve, so a warning can be matched to the place
+ * the visitor actually asked about. The feed lists affected regions on each
+ * warning line; discarding them made Seoul, Busan and Jeju show an identical
+ * five-warning block — including a heat-wave warning at 28°C under cloud.
+ */
+const CITY_KO: Record<string, RegExp> = {
+  Seoul: /서울/,
+  Busan: /부산/,
+  Incheon: /인천/,
+  Daegu: /대구/,
+  Daejeon: /대전|세종/,
+  Gwangju: /광주|전남/,
+  Ulsan: /울산/,
+  Jeju: /제주/,
+  Suwon: /경기|수원/,
+  Gangneung: /강원|강릉/,
+  Jeonju: /전북|전주/,
+  Gyeongju: /경북|경주/,
+};
+
+export function parseAlerts(t6?: string, city?: string): string[] {
   const text = (t6 ?? "").trim();
   if (!text || /없\s*음/.test(text)) return [];
+  const where = city ? CITY_KO[city] : undefined;
   const out = new Set<string>();
   for (const line of text.split(/\n|o\s/)) {
     const s = line.trim();
     if (!s) continue;
+    // Keep a warning only when it names this city (or is genuinely nationwide).
+    if (where && !where.test(s) && !/전국/.test(s)) continue;
     const type = WARN_TYPE.find(([re]) => re.test(s));
     const level = WARN_LEVEL.find(([re]) => re.test(s));
     if (type) out.add(`${type[1]} ${level ? level[1] : "alert"}`);
@@ -268,8 +292,8 @@ interface PwnItem {
 const alertCache = new TtlCache<string[]>(15 * 60_000);
 
 /** Currently-active weather warnings nationwide (English labels). Best-effort. */
-export async function getWeatherAlerts(): Promise<string[]> {
-  return alertCache.getOrLoad("alerts", async () => {
+export async function getWeatherAlerts(city?: string): Promise<string[]> {
+  return alertCache.getOrLoad(`alerts:${city ?? "all"}`, async () => {
     const sp = new URLSearchParams({
       serviceKey: ENV.BUS_API_KEY,
       dataType: "JSON",
@@ -279,6 +303,6 @@ export async function getWeatherAlerts(): Promise<string[]> {
     const json = await fetchJson<{ response?: { body?: { items?: { item?: PwnItem[] } } } }>(`${WRN_BASE}?${sp}`);
     const items = json.response?.body?.items?.item ?? [];
     const t6 = items.map((i) => i.t6 ?? "").join("\n");
-    return parseAlerts(t6);
+    return parseAlerts(t6, city);
   });
 }

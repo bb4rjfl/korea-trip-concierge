@@ -93,7 +93,15 @@ export function contextHint(ctx: ConvoContext): string {
 }
 
 const BLANK = /^\s*$|^(?:this|that|here|there|it|one of these|the place|거기|여기|이곳|그곳|そこ|ここ|这里|那里)\s*$/i;
-const missing = (v: unknown): boolean => typeof v !== "string" || BLANK.test(v);
+
+// A tapped chip arrives as its own label, and the model sometimes passes that
+// label straight through as a place name — QA saw "이 중에 지금 열려 있는 곳"
+// and "訪れるのに良い時期" looked up as if they were venues. Anything that reads
+// as one of our own questions is treated as missing so the slots fill it.
+const CHIP_LABEL =
+  /\b(?:one of these|right now|open now|how do I get|guide me|search for|show me|track bus|plan a route|better time|nothing matched)\b|지금 열|이 중|가는 길|안내해|검색|추천해|더 나은|일치하는|今開|訪れる|案内|検索|良い時期|现在开|这些中|怎么去|介绍一下|搜索|更好的|没有匹配/i;
+const missing = (v: unknown): boolean =>
+  typeof v !== "string" || BLANK.test(v) || CHIP_LABEL.test(v) || v.trim().length > 60;
 
 /**
  * Fill arguments the router left empty (or left as a pronoun) from the slots.

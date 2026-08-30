@@ -41,7 +41,10 @@ describe("mapLinks", () => {
     const m = mapLinks("Seongsu (성수동)");
     expect(m).toContain("map.naver.com/p/search/");
     expect(m).toContain("map.kakao.com/?q=");
-    expect(m).toContain(encodeURIComponent("Seongsu (성수동)"));
+    // The romanized prefix is dropped: Kakao/Naver search a Korean database, and
+    // "Seongsu (성수동)" returns nothing there while "성수동" finds the place.
+    expect(m).toContain(encodeURIComponent("성수동"));
+    expect(m).not.toContain("Seongsu%20");
   });
   it("is empty for blank input", async () => {
     const { mapLinks } = await import("../src/lib/maplinks.js");

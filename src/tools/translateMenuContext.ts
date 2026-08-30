@@ -245,6 +245,29 @@ const ALLERGEN_KO: Record<string, string> = {
 };
 // Japanese katakana spellings of Korean dishes. Visitors type トッポッキ, not
 // tteokbokki, and every katakana dish query in QA came back "no known dish".
+// Chinese names of Korean dishes. The katakana gap was fixed but the Chinese one
+// was not — 炒年糕, 五花肉, 部队锅, 泡菜汤 all came back "no known dish".
+const HANZI_DISHES: [RegExp, string][] = [
+  [/炒年糕|辣炒年糕/g, "tteokbokki"],
+  [/五花肉|烤五花肉/g, "samgyeopsal"],
+  [/部队锅|部隊鍋/g, "budae jjigae"],
+  [/泡菜汤|泡菜鍋|泡菜锅/g, "kimchi jjigae"],
+  [/嫩豆腐汤|豆腐汤/g, "sundubu"],
+  [/拌饭|石锅拌饭/g, "bibimbap"],
+  [/紫菜包饭|海苔饭卷/g, "gimbap"],
+  [/冷面|冷麵/g, "naengmyeon"],
+  [/参鸡汤|蔘雞湯/g, "samgyetang"],
+  [/炸酱面|炸醬麵/g, "jjajangmyeon"],
+  [/海鲜面|炒码面/g, "jjamppong"],
+  [/烤排骨|排骨/g, "galbi"],
+  [/血肠/g, "sundae"],
+  [/辣炒鸡|春川辣炒鸡/g, "dakgalbi"],
+  [/韩式炸鸡|调味炸鸡/g, "yangnyeom chicken"],
+  [/糖饼/g, "hotteok"],
+  [/泡菜/g, "kimchi"],
+  [/煎饼|海鲜饼/g, "jeon"],
+];
+
 const KANA_DISHES: [RegExp, string][] = [
   [/トッポッキ|トッポギ/g, "tteokbokki"],
   [/サムギョプサル/g, "samgyeopsal"],
@@ -270,6 +293,7 @@ const KANA_DISHES: [RegExp, string][] = [
 export function normalizeDishText(text: string): string {
   let out = text ?? "";
   for (const [re, roman] of KANA_DISHES) out = out.replace(re, roman);
+  for (const [re, roman] of HANZI_DISHES) out = out.replace(re, roman);
   return out;
 }
 export const translateMenuContext: ToolDef = {

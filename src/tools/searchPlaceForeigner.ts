@@ -18,7 +18,7 @@ import {
   type SeoulContent,
 } from "../lib/sources/visitseoul.js";
 import { resolvePlaceCoord, findPlaceInText } from "../lib/places.js";
-import { similarity } from "../lib/fuzzy.js";
+import { similarity, cjkToKorean } from "../lib/fuzzy.js";
 import { mapLinks, mapLinksAt } from "../lib/maplinks.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
@@ -273,7 +273,10 @@ export function searchTerms(query: string): string {
   return compact.length >= 2 ? compact : (query ?? "").trim();
 }
 function seoulKeyword(area: string, query: string): string {
-  const a = area.trim();
+  // 首爾 / ソウル / 首尔 name the whole CITY. Treating them as a neighbourhood
+  // switched off the must-see seeding, so "首爾有哪些必去景點？" led with luggage
+  // lockers instead of the palaces.
+  const a = cjkToKorean(area).trim();
   if (a && !/^seoul(특별시)?$|^서울(특별시)?$/i.test(a)) return a;
   for (const name of SEOUL_AREAS) if (new RegExp(name, "i").test(query)) return name;
   return "";

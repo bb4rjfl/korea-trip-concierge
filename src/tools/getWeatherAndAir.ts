@@ -79,7 +79,7 @@ export const getWeatherAndAir: ToolDef = {
     // allSettled, not all: the three sources fail independently (e.g. KMA hits its
     // daily quota / 429 while AirKorea is fine) — show whatever we did get rather
     // than throwing the whole response away.
-    const [wRes, aRes, alertRes] = await Promise.allSettled([getWeather(city), getAir(city), getWeatherAlerts()]);
+    const [wRes, aRes, alertRes] = await Promise.allSettled([getWeather(city), getAir(city), getWeatherAlerts(city.label)]);
     const weather = wRes.status === "fulfilled" ? wRes.value : undefined;
     const air = aRes.status === "fulfilled" ? aRes.value : undefined;
     const alerts = alertRes.status === "fulfilled" ? alertRes.value : [];
@@ -108,7 +108,7 @@ export const getWeatherAndAir: ToolDef = {
     // as a longer list than reality.
     const uniqueAlerts = [...new Set(alerts)];
     if (uniqueAlerts.length) {
-      lines.push(`🚨 **Weather warnings in effect:** ${uniqueAlerts.join(", ")} _(issued nationwide — confirm for your district)_`, "");
+      lines.push(`🚨 **Weather warnings in effect:** ${uniqueAlerts.join(", ")} _(for this area — confirm locally)_`, "");
     }
 
     const w: string[] = [];
