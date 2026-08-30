@@ -457,6 +457,12 @@ const PERMANENT_VENUE_RE =
 // Korean exhibition markers, or the 《》 brackets Korean venues use for show titles.
 const DATED_TITLE_RE = /\b(?:19|20)\d{2}\b|《|》|개인전|기획전|특별전|초대전|展/;
 
+// Listings that are services, not sights. They surface under a generic "what
+// should I see" browse because the endpoint answers with its newest content —
+// luggage storage counters are not an answer to "must-see sights in Seoul".
+const NOT_A_SIGHT_RE =
+  /luggage|locker|storage|baggage|짐\s*보관|물품보관|rental office|대여소|parking|주차/i;
+
 /** Rank Seoul results for the query: float a specific noun (museum/palace/gallery)
  *  up (Y3), and demote ephemeral events/exhibitions for general sightseeing intent
  *  (P-V2) — unless the user explicitly asked for events. */
@@ -527,16 +533,21 @@ async function trySeoul(
   const kw = seoulKeyword(area, query);
   try {
     // 1) area-narrowed within category; broaden if thin so we still lead with VS.
-    let vs = await searchSeoulContent({ category: vsCat, keyword: kw, language, limit: 8 });
+    // With neither a category nor an area keyword there is nothing to search on,
+    // and the endpoint answers with its newest content — which is how "must-see
+    // sights in Seoul" came back as luggage lockers. Anchor generic sightseeing on
+    // the culture node instead of asking for "anything".
+    const effectiveCat = vsCat ?? (kw ? undefined : VS_CATEGORY.culture);
+    let vs = await searchSeoulContent({ category: effectiveCat, keyword: kw, language, limit: 8 });
     if (vs.length < 3) {
-      const broaden = vsCat ?? VS_CATEGORY.culture; // generic discovery → things to see
+      const broaden = effectiveCat ?? VS_CATEGORY.culture; // generic discovery → things to see
       const more = await searchSeoulContent({ category: broaden, keyword: kw, language, limit: 8 });
       vs = dedupeByTitle([...vs, ...more], 8);
     }
     // Drop stale past-dated events (Y1) and float intent-matching picks (Y3).
     const year = currentYearKST();
     vs = rankByIntent(
-      vs.filter((c) => !isStalePastEvent(c.title, year)),
+      vs.filter((c) => !isStalePastEvent(c.title, year) && !NOT_A_SIGHT_RE.test(`${c.title} ${c.categoryPath ?? ""}`)),
       query,
     );
     if (indoor) {
