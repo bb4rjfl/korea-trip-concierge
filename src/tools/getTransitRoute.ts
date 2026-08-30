@@ -4,12 +4,14 @@ import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
 import { searchTopPlace } from "../lib/sources/tourapi.js";
 import { routesBetween, type TransitRoute } from "../lib/sources/odsay.js";
-import { romanizeText } from "../lib/romanize.js";
+import { romanizeText, resolveStationKo } from "../lib/romanize.js";
 import { resolvePlaceCoord } from "../lib/places.js";
 import { detectIntercity, renderIntercity } from "../lib/intercity.js";
 import { normalizeName } from "../lib/fuzzy.js";
-import { getGraph, lineLabel, planRoute } from "../lib/sources/subwayGraph.js";
+import { exitLine } from "../lib/exits.js";
+import { getGraph, lineLabel, planRoute, findStationCodes } from "../lib/sources/subwayGraph.js";
 import { getStationArrivals } from "../lib/sources/seoulSubway.js";
+import { planDirectBus } from "../lib/sources/busRoute.js";
 import { directionsLinks } from "../lib/maplinks.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
@@ -147,6 +149,40 @@ function toStationName(name: string): string {
 }
 
 /**
+ * The bus API indexes stops by their Korean names only, so an English or Japanese
+ * endpoint has to be turned into Korean before we can look it up. Landmarks come
+ * from the map above; anything else we try to match against the station index,
+ * which already knows how each name romanizes.
+ */
+async function koreanEndpoint(name: string): Promise<string | undefined> {
+  if (/[가-힣]/.test(name)) return name;
+  const mapped = toStationName(name);
+  if (/[가-힣]/.test(mapped)) return mapped;
+  // "Hannam-dong" is not a station, but "Hannam" is a name we know how to write —
+  // and the neighbourhood suffix comes straight back on the Korean side.
+  const suffix = /[-\s](dong|ro|gil|gu)\b/i.exec(name);
+  const SUFFIX_KO: Record<string, string> = { dong: "동", ro: "로", gil: "길", gu: "구" };
+  const bare = suffix ? name.slice(0, suffix.index).trim() : name;
+  const romanized = resolveStationKo(bare);
+  if (romanized) return suffix ? romanized + SUFFIX_KO[suffix[1].toLowerCase()] : romanized;
+  try {
+    const graph = await getGraph();
+    const codes = findStationCodes(graph, name);
+    const ko = codes.length ? graph.byCode.get(codes[0])?.ko : undefined;
+    return ko && /[가-힣]/.test(ko) ? ko : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Plan a direct bus between two free-text endpoints, in whatever language. */
+async function busBetween(from: string, to: string) {
+  const [a, b] = await Promise.all([koreanEndpoint(from), koreanEndpoint(to)]);
+  if (!a || !b || a === b) return undefined;
+  return planDirectBus(a, b).catch(() => undefined);
+}
+
+/**
  * Plan the trip on the subway graph and dress it with a live first-train time.
  * Returns undefined when the rails can't serve this pair, so the caller falls
  * through to the metered routing API.
@@ -174,10 +210,31 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
       /* live board is a bonus, never a blocker */
     }
 
+    // A direct bus, when one exists, is often the nicer ride — no stairs, no
+    // transfer — so offer it alongside the rails rather than instead of them.
+    const lastLeg = route.legs[route.legs.length - 1];
+    const bus = await busBetween(first.from, lastLeg.to);
+    // Only worth offering if it is in the same league as the train; a bus that
+    // takes twice as long is not an alternative, it is a wrong turn.
+    const busWorthIt = bus && bus.minutes <= route.minutes * 1.6 + 5;
+    const busLine = busWorthIt && bus
+      ? `\n🚌 **Or one bus, no transfer —** **${bus.routeName}** from ${bus.boardAt} to ${bus.alightAt} _(${bus.stops} stops, about ${bus.minutes} min)_`
+      : "";
+
+    // Arriving at the station is only half of it; the exit is what saves the walk.
+    const exit = exitLine(to);
+
     const lines = route.legs.map((l, i) => {
       const label = lineLabel(l.line);
       return `${i === 0 ? "🚇" : "🔁"} **${label}** ${l.from} → ${l.to} _(${l.stops} stop${l.stops === 1 ? "" : "s"})_`;
     });
+
+    // Quoting a 7-minute ride at 3am would be a lie: the trains are in the depot.
+    const kstHour = new Date(Date.now() + 9 * 3600_000).getUTCHours();
+    const closed = kstHour < 5;
+    const closedNote = closed
+      ? `⛔ **The subway isn't running right now** (roughly 05:30–24:00). Until first train, take a night bus (N-routes) or a taxi — Kakao T works with a foreign card.`
+      : "";
 
     const head =
       `🚇 **${from} → ${to}** — by subway\n\n` +
@@ -186,7 +243,20 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
       `💳 around **₩${route.fareWon.toLocaleString()}**`;
 
     return ok(
-      [head, "", ...lines, live, "", dir, "", "_Route from Seoul subway network data (ⓒ서울특별시); times are typical._"]
+      [
+        head,
+        closedNote,
+        "",
+        ...lines,
+        exit ? "" : "",
+        exit ?? "",
+        busLine,
+        live,
+        "",
+        dir,
+        "",
+        "_Routes from Seoul subway & bus open data (ⓒ서울특별시); times are typical._",
+      ]
         .filter(Boolean)
         .join("\n"),
       CHOICES,
@@ -285,6 +355,28 @@ export const getTransitRoute: ToolDef = {
     // API below is now only the fallback for anything the rails can't serve.
     const rail = await trySubwayGraph(from, to, dir);
     if (rail) return rail;
+
+    // Not on the rails — but a single bus may still do it. Bus stops sit at street
+    // corners the subway never reaches, so this catches neighbourhood hops
+    // (markets, hanok lanes, riverside parks) that station names can't express.
+    const onlyBus = await busBetween(from, to);
+    if (onlyBus) {
+      return ok(
+        [
+          `🚌 **${from} → ${to}** — one bus, no transfer`,
+          "",
+          `⏱️ about **${onlyBus.minutes} min** · ${onlyBus.stops} stops · 💳 around **₩1,500**`,
+          "",
+          `🚌 Take bus **${onlyBus.routeName}** at **${onlyBus.boardAt}**, get off at **${onlyBus.alightAt}**.`,
+          `Tap the stop name on the bus screen or count the stops — announcements are in English too.`,
+          "",
+          dir,
+          "",
+          "_Route from Seoul bus open data (ⓒ서울특별시); times are typical._",
+        ].join("\n"),
+        CHOICES,
+      );
+    }
 
     if (!hasKey("TRANSIT_API_KEY") || !hasKey("TOUR_API_KEY")) {
       return notConnected(

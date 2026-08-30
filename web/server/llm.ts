@@ -99,9 +99,15 @@ const translateCache = new Map<string, { value: string; exp: number }>();
 const TRANSLATE_TTL_MS = 60 * 60 * 1000;
 const TRANSLATE_CACHE_MAX = 300;
 
-export async function llmTranslate(markdown: string, lang: Lang, timeoutMs = 9000): Promise<string | null> {
+export async function llmTranslate(
+  markdown: string,
+  lang: Lang,
+  timeoutMs = 9000,
+  /** The reader wrote in Traditional characters, so answer in them. */
+  traditional = false,
+): Promise<string | null> {
   if (!llmEnabled() || lang === "en") return null;
-  const cacheKey = `${lang}:${markdown}`;
+  const cacheKey = `${lang}${traditional ? "-hant" : ""}:${markdown}`;
   const hit = translateCache.get(cacheKey);
   if (hit && hit.exp > Date.now()) return hit.value;
 
@@ -114,7 +120,9 @@ export async function llmTranslate(markdown: string, lang: Lang, timeoutMs = 900
   });
 
   const prompt = [
-    `Translate the following Markdown travel answer into ${LANG_NAMES[lang]}.`,
+    `Translate the following Markdown travel answer into ${
+      traditional ? "Traditional Chinese (繁體中文, as written in Taiwan and Hong Kong)" : LANG_NAMES[lang]
+    }.`,
     "Keep ALL Markdown structure, emoji, placeholders like (__L0__), numbers, and times unchanged.",
     "Proper nouns (station/place/dish names) may stay as-is or add the local form.",
     "Translate only the prose. Do not add or remove information. Output ONLY the translated Markdown.",

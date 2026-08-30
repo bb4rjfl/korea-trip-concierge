@@ -432,8 +432,27 @@ describe("Seoul subway graph", () => {
     // 시청's, which used to link them as if they were neighbouring stops.
     const r = planRoute(graph, "시청", "까치산")!;
     expect(r.stops).toBeGreaterThan(10);
+    // 성수지선 is 성수-용답-신답-용두-신설동; 용두 was numbered last of all Line 2
+    // stations, so it used to fall out of the branch entirely.
     const r2 = planRoute(graph, "성수", "신설동")!;
-    expect(r2.stops).toBe(3); // 성수지선
+    expect(r2.stops).toBe(4);
+    expect(r2.legs[0].line).toBe("02호선");
+  });
+
+  it("routes the airport line without inventing transfers", () => {
+    // AREX is a straight run from Seoul Station; a gap in the station codes used to
+    // sever it at DMC and send people round via three other lines.
+    const r = planRoute(graph, "서울역", "인천공항1터미널")!;
+    expect(r.transfers).toBe(0);
+    expect(r.legs).toHaveLength(1);
+    expect(lineLabel(r.legs[0].line)).toContain("AREX");
+  });
+
+  it("does not treat scrambled Korail codes as adjacency", () => {
+    // 청량리 and 수원 are numbered next to each other on 수인분당선 but are 36 stops
+    // apart, which made a Suwon-to-Seoul trip look like a two-stop hop.
+    const r = planRoute(graph, "수원", "청량리")!;
+    expect(r.stops).toBeGreaterThan(15);
   });
 
   it("plans across languages", () => {

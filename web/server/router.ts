@@ -24,6 +24,17 @@ export function detectLang(text: string): Lang | null {
   return null;
 }
 
+/**
+ * Taiwan and Hong Kong visitors write Traditional characters, and answering them
+ * in Simplified reads the way a British reader would read forced US spelling —
+ * understandable, but plainly not written for them.
+ */
+const TRADITIONAL_ONLY = /[們這個來說灣觀沒電錢學樂買賣車頭飯開關門後點時間問題經過運動車輛雞區鐵條臺國語會員價錢營業實際發現進場]/;
+
+export function isTraditionalChinese(text: string): boolean {
+  return TRADITIONAL_ONLY.test(text ?? "");
+}
+
 /* ---------------------------------- cities ---------------------------------- */
 
 const CITY_NAMES: Record<string, string[]> = {
@@ -385,7 +396,7 @@ const LOST_STOLEN =
 // I broke my ankle' and 'high fever' all answered with a menu of ATMs and
 // currency exchange, with no emergency number anywhere.
 const MEDICAL_NEED =
-  /(?:chest|stomach|abdomen|abdominal|head|back|tooth)\s*(?:pain|ache|hurts?)|(?:pain|hurts?|hurting|injur|broke(?:n)?\s+(?:my|his|her|a)|sprain|fracture|bleed|fever|vomit|nausea|dizzy|faint|allergic reaction|asthma|infection)|(?:see|need|find)\s+(?:a\s+)?(?:doctor|hospital|emergency room|er|clinic|dentist)|not breathing|can\'?t breathe|trouble breathing|unconscious|unresponsive|collapsed|seizure|choking|ambulance|응급|아파요|아픈데|아프고|다쳤|열이\s*나|숨(?:이|을)?\s*(?:안|못)|토하|어지러|골절|출혈|痛い|熱が|怪我|救急|病院|疼|发烧|受伤|急诊|医院/i;
+  /(?:chest|stomach|abdomen|abdominal|head|back|tooth)\s*(?:pain|ache|hurts?)|(?:pain|hurts?|hurting|injur|broke(?:n)?\s+(?:my|his|her|a)|sprain|fracture|bleed|fever|vomit|nausea|dizzy|faint|allergic reaction|asthma|infection)|(?:see|need|find)\s+(?:a\s+)?(?:doctor|hospital|emergency room|\ber\b|clinic|dentist)|not breathing|can\'?t breathe|trouble breathing|unconscious|unresponsive|collapsed|seizure|choking|ambulance|응급|아파요|아픈데|아프고|다쳤|열이\s*나|숨(?:이|을)?\s*(?:안|못)|토하|어지러|골절|출혈|痛い|熱が|怪我|救急|病院|疼|发烧|受伤|急诊|医院/i;
 
 // A personal-safety threat needs the POLICE first, not an ambulance.
 const SAFETY_THREAT =

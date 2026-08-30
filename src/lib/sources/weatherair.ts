@@ -76,6 +76,17 @@ export interface Weather {
   precip?: string;
   rainProb?: number;
   when?: string;
+  tomorrow?: DayOutlook;
+}
+
+/** Tomorrow at a glance — enough to decide what to pack and whether to go outdoors. */
+export interface DayOutlook {
+  date: string;
+  minC?: number;
+  maxC?: number;
+  sky?: string;
+  precip?: string;
+  rainProb?: number;
 }
 
 const SKY: Record<string, string> = { "1": "Clear", "3": "Partly cloudy", "4": "Cloudy" };
@@ -108,6 +119,43 @@ export function parseWeather(items: FcstItem[]): Weather {
   };
 }
 
+/** Tomorrow's date in KST as the YYYYMMDD the KMA feed uses. */
+function tomorrowYmd(): string {
+  const k = new Date(Date.now() + 9 * 3600_000 + 24 * 3600_000);
+  return `${k.getUTCFullYear()}${String(k.getUTCMonth() + 1).padStart(2, "0")}${String(k.getUTCDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Summarize tomorrow from the same forecast payload. A visitor planning the next
+ * day needs the range and the chance of rain, not 24 hourly rows — and the daily
+ * TMN/TMX rows the feed publishes are exactly that, when they are present.
+ */
+export function parseTomorrow(items: FcstItem[], ymd = tomorrowYmd()): DayOutlook | undefined {
+  const rows = (items ?? []).filter((it) => it.fcstDate === ymd);
+  if (!rows.length) return undefined;
+  const nums = (cat: string) =>
+    rows.filter((it) => it.category === cat).map((it) => Number(it.fcstValue)).filter((n) => Number.isFinite(n));
+  const temps = nums("TMP");
+  const minC = nums("TMN")[0] ?? (temps.length ? Math.min(...temps) : undefined);
+  const maxC = nums("TMX")[0] ?? (temps.length ? Math.max(...temps) : undefined);
+  // Sky at midday reads as "what tomorrow is like" better than an average would.
+  const at = (cat: string, time: string) => rows.find((it) => it.category === cat && it.fcstTime === time)?.fcstValue;
+  const skyCode = at("SKY", "1200") ?? at("SKY", "1500") ?? rows.find((it) => it.category === "SKY")?.fcstValue;
+  const ptyCodes = rows.filter((it) => it.category === "PTY").map((it) => it.fcstValue ?? "0");
+  const pty = ptyCodes.find((c) => c !== "0" && PTY[c]);
+  // Daytime hours only: a 70% chance at 3am is not what stops a day of sightseeing.
+  const day = rows.filter((it) => it.category === "POP" && it.fcstTime! >= "0600" && it.fcstTime! <= "2100");
+  const pops = day.map((it) => Number(it.fcstValue)).filter((n) => Number.isFinite(n));
+  return {
+    date: ymd,
+    minC,
+    maxC,
+    sky: skyCode != null ? SKY[skyCode] : undefined,
+    precip: pty ? PTY[pty] : undefined,
+    rainProb: pops.length ? Math.max(...pops) : undefined,
+  };
+}
+
 const weatherCache = new TtlCache<Weather>(30 * 60_000);
 
 /** KMA base_date/base_time: latest published slot in KST (10-min buffer). */
@@ -131,7 +179,7 @@ export async function getWeather(city: CityGeo): Promise<Weather> {
     const sp = new URLSearchParams({
       serviceKey: ENV.BUS_API_KEY,
       dataType: "JSON",
-      numOfRows: "300",
+      numOfRows: "900", // enough rows to reach tomorrow, not just the next few hours
       pageNo: "1",
       base_date: date,
       base_time: time,
@@ -139,7 +187,8 @@ export async function getWeather(city: CityGeo): Promise<Weather> {
       ny: String(city.ny),
     });
     const json = await fetchJson<{ response?: { body?: { items?: { item?: FcstItem[] } } } }>(`${KMA_BASE}?${sp}`);
-    return parseWeather(json.response?.body?.items?.item ?? []);
+    const items = json.response?.body?.items?.item ?? [];
+    return { ...parseWeather(items), tomorrow: parseTomorrow(items) };
   });
 }
 

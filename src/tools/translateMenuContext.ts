@@ -30,7 +30,6 @@ const DISHES: Dish[] = [
   { match: /떡볶이|tteokbokki/i, en: "Tteokbokki", desc: "Chewy rice cakes in a sweet-spicy gochujang sauce.", spice: 3, allergens: ["gluten", "soy"] },
   { match: /순두부|sundubu/i, en: "Soft-tofu stew", desc: "Silky soft tofu in a spicy seafood-or-pork broth, served bubbling.", spice: 2, allergens: ["soy", "egg", "shellfish", "fish"] },
   { match: /냉면|naengmyeon/i, en: "Cold buckwheat noodles", desc: "Chilled buckwheat noodles in an icy beef broth (mul) or a spicy-sweet sauce (bibim); the mul broth is beef-based, and both are often topped with a slice of meat and egg.", spice: 1, allergens: ["gluten", "egg", "soy"] },
-  { match: /김밥|kimbap|gimbap/i, en: "Kimbap", desc: "Seaweed rice rolls with vegetables, egg, and often ham or tuna.", spice: 0, allergens: ["egg", "sesame", "fish", "soy"] },
   { match: /제육|jeyuk/i, en: "Spicy stir-fried pork", desc: "Pork stir-fried in a spicy gochujang marinade.", spice: 2, allergens: ["soy", "pork", "sesame"] },
   { match: /삼계탕|samgyetang/i, en: "Ginseng chicken soup", desc: "Whole young chicken stuffed with rice, ginseng, and garlic in a mild broth — a summer health dish.", spice: 0, allergens: [] },
   { match: /잡채|japchae/i, en: "Glass noodle stir-fry", desc: "Sweet-savory sweet-potato glass noodles with vegetables and beef.", spice: 0, allergens: ["soy", "sesame", "egg"] },
@@ -115,6 +114,37 @@ const SPICE_LABEL = ["🌶️ none", "🌶️ mild", "🌶️🌶️ medium", "�
 // concern we can't check (e.g. dairy), which would be dangerous false reassurance.
 const SUPPORTED_ALLERGENS = new Set(DISHES.flatMap((d) => d.allergens));
 
+/**
+ * People say "shrimp", "エビ", "새우" — not "shellfish", which is the token our
+ * dish data is written in. Without this map a shrimp allergy lands in the
+ * "can't check that" bucket while the data knew the answer all along, which is
+ * the one failure mode that actually puts someone in hospital.
+ */
+const CONCERN_SYNONYMS: [RegExp, string][] = [
+  [/shrimp|prawn|crab|lobster|crustace|shellfish|clam|oyster|mussel|scallop|squid|octopus|abalone|새우|조개|갑각류|게|굴|holl|エビ|えび|貝|虾|蝦|蟹/i, "shellfish"],
+  [/\bfish\b|anchovy|seafood|tuna|pollock|mackerel|생선|어류|멸치|魚|さかな|鱼/i, "fish"],
+  [/gluten|wheat|flour|barley|noodle|밀|글루텐|小麦|グルテン|面筋|麸/i, "gluten"],
+  [/peanut|groundnut|\bnuts?\b|tree.?nut|almond|walnut|땅콩|견과|ピーナ|ナッツ|花生|坚果/i, "peanut"],
+  [/\bsoy|soya|soybean|tofu|대두|콩|간장|大豆|醤油|豆/i, "soy"],
+  [/\begg|omelet|계란|달걀|卵|たまご|鸡蛋|雞蛋/i, "egg"],
+  [/sesame|참깨|깨|ごま|胡麻|芝麻/i, "sesame"],
+  [/pork|bacon|\bham\b|돼지|豚|ぶた|猪肉/i, "pork"],
+];
+
+/**
+ * Turn what someone typed into the tokens the dish data uses, keeping anything we
+ * can't map so it is still reported honestly as unchecked.
+ */
+function canonicalConcerns(raw: string[]): string[] {
+  const out: string[] = [];
+  for (const c of raw) {
+    const hit = CONCERN_SYNONYMS.find(([re]) => re.test(c));
+    const token = hit ? hit[1] : c;
+    if (!out.includes(token)) out.push(token);
+  }
+  return out;
+}
+
 const ANIMAL = ["pork", "fish", "shellfish"];
 // Beef/chicken aren't allergen tokens, so detect meat/fish by name too — else a
 // vegetarian sees "No common allergens" for 삼계탕/불고기 (N6).
@@ -168,7 +198,8 @@ function phraseCard(concerns: string[], veg: boolean, noPork: boolean): string[]
   return rows.length ? ["", "🪧 **Show this to the staff (Korean):**", ...rows] : [];
 }
 
-function render(menuText: string, concerns: string[]): string {
+function render(menuText: string, rawConcerns: string[]): string {
+  const concerns = canonicalConcerns(rawConcerns);
   // Preserve the order dishes appear in the user's text, not dictionary order.
   const found = DISHES.filter((d) => d.match.test(menuText)).sort(
     (a, b) => menuText.search(a.match) - menuText.search(b.match),

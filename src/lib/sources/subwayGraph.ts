@@ -70,6 +70,22 @@ const MIN_PER_STOP = 2.2;
 const MIN_PER_TRANSFER = 6;
 const BASE_FARE = 1400;
 
+/**
+ * Not every "stop" is the same distance. The airport line runs 5-8 km between
+ * stations where Line 2 runs 1 km, so costing them alike made the planner route
+ * Hongdae→Anguk via AREX and two transfers instead of the obvious Line 2 ride.
+ */
+const LINE_MIN_PER_STOP: [RegExp, number][] = [
+  [/공항철도|AREX/i, 4.2],
+  [/경의|경춘|수인분당|서해/, 3.0],
+  [/GTX/i, 6.5],
+  [/신분당/, 2.8],
+];
+
+function stopMinutes(line: string): number {
+  return LINE_MIN_PER_STOP.find(([re]) => re.test(line))?.[1] ?? MIN_PER_STOP;
+}
+
 const API = "http://openapi.seoul.go.kr:8088";
 // The network is static; a day's cache keeps this to one call per deploy.
 const graphCache = new TtlCache<SubwayGraph>(24 * 60 * 60_000);
@@ -135,35 +151,131 @@ export function buildGraph(rows: StationRow[]): SubwayGraph {
       const prev = ordered[i - 1];
       const cur = ordered[i];
       if (Number(cur.code) - Number(prev.code) !== 1) continue; // branch boundary
-      link(prev.code, cur.code, MIN_PER_STOP, false);
-      link(cur.code, prev.code, MIN_PER_STOP, false);
+      const pace = stopMinutes(line);
+      link(prev.code, cur.code, pace, false);
+      link(cur.code, prev.code, pace, false);
     }
-    // Line 2 is the one line the code-order rule gets wrong: its two branches are
-    // appended AFTER the ring, so 까치산(0200) looks adjacent to 시청(0201) and
-    // 충정로(0243) to 용답(0244). Spell the real topology out instead.
-    if (line === "02호선") {
-      const byName2 = new Map(ordered.map((s) => [s.ko, s.code]));
-      const chain = (names: string[]): void => {
-        for (let i = 1; i < names.length; i++) {
-          const a = byName2.get(names[i - 1]);
-          const b = byName2.get(names[i]);
-          if (!a || !b) continue;
-          link(a, b, MIN_PER_STOP, false);
-          link(b, a, MIN_PER_STOP, false);
-        }
-      };
-      // Undo the two false links the generic rule just made.
-      for (const [a, b] of [["0200", "0201"], ["0243", "0244"], ["0246", "0247"], ["0249", "0250"]]) {
+    // Station codes are assigned in build order, not running order, so a line that
+    // gained a station later — or that Korail and Seoul Metro number jointly — comes
+    // out of the generic rule with links the trains don't make and gaps where they
+    // do. These corrections spell out the real topology for the lines visitors ride.
+    const byName2 = new Map(ordered.map((st) => [st.ko, st.code]));
+    const pace = stopMinutes(line);
+    const chain = (names: string[]): void => {
+      for (let i = 1; i < names.length; i++) {
+        const a = byName2.get(names[i - 1]);
+        const b = byName2.get(names[i]);
+        if (!a || !b) continue;
+        link(a, b, pace, false);
+        link(b, a, pace, false);
+      }
+    };
+    const unlink = (pairs: string[][]): void => {
+      for (const [x, y] of pairs) {
+        const a = byName2.get(x);
+        const b = byName2.get(y);
+        if (!a || !b) continue;
         edges.set(a, (edges.get(a) ?? []).filter((e) => e.to !== b));
         edges.set(b, (edges.get(b) ?? []).filter((e) => e.to !== a));
       }
-      const ring = ordered.filter((s) => Number(s.code) >= 201 && Number(s.code) <= 243);
+    };
+
+    if (line === "02호선") {
+      // The branches are appended after the ring, so 까치산 looks adjacent to 시청.
+      // 용두 was numbered last though it sits mid-branch, so the code rule strings
+      // 신답 straight onto 신설동 and hangs 용두 off 신정네거리.
+      unlink([
+        ["까치산", "시청"],
+        ["충정로", "용답"],
+        ["신답", "신설동"],
+        ["신설동", "도림천"],
+        ["신정네거리", "용두"],
+      ]);
+      const ring = ordered.filter((st) => Number(st.code) >= 201 && Number(st.code) <= 243);
       if (ring.length > 40) {
-        link(ring[0].code, ring[ring.length - 1].code, MIN_PER_STOP, false);
-        link(ring[ring.length - 1].code, ring[0].code, MIN_PER_STOP, false);
+        link(ring[0].code, ring[ring.length - 1].code, pace, false);
+        link(ring[ring.length - 1].code, ring[0].code, pace, false);
       }
       chain(["성수", "용답", "신답", "용두", "신설동"]); // 성수지선
       chain(["신도림", "도림천", "양천구청", "신정네거리", "까치산"]); // 신정지선
+    }
+
+    if (line === "공항철도") {
+      // 영종 opened later and sits between 청라국제도시 and 운서, not at the end.
+      unlink([["청라국제도시", "운서"]]);
+      chain([
+        "서울역", "공덕", "홍대입구", "디지털미디어시티", "마곡나루", "김포공항", "계양",
+        "검암", "청라국제도시", "영종", "운서", "공항화물청사", "인천공항1터미널", "인천공항2터미널",
+      ]);
+    }
+
+    if (line === "01호선") {
+      // Seoul Metro numbers the central stretch, Korail the branches, and 동묘앞
+      // was inserted decades later — so the core corridor has to be stated.
+      unlink([["동대문", "신설동"], ["청량리", "동묘앞"], ["대방", "영등포"]]);
+      chain([
+        "회기", "청량리", "제기동", "신설동", "동묘앞", "동대문", "종로5가", "종로3가", "종각",
+        "시청", "서울역", "남영", "용산", "노량진", "대방", "신길", "영등포", "신도림", "구로",
+      ]);
+      chain(["창동", "방학"]); // northern branch hookup
+      chain(["구로", "구일", "개봉"]); // 경인선 branch
+    }
+
+    if (line === "03호선") {
+      // 원흥 opened between 삼송 and 원당 but was numbered before both.
+      unlink([["삼송", "원당"]]);
+      chain(["지축", "삼송", "원흥", "원당"]);
+    }
+
+    // Three lines were built by merging existing Korail track, so their codes bear
+    // no relation to running order at all — 청량리 and 수원 sit next to each other
+    // in the numbering and 36 stations apart on the ground. For these the generic
+    // pass is discarded outright and the running order stated in full.
+    const REBUILD: Record<string, string[][]> = {
+      수인분당선: [
+        [
+          "청량리", "왕십리", "서울숲", "압구정로데오", "강남구청", "선정릉", "선릉", "한티", "도곡",
+          "구룡", "개포동", "대모산입구", "수서", "복정", "가천대", "태평", "모란", "야탑", "이매",
+          "서현", "수내", "정자", "미금", "오리", "죽전", "보정", "구성", "신갈", "기흥", "상갈",
+          "청명", "영통", "망포", "매탄권선", "수원시청", "매교", "수원", "고색", "오목천", "어천",
+          "야목", "사리", "한대앞", "중앙", "고잔", "초지", "안산", "신길온천", "정왕", "오이도",
+          "달월", "월곶", "소래포구", "인천논현", "호구포", "남동인더스파크", "원인재", "연수",
+          "송도", "인하대", "숭의", "신포", "인천",
+        ],
+      ],
+      경의선: [
+        [
+          "문산", "파주", "월롱", "금촌", "금릉", "운정", "야당", "탄현", "일산", "풍산", "백마",
+          "곡산", "대곡", "능곡", "행신", "강매", "한국항공대", "수색", "디지털미디어시티", "가좌",
+          "홍대입구", "서강대", "공덕", "효창공원앞", "용산", "이촌", "서빙고", "한남", "옥수",
+          "응봉", "왕십리", "청량리", "회기", "중랑", "상봉", "망우", "양원", "구리", "도농",
+          "양정", "덕소", "도심", "팔당", "운길산", "양수", "신원", "국수", "아신", "오빈",
+          "양평", "원덕", "용문", "지평",
+        ],
+        ["가좌", "신촌", "서울역"], // the 서울역 branch
+        ["문산", "운천", "임진강"],
+      ],
+      서해선: [
+        [
+          "일산", "풍산", "백마", "곡산", "대곡", "능곡", "김포공항", "원종", "부천종합운동장",
+          "소사", "소새울", "시흥대야", "신천", "신현", "시흥시청", "시흥능곡", "달미", "선부",
+          "초지", "시우", "원시",
+        ],
+      ],
+    };
+    const rebuild = REBUILD[line];
+    if (rebuild) {
+      const own = new Set(ordered.map((st) => st.code));
+      for (const code of own) {
+        edges.set(code, (edges.get(code) ?? []).filter((e) => e.transfer || !own.has(e.to)));
+      }
+      for (const seq of rebuild) chain(seq);
+    }
+
+    if (line === "04호선") {
+      chain(["남태령", "선바위"]); // Seoul Metro hands over to Korail here
+      chain(["금정", "산본"]);
+      chain(["오남", "별내별가람"]);
     }
   }
 
@@ -354,7 +466,9 @@ export function planRoute(graph: SubwayGraph, fromName: string, toName: string):
   }
   if (!legs.length) return undefined;
 
-  const minutes = Math.round(stops * MIN_PER_STOP + transfers * MIN_PER_TRANSFER);
+  // The search already priced every edge at its line's real pace; reusing that
+  // total keeps the quoted time honest for express lines.
+  const minutes = Math.round(dist.get(goal) ?? stops * MIN_PER_STOP + transfers * MIN_PER_TRANSFER);
   // Seoul fare: the base covers 10km, then ~100 won per 5km. Stops approximate distance.
   const fareWon = BASE_FARE + Math.max(0, Math.floor((stops - 10) / 5)) * 100;
   return { legs, stops, transfers, minutes, fareWon };

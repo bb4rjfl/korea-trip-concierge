@@ -6,8 +6,10 @@
 import { executeTool, CATALOG_BY_NAME } from "./catalog.js";
 import { parseToolMarkdown, type Chip } from "./chips.js";
 import { llmDecide, llmEnabled, llmTranslate, type ChatTurn } from "./llm.js";
-import { criticalRoute, detectLang, routeText, type Lang } from "./router.js";
+import { criticalRoute, detectLang, isTraditionalChinese, routeText, type Lang } from "./router.js";
 import { backfillArgs, contextHint, deriveContext } from "./context.js";
+import { localizeLabels, toTraditional } from "./labels.js";
+import { asksAboutExit, exitFor } from "../../src/lib/exits.js";
 import { searchPlaces } from "../../src/lib/sources/tourapi.js";
 
 export interface ChatRequest {
@@ -192,6 +194,7 @@ async function localizeAnswer(
   body: string,
   chips: Chip[],
   lang: Lang,
+  traditional = false,
 ): Promise<{ body: string; chips: Chip[] }> {
   if (lang === "en") return { body, chips };
 
@@ -204,15 +207,15 @@ async function localizeAnswer(
     .filter(({ c }) => (lang === "ko" ? !c.cmdKo : true));
 
   if (!llmEnabled() || needsLabel.length === 0) {
-    return { body: await localizeToolBody(body, lang), chips: base };
+    return { body: await localizeToolBody(body, lang, traditional), chips: base };
   }
 
   const chipList = needsLabel.map(({ c }, n) => `${n + 1}. ${c.cmdEn}`).join("\n");
   const packed = `${body}\n\n${CHIP_MARKER}\n${chipList}`;
-  const translated = await llmTranslate(packed, lang);
+  const translated = await llmTranslate(packed, lang, 9000, traditional);
   if (!translated || !translated.includes(CHIP_MARKER)) {
     // Fall back to translating the body alone rather than shipping a mangled mix.
-    return { body: await localizeToolBody(body, lang), chips: base };
+    return { body: await localizeToolBody(body, lang, traditional), chips: base };
   }
 
   const [tBody, tChips] = translated.split(CHIP_MARKER);
@@ -224,19 +227,24 @@ async function localizeAnswer(
   needsLabel.forEach(({ i }, n) => {
     if (labels[n]) merged[i] = { ...merged[i], cmdEn: labels[n] };
   });
-  return { body: tBody.trimEnd(), chips: merged };
+  return { body: localizeLabels(tBody.trimEnd(), lang), chips: merged };
 }
 
 /** Localize an English tool body: LLM translation when available, else a notice line. */
-async function localizeToolBody(body: string, lang: Lang): Promise<string> {
+async function localizeToolBody(body: string, lang: Lang, traditional = false): Promise<string> {
   // Translate unless the body is already overwhelmingly in the target script —
   // mixed bodies (localized content under English headers) get their headers
   // fixed too. Cached in llmTranslate, so chip round-trips don't re-pay.
-  if (lang === "en" || body.length < 40 || scriptShare(body, lang) >= 0.8) return body;
-  const translated = await llmTranslate(body, lang);
+  if (lang === "en") return body;
+  // Our own labels always get translated, even in a body the LLM pass will skip:
+  // a card built from Japanese tourism data reads as Japanese overall while every
+  // header we wrote is still in English.
+  const labelled = localizeLabels(body, lang);
+  if (labelled.length < 40 || scriptShare(labelled, lang) >= 0.8) return labelled;
+  const translated = await llmTranslate(labelled, lang, 9000, traditional);
   if (translated) return translated;
-  if (scriptShare(body, lang) >= 0.05) return body; // partially localized — usable as-is
-  return `${ENGLISH_NOTE[lang as Exclude<Lang, "en">]}\n\n${body}`;
+  if (scriptShare(labelled, lang) >= 0.05) return labelled; // partially localized — usable as-is
+  return `${ENGLISH_NOTE[lang as Exclude<Lang, "en">]}\n\n${labelled}`;
 }
 
 /* ------------------------------ image enrichment ----------------------------- */
@@ -305,6 +313,21 @@ async function enrichImages(body: string, tool: string | undefined, lang: Lang):
   });
 }
 
+/**
+ * When a follow-up lands on the identical card, say so.
+ *
+ * "Anything cheaper?" after a restaurant list would re-run the same search and
+ * reprint the same five places, which reads as a broken app rather than as an
+ * answer. Naming the repeat and asking for the missing detail is honest and gets
+ * the conversation moving again.
+ */
+const REPEAT_NOTE: Record<Lang, string> = {
+  en: "_That's the same answer as above — tell me what to change (a different area, price, time or cuisine) and I'll look again._",
+  ja: "_先ほどと同じ内容です。エリア・予算・時間・ジャンルなど、変えたい条件を教えてください。_",
+  zh: "_和上面的结果相同。告诉我要改什么（地区、价格、时间或菜系），我再查一次。_",
+  ko: "_위와 같은 결과예요. 지역·가격·시간·종류 중 무엇을 바꿀지 알려주시면 다시 찾아볼게요._",
+};
+
 const ERROR_MSG: Record<Lang, string> = {
   en: "Sorry — something hiccuped on my side. Please try that once more.",
   ja: "すみません、こちらの不具合です。もう一度お試しください。",
@@ -357,6 +380,8 @@ export async function handleChat(req: ChatRequest, onStatus?: (e: StatusEvent) =
   // user who cannot read it. Script detection now only fills in when the client
   // sent no preference at all.
   const lang: Lang = uiLang ?? detectLang(text) ?? "en";
+  // Someone writing 觀光 rather than 观光 should not be answered in Simplified.
+  const hant = lang === "zh" && history.some((h) => h.role === "user" && isTraditionalChinese(h.content));
 
   // Deterministic safety net: if the user described a life-threatening situation,
   // the ambulance number leads — whatever the router decided to do underneath.
@@ -396,6 +421,27 @@ ${partial.reply ?? ""}`.trim(),
   // Answering this with a tourism-branded place list is a legal-exposure risk.
   if (isIllegalRequest(text)) {
     return done({ reply: ILLEGAL_REPLY[lang], chips: DEFAULT_CHIPS_BY_LANG[lang] });
+  }
+
+  // "Which exit?" is a one-line question with a one-line answer, and routing it
+  // through a place lookup buried the answer under opening hours and weather.
+  if (asksAboutExit(text)) {
+    const named = [text, ...ctx.places, ctx.area, ctx.station].filter(Boolean) as string[];
+    const hit = named.map((n) => ({ n, h: exitFor(n) })).find((x) => x.h);
+    if (hit?.h) {
+      const card = [
+        `🚪 **Exit ${hit.h.exit}** — ${hit.h.station} Station`,
+        "",
+        hit.h.walk,
+        "",
+        "_Follow the numbered signs on the platform; every exit is numbered._",
+      ].join("\n");
+      return done({
+        toolMarkdown: await localizeToolBody(card, lang, hant),
+        chips: DEFAULT_CHIPS_BY_LANG[lang],
+        meta: { engine: "rules" },
+      });
+    }
   }
 
   try {
@@ -476,10 +522,24 @@ ${partial.reply ?? ""}`.trim(),
     // translation window instead of adding latency. Chips travel with the body so
     // localizing them costs no extra round-trip: they are the primary interaction
     // surface, and English buttons under a Japanese answer are unusable.
-    const [localized, images] = await Promise.all([
-      localizeAnswer(body, chips, lang),
+    const [localizedRaw, images] = await Promise.all([
+      localizeAnswer(body, chips, lang, hant),
       enrichImages(body, toolCall.name, lang),
     ]);
+    // The client sends its own transcript back, so the previous card is right here.
+    const lastAssistant = [...history].reverse().find((h) => h.role === "assistant")?.content?.trim();
+    if (lastAssistant && lastAssistant === localizedRaw.body.trim()) {
+      localizedRaw.body = `${localizedRaw.body}
+
+${REPEAT_NOTE[lang]}`;
+    }
+
+    const localized = hant
+      ? {
+          body: toTraditional(localizedRaw.body),
+          chips: localizedRaw.chips.map((c) => ({ ...c, cmdEn: toTraditional(c.cmdEn) })),
+        }
+      : localizedRaw;
     return done({
       toolMarkdown: localized.body,
       chips: localized.chips,

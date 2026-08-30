@@ -118,6 +118,21 @@ export const getWeatherAndAir: ToolDef = {
     if (weather?.rainProb != null) w.push(`rain ${weather.rainProb}%`);
     lines.push(w.length ? w.join(" · ") : "🌡️ _Forecast unavailable right now (try again shortly)._");
 
+    // Tomorrow decides what someone packs and books tonight, so it belongs on the
+    // same card rather than behind another question.
+    const t = weather?.tomorrow;
+    if (t && (t.maxC != null || t.sky)) {
+      const parts: string[] = [];
+      if (t.minC != null && t.maxC != null) parts.push(`${t.minC}–${t.maxC}°C`);
+      else if (t.maxC != null) parts.push(`up to ${t.maxC}°C`);
+      if (t.sky) parts.push(t.sky);
+      if (t.precip) parts.push(`☔ ${t.precip}`);
+      if (t.rainProb != null) parts.push(`rain ${t.rainProb}%`);
+      const dayLabel = `${t.date.slice(4, 6)}/${t.date.slice(6, 8)}`;
+      lines.push("", `📅 **Tomorrow (${dayLabel}):** ${parts.join(" · ")}`);
+      if ((t.rainProb ?? 0) >= 60) lines.push(`_Pack an umbrella — convenience stores sell them for about ₩5,000._`);
+    }
+
     lines.push("");
     const pm: string[] = [];
     if (air?.pm10 != null) pm.push(`PM10 ${air.pm10}`);

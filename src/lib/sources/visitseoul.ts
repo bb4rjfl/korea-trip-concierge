@@ -225,6 +225,45 @@ export interface HoursVerdict {
  * Returns undefined when nothing parseable is present (caller then shows hours
  * without a verdict rather than guessing). `dow` 0=Sun…6=Sat, `minutes` KST.
  */
+/**
+ * Split hours text that names different days into per-day segments.
+ *
+ * "Mon-Fri 09:00-18:00 / Sat 10:00-15:00" used to be flattened into one 09:00-18:00
+ * window, so at 17:00 on a Saturday the card said "Open now" directly above its own
+ * line saying Saturday closes at 15:00. Reading the day labels keeps the verdict and
+ * the printed hours telling the same story.
+ */
+function daySegments(h: string): { days: Set<number>; ranges: [number, number][] }[] {
+  const re =
+    /(sun|mon|tue|wed|thu|fri|sat)[a-z]*(?:\s*[~\-–—]\s*(sun|mon|tue|wed|thu|fri|sat)[a-z]*)?\s*:?\s*((?:\d{1,2}:\d{2}\s*[~\-–—]\s*\d{1,2}:\d{2}[,\s]*)+)/g;
+  const out: { days: Set<number>; ranges: [number, number][] }[] = [];
+  for (const m of h.matchAll(re)) {
+    const start = DOW_ABBR.indexOf(m[1].slice(0, 3));
+    if (start < 0) continue;
+    const days = new Set<number>();
+    if (m[2]) {
+      const end = DOW_ABBR.indexOf(m[2].slice(0, 3));
+      if (end < 0) continue;
+      for (let i = 0; i < 7; i++) {
+        const d = (start + i) % 7;
+        days.add(d);
+        if (d === end) break;
+      }
+    } else {
+      days.add(start);
+    }
+    const ranges: [number, number][] = [];
+    for (const r of m[3].matchAll(/(\d{1,2}):(\d{2})\s*[~\-–—]\s*(\d{1,2}):(\d{2})/g)) {
+      const o = Number(r[1]) * 60 + Number(r[2]);
+      let cl = Number(r[3]) * 60 + Number(r[4]);
+      if (cl <= o) cl += 24 * 60;
+      ranges.push([o, cl]);
+    }
+    if (ranges.length) out.push({ days, ranges });
+  }
+  return out;
+}
+
 export function seoulHoursVerdict(
   hours: string | undefined,
   closed: string | undefined,
@@ -251,20 +290,32 @@ export function seoulHoursVerdict(
         days.add(d);
         if (d === end) break;
       }
-      if (!days.has(dow)) {
+      // Only conclusive when today has no hours of its own further along: a text
+      // reading "Mon-Fri 09:00-18:00 / Sat 10:00-15:00" is open on Saturday.
+      if (!days.has(dow) && !daySegments(h).some((seg) => seg.days.has(dow))) {
         return { status: "closed", headline: `🔴 Closed today — open ${cap(DOW_ABBR[start])}–${cap(DOW_ABBR[end])}.` };
       }
     }
   }
-  // 3) Widest [open, close] across all HH:MM–HH:MM ranges (handles multi-part hours).
-  const ranges = [...h.matchAll(/(\d{1,2}):(\d{2})\s*[~\-–—]\s*(\d{1,2}):(\d{2})/g)];
-  if (ranges.length === 0) return undefined; // nothing parseable → no verdict
+  // 3) Per-day segments first: only today's hours can decide today's verdict.
+  const segments = daySegments(h);
+  const todaySeg = segments.filter((seg) => seg.days.has(dow));
+  if (segments.length && !todaySeg.length) {
+    return { status: "closed", headline: "🔴 Closed today — the posted hours don't cover today." };
+  }
+
+  const pairs: [number, number][] = todaySeg.length
+    ? todaySeg.flatMap((seg) => seg.ranges)
+    : [...h.matchAll(/(\d{1,2}):(\d{2})\s*[~\-–—]\s*(\d{1,2}):(\d{2})/g)].map((m) => {
+        const o = Number(m[1]) * 60 + Number(m[2]);
+        let cl = Number(m[3]) * 60 + Number(m[4]);
+        if (cl <= o) cl += 24 * 60; // crosses midnight
+        return [o, cl] as [number, number];
+      });
+  if (pairs.length === 0) return undefined; // nothing parseable → no verdict
   let minOpen = Infinity;
   let maxClose = -Infinity;
-  for (const m of ranges) {
-    const o = Number(m[1]) * 60 + Number(m[2]);
-    let cl = Number(m[3]) * 60 + Number(m[4]);
-    if (cl <= o) cl += 24 * 60; // crosses midnight
+  for (const [o, cl] of pairs) {
     minOpen = Math.min(minOpen, o);
     maxClose = Math.max(maxClose, cl);
   }
@@ -276,7 +327,9 @@ export function seoulHoursVerdict(
   // Extended-hours hedge: a later time than the main close appears in the text
   // ("Extended Hours: Every Friday until 21:00") — don't confidently say "closed"
   // inside that window, since some days run later. Only for same-day ranges.
-  if (maxClose <= 24 * 60) {
+  // Only today's own times count: a later close on a weekday is not a reason to
+  // hedge about Saturday afternoon.
+  if (maxClose <= 24 * 60 && !todaySeg.length) {
     const allTimes = [...h.matchAll(/(\d{1,2}):(\d{2})/g)].map((m) => Number(m[1]) * 60 + Number(m[2]));
     const latest = allTimes.length ? Math.max(...allTimes) : maxClose;
     if (latest > maxClose && minutes >= maxClose && minutes < latest) {
