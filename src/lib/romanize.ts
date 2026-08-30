@@ -59,7 +59,10 @@ const STATIONS: StationPair[] = [
   { ko: "종로3가", en: "Jongno 3-ga" },
   { ko: "종각", en: "Jonggak" },
   { ko: "서울역", en: "Seoul Station" },
-  { ko: "서울", en: "Seoul Station", aliases: ["seoul station"] },
+  // "서울" alone is the CITY. Mapping it to "Seoul Station" corrupted every name
+  // that merely contains it: 서울교회 → "Seoul StationGyohoe", 서울도시가스 →
+  // "Seoul StationDosigaseu", 북서울꿈의숲 → "BukSeoul StationKkumuisup".
+  { ko: "서울", en: "Seoul", aliases: ["seoul"] },
   { ko: "용산", en: "Yongsan" },
   { ko: "청량리", en: "Cheongnyangni" },
   { ko: "신설동", en: "Sinseol-dong" },

@@ -225,6 +225,22 @@ export const findForeignerFriendlyStore: ToolDef = {
     const need = resolveNeed(args.need as string | undefined);
 
     if (!area) {
+      // Someone describing chest pain or a collapse must never be handed a menu of
+      // ATMs and currency exchange. When the need is medical, the hotlines and what
+      // to do come first; the area only refines WHERE, and can be asked afterwards.
+      if (need === "emergency") {
+        const e = ESSENTIALS.emergency;
+        return ok(
+          [
+            `${e.emoji} **${e.label}**`,
+            "",
+            e.tip,
+            "",
+            "_Tell me the neighborhood you're in (e.g. Myeongdong, Hongdae, Itaewon) and I'll add the nearest emergency room and pharmacies._",
+          ].join("\n"),
+          EMERGENCY_CHOICES,
+        );
+      }
       return fail(
         "Which area?",
         "Tell me a neighborhood (e.g. Myeongdong, Hongdae, Itaewon) and what you need — a foreign-card ATM, pharmacy, currency exchange, convenience store, or tourist info.",

@@ -132,6 +132,41 @@ function scriptShare(text: string, lang: Lang): number {
 const LIFE_THREATENING_RE =
   /seizure|convuls|unconscious|not breathing|can.?t breathe|choking|heart attack|cardiac|stroke|overdose|bleeding badly|heavy bleeding|unresponsive|passed out|fainted|collapsed|anaphyla|의식(?:이)?\s*없|쓰러|발작|경련|숨을?\s*(?:안|못)\s*(?:쉬|쉼)|심정지|심장마비|뇌졸중|과다출혈|의식불명|意識(?:が)?な|倒れ|発作|けいれん|呼吸(?:が)?(?:ない|できな)|心臓発作|脳卒中|昏迷|昏倒|不省人事|抽搐|癫痫|呼吸(?:困难|停止)|心脏病发|中风|大出血/i;
 
+/** A personal-safety threat needs the POLICE first, not an ambulance. */
+const SAFETY_THREAT_RE =
+  /following me|followed me|threaten|attack(?:ed|ing)?|assault|harass|mugg(?:ed|ing)|robbed|feel unsafe|in danger|쫓아와|따라와|위협|폭행|성추행|위험해|살려|追いかけ|襲われ|跟踪我|抢劫|被打/i;
+
+export function isSafetyThreat(text: string): boolean {
+  return SAFETY_THREAT_RE.test(text ?? "");
+}
+
+/**
+ * Buying illegal drugs is a serious criminal offence in Korea, tourists included.
+ * QA found 'where can I buy weed in Itaewon' answered with a place list under an
+ * 'official Seoul Tourism' heading — a legal-exposure and demo risk.
+ */
+const ILLEGAL_RE =
+  /\b(?:weed|marijuana|cannabis|hash|cocaine|meth|ecstasy|mdma|ketamine|magic mushrooms|lsd)\b|대마|마약|필로폰|大麻|毒品|覚醒剤|(?:buy|score|find|get)\s+(?:some\s+)?(?:drugs|dope)\b/i;
+
+export function isIllegalRequest(text: string): boolean {
+  return ILLEGAL_RE.test(text ?? "");
+}
+
+const ILLEGAL_REPLY: Record<Lang, string> = {
+  en: "I can't help with that — cannabis and other narcotics are illegal in Korea for visitors too, and the penalties are severe (Korean law applies even to acts legal at home). I'm happy to help with anything else: nightlife areas, bars, late-night food, or getting home safely.",
+  ko: "그건 도와드릴 수 없어요 — 한국에서 대마를 포함한 마약류는 외국인에게도 불법이고 처벌이 무겁습니다(본국에서 합법이어도 한국 법이 적용됩니다). 대신 밤에 놀 만한 동네, 술집, 심야 음식, 안전한 귀가 방법은 얼마든지 도와드릴게요.",
+  ja: "それはお手伝いできません — 韓国では大麻を含む薬物は旅行者にも違法で、刑罰が非常に重いです(母国で合法でも韓国の法律が適用されます)。ナイトスポット、バー、深夜の食事、安全な帰り方などは喜んでご案内します。",
+  zh: "这个我无法协助 — 在韩国，大麻及其他毒品对外国游客同样违法，处罚很重(即使在本国合法，韩国法律仍然适用)。夜生活区域、酒吧、深夜美食或安全回住处的方法，我很乐意帮忙。",
+};
+
+/** Police-first banner, shown above whatever else we found. */
+const POLICE_BANNER: Record<Lang, string> = {
+  en: "🚨 **If you are in immediate danger, call 112 (police) now** — or step into a lit shop, a convenience store, or a police box (파출소) and ask them to call. **1330** (24h) can interpret for you. Ambulance: **119**.",
+  ko: "🚨 **위험한 상황이면 지금 112(경찰)로 전화하세요** — 또는 불 켜진 가게·편의점·파출소로 들어가 도움을 요청하세요. **1330**(24시간)이 통역해 드립니다. 구급차는 **119**.",
+  ja: "🚨 **危険を感じたら今すぐ112(警察)へ** — または明かりのある店・コンビニ・交番(파출소)に入って助けを求めてください。**1330**(24時間)が通訳します。救急車は **119**。",
+  zh: "🚨 **如果有危险，请立即拨打 112(报警)** — 或走进有灯光的商店、便利店或派出所(파출소)求助。**1330**(24小时)可提供翻译。救护车：**119**。",
+};
+
 export function isLifeThreatening(text: string): boolean {
   return LIFE_THREATENING_RE.test(text ?? "");
 }
@@ -305,7 +340,10 @@ export async function handleChat(req: ChatRequest, onStatus?: (e: StatusEvent) =
 
   // Deterministic safety net: if the user described a life-threatening situation,
   // the ambulance number leads — whatever the router decided to do underneath.
-  const urgent = isLifeThreatening(text);
+  // A safety threat needs the police first; a medical emergency the ambulance.
+  const threat = isSafetyThreat(text);
+  const urgent = isLifeThreatening(text) || threat;
+  const banner = threat ? POLICE_BANNER[lang] : EMERGENCY_BANNER[lang];
   // Slots recovered from what was already said, so a tapped chip or a
   // "how do I get there from here?" keeps the journey it belongs to.
   const ctx = deriveContext(history);
@@ -314,13 +352,13 @@ export async function handleChat(req: ChatRequest, onStatus?: (e: StatusEvent) =
       ? {
           ...partial,
           toolMarkdown: partial.toolMarkdown
-            ? `${EMERGENCY_BANNER[lang]}
+            ? `${banner}
 
 ---
 
 ${partial.toolMarkdown}`
             : undefined,
-          reply: partial.toolMarkdown ? partial.reply : `${EMERGENCY_BANNER[lang]}
+          reply: partial.toolMarkdown ? partial.reply : `${banner}
 
 ${partial.reply ?? ""}`.trim(),
         }
@@ -333,6 +371,11 @@ ${partial.reply ?? ""}`.trim(),
 
   if (!text) {
     return done({ reply: WELCOME[lang], chips: DEFAULT_CHIPS });
+  }
+
+  // Answering this with a tourism-branded place list is a legal-exposure risk.
+  if (isIllegalRequest(text)) {
+    return done({ reply: ILLEGAL_REPLY[lang], chips: DEFAULT_CHIPS });
   }
 
   try {

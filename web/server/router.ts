@@ -375,9 +375,25 @@ const rulePlaceSearch: Rule = (text, lang) => {
  * wallet came back as a list of emergency rooms. These are decided before the
  * model gets a say.
  */
-const LAST_TRAIN = /last\s*train|final\s*train|막차|끝차|終電|最終電車|末班车|末班車/i;
+const LAST_TRAIN =
+  /last\s*(?:train|subway|metro)|final\s*(?:train|subway|metro)|(?:subway|metro|trains?)\s+(?:stop|close|finish|end)\s*(?:running)?|what time (?:does|do) the (?:subway|metro|trains?)|막차|끝차|終電|最終電車|末班车|末班車/i;
 const LOST_STOLEN =
   /(?:lost|stole|stolen|theft|pickpocket)\b|left (?:my|it|the) [a-z]+ (?:on|in)\b|분실|잃어버|도난|소매치기|置き忘|なくし|盗まれ|丢了|丢失|被偷/i;
+
+// Any medical need — not just the life-threatening wording the banner catches.
+// QA found 'chest pain and dizzy', 'sharp abdominal pain and a fever', 'I think
+// I broke my ankle' and 'high fever' all answered with a menu of ATMs and
+// currency exchange, with no emergency number anywhere.
+const MEDICAL_NEED =
+  /(?:chest|stomach|abdomen|abdominal|head|back|tooth)\s*(?:pain|ache|hurts?)|(?:pain|hurts?|hurting|injur|broke(?:n)?\s+(?:my|his|her|a)|sprain|fracture|bleed|fever|vomit|nausea|dizzy|faint|allergic reaction|asthma|infection)|(?:see|need|find)\s+(?:a\s+)?(?:doctor|hospital|emergency room|er|clinic|dentist)|not breathing|can\'?t breathe|trouble breathing|unconscious|unresponsive|collapsed|seizure|choking|ambulance|응급|아파요|아픈데|아프고|다쳤|열이\s*나|숨(?:이|을)?\s*(?:안|못)|토하|어지러|골절|출혈|痛い|熱が|怪我|救急|病院|疼|发烧|受伤|急诊|医院/i;
+
+// A personal-safety threat needs the POLICE first, not an ambulance.
+const SAFETY_THREAT =
+  /(?:following me|followed me|threaten|attack|assault|harass|mugg|robbed|unsafe|in danger|help me)\b|쫓아와|따라와|위협|폭행|성추행|위험해|살려|追いかけ|襲われ|跟踪我|抢劫|被打/i;
+
+// Words that name a body part or a symptom — never a neighbourhood.
+const BODY_OR_SYMPTOM =
+  /\b(?:my|his|her|the|a|an)\b|abdomen|abdominal|chest|stomach|head|back|leg|arm|ankle|knee|throat|tooth|eye|ear|pain|fever|blood|breath|side|body|가슴|배|머리|다리|팔|목|이빨/i;
 
 export function criticalRoute(text: string): RouteHit | null {
   const t = text ?? "";
@@ -390,6 +406,14 @@ export function criticalRoute(text: string): RouteHit | null {
   }
   if (LOST_STOLEN.test(t)) {
     return { tool: "explainKoreanService", args: { service: t.slice(0, 200) } };
+  }
+  // Medical need or a safety threat → the emergency card, which leads with the
+  // hotlines. Checked after lost-property so "I lost my wallet" is not medical.
+  if (MEDICAL_NEED.test(t) || SAFETY_THREAT.test(t)) {
+    const raw = firstMatch(t, [/\b(?:in|near|around|at)\s+([A-Za-z가-힣 ]{2,20})/i]);
+    // "sharp pain in my lower right abdomen" must not be read as a neighbourhood.
+    const area = raw && !BODY_OR_SYMPTOM.test(raw) ? raw : undefined;
+    return { tool: "findForeignerFriendlyStore", args: { need: "emergency", ...(area ? { area } : {}) } };
   }
   return null;
 }

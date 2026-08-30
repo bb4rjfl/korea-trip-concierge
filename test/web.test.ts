@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { buildChoiceFooter } from "../src/lib/footer.js";
 import { parseToolMarkdown } from "../web/server/chips.js";
 import { CATALOG, CATALOG_BY_NAME, executeTool } from "../web/server/catalog.js";
-import { detectLang, extractFromTo, findCity, routeText } from "../web/server/router.js";
-import { extractPlaceNames } from "../web/server/orchestrator.js";
+import { criticalRoute, detectLang, extractFromTo, findCity, routeText } from "../web/server/router.js";
+import { extractPlaceNames, isIllegalRequest, isSafetyThreat } from "../web/server/orchestrator.js";
 import { backfillArgs, deriveContext } from "../web/server/context.js";
 import { resolvePlaceCoord } from "../src/lib/places.js";
 import { matchAreaName } from "../src/tools/getAreaGuide.js";
@@ -340,5 +340,45 @@ describe("search term reduction", () => {
   it("never reduces a query to nothing", () => {
     expect(searchTerms("the best around here now").length).toBeGreaterThan(0);
     expect(searchTerms("카페")).toBe("카페");
+  });
+});
+
+/* ------------------------- safety routing must be certain -------------------- */
+
+describe("emergency and safety routing", () => {
+  it.each([
+    "I have sharp pain in my lower right abdomen and a fever",
+    "my chest hurts and I feel dizzy",
+    "he is not breathing",
+    "I think I broke my ankle, I cant walk",
+    "갑자기 가슴이 아프고 숨쉬기 힘들어요",
+  ])("routes a medical need to the emergency card: %s", (text) => {
+    const hit = criticalRoute(text);
+    expect(hit?.tool).toBe("findForeignerFriendlyStore");
+    expect(hit?.args.need).toBe("emergency");
+  });
+
+  it("never reads a body part as a neighbourhood", () => {
+    // "pain in my lower right abdomen" produced area="my lower right abdom".
+    expect(criticalRoute("sharp pain in my lower right abdomen")?.args.area).toBeUndefined();
+    expect(criticalRoute("I feel unsafe in Itaewon")?.args.area).toBe("Itaewon");
+  });
+
+  it("leaves ordinary questions alone", () => {
+    for (const t of ["best cafes in Hongdae", "how do I get to Gangnam", "where can I exchange money"]) {
+      expect(criticalRoute(t)).toBeNull();
+    }
+  });
+
+  it("puts the police first for a personal-safety threat", () => {
+    expect(isSafetyThreat("a man is following me and I feel unsafe")).toBe(true);
+    expect(isSafetyThreat("where is the best coffee")).toBe(false);
+  });
+
+  it("refuses to help buy illegal drugs", () => {
+    expect(isIllegalRequest("where can I buy weed in Itaewon")).toBe(true);
+    expect(isIllegalRequest("대마 어디서 사?")).toBe(true);
+    expect(isIllegalRequest("where can I buy weed killer for my garden")).toBe(true); // conservative: refuse
+    expect(isIllegalRequest("where can I buy souvenirs")).toBe(false);
   });
 });
