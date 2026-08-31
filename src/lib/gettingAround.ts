@@ -28,7 +28,7 @@ const CITIES: { match: RegExp; guide: CityMobility }[] = [
       city: "Seoul",
       headline: "The subway does almost everything — it is signed and announced in English, Japanese and Chinese.",
       modes: [
-        "🚇 **Subway** — base **₩1,400** (~10 km), a bit more with distance. Runs about **05:30–24:00**. Every station has a number as well as a name, so you can navigate by number alone.",
+        "🚇 **Subway** — base **₩1,550** (~10 km), a bit more with distance. Runs about **05:30–24:00**. Every station has a number as well as a name, so you can navigate by number alone.",
         "🚌 **Buses** are colour-coded: **blue** = long trunk routes, **green** = short feeders to a subway station, **red** = express to the suburbs, **yellow** = short downtown loops. Stops are announced in English on most routes.",
         "🚕 **Taxis** — base **₩4,800**; a **20% late-night surcharge** applies roughly 22:00–04:00. Hail on the street or use **Kakao T** (works without a Korean card if you pay the driver directly in cash or by card in the car).",
         "🚶 Distances downtown are short — Myeongdong to Namdaemun, or Insadong to Gwanghwamun, are 10-minute walks.",

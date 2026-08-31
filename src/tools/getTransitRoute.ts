@@ -287,6 +287,12 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
     const fareWon = airportLeg
       ? (AREX_FARE.find(([re]) => re.test(/인천공항/.test(airportLeg.to) ? airportLeg.from : airportLeg.to))?.[1] ?? 4750)
       : route.fareWon;
+    // The Sinbundang Line bills its own surcharge on top of the metro fare — ₩700
+    // more between Gangnam and Sinsa — and the gate is where people find out.
+    const premiumNote = route.legs.some((l) => /신분당/.test(l.line))
+      ? "\n💡 _This route uses the **Sinbundang Line**, which charges a separate surcharge — lines 2 and 3 reach the same place for about ₩700 less if you are not in a hurry._"
+      : "";
+
     const arexNote = airportLeg
       ? "\n✈️ _That fare is the all-stop AREX train. The non-stop Express (Seoul Station → T1, 43 min) is about ₩11,000 and needs a seat reservation._"
       : "";
@@ -295,7 +301,7 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
       `🚇 **${from} → ${to}** — by subway\n\n` +
       `⏱️ about **${route.minutes} min** · ${route.stops} stops · ` +
       `${route.transfers === 0 ? "no transfers" : `${route.transfers} transfer${route.transfers === 1 ? "" : "s"}`} · ` +
-      `💳 around **₩${fareWon.toLocaleString()}**${arexNote}`;
+      `💳 around **₩${fareWon.toLocaleString()}**${arexNote}${premiumNote}`;
 
     return ok(
       [

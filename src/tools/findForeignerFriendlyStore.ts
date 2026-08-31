@@ -27,6 +27,10 @@ const NEEDS = [
   "touristInfo",
   "foreignCardDining",
   "emergency",
+  "luggage",
+  "laundry",
+  "prayer",
+  "post",
 ] as const;
 type Need = (typeof NEEDS)[number];
 
@@ -88,6 +92,34 @@ const ESSENTIALS: Record<Need, Essential> = {
     tip: "**119** = ambulance/fire (free; has interpretation). **112** = police. **1339** = medical advice / nearest ER. **1330** = the 24h multilingual **Korea Travel Hotline** — they do **3-way medical interpretation** and route you. Pharmacies (**약국**, green sign) close ~20:00–21:00; after hours use a **24h pharmacy** or a hospital **ER** (foreign cards accepted). Bring your medicines' **generic names**.",
     query: "응급실",
   },
+  luggage: {
+    label: "Luggage storage",
+    emoji: "🧳",
+    short: "station coin lockers, or leave bags at your hotel",
+    tip: "**Ask your hotel first** — almost every hotel and guesthouse in Korea holds luggage free before check-in and after check-out, including on your last day. Otherwise, **subway station lockers (물품보관함)** are the standard answer: most stations have them, they take a **T-money card or a card payment**, they have an English menu, and they run about **₩2,000–4,000** for a few hours depending on size. The big interchanges — **Seoul Station, Hongik Univ., Myeongdong, Gangnam, Busan Station** — have the most, and they do fill up on weekends. Incheon Airport has staffed left-luggage counters and same-day delivery to city hotels.",
+    query: "물품보관함",
+  },
+  laundry: {
+    label: "Laundry",
+    emoji: "🧺",
+    short: "24h coin laundries; hotel laundry is far pricier",
+    tip: "**Coin laundries (코인빨래방)** are open 24 hours, unstaffed, and everywhere in residential areas. A wash and dry runs about **₩4,000–7,000** total, machines take **cards and cash**, detergent is dispensed automatically, and the panels usually have an English mode. Guesthouses often have a free or cheap machine — ask before you pay hotel laundry rates, which are charged per item.",
+    query: "코인빨래방",
+  },
+  prayer: {
+    label: "Prayer room & halal",
+    emoji: "🕌",
+    short: "Seoul Central Masjid in Itaewon; prayer rooms at the airport and malls",
+    tip: "**Seoul Central Masjid** in Itaewon is the main mosque, and the streets below it hold most of the city's **halal-certified restaurants**. Prayer rooms are also available at **Incheon Airport (both terminals)**, **COEX**, **Lotte World Tower**, and several department stores — look for 기도실 / prayer room on the floor guide. The Korea Tourism Organization publishes a Muslim-friendly restaurant classification (certified / self-certified / pork-free), which is worth checking before you rely on a sign in a window.",
+    query: "이슬람 기도실",
+  },
+  post: {
+    label: "Post & shipping home",
+    emoji: "📮",
+    short: "Korea Post EMS for overseas; convenience stores are domestic only",
+    tip: "**Korea Post (우체국)** is how you send things home — ask for **EMS**, which is trackable and reaches most countries in under a week. They sell **boxes at the counter**, so you can arrive with loose shopping. Post offices open weekdays about **09:00–18:00** and close at weekends, so plan around it. Convenience-store parcel services (편의점 택배) are cheap but **domestic only**. Tax-refund goods must stay unopened until you clear the refund desk at the airport.",
+    query: "우체국",
+  },
 };
 
 const NEED_BY_ALIAS: Record<string, Need> = {
@@ -111,12 +143,44 @@ const NEED_BY_ALIAS: Record<string, Need> = {
   doctor: "emergency",
   clinic: "emergency",
   sick: "emergency",
+  luggage: "luggage",
+  luggagestorage: "luggage",
+  locker: "luggage",
+  coinlocker: "luggage",
+  bag: "luggage",
+  bags: "luggage",
+  storage: "luggage",
+  laundry: "laundry",
+  laundromat: "laundry",
+  washing: "laundry",
+  wash: "laundry",
+  prayer: "prayer",
+  prayerroom: "prayer",
+  mosque: "prayer",
+  muslim: "prayer",
+  halal: "prayer",
+  post: "post",
+  postoffice: "post",
+  shipping: "post",
+  parcel: "post",
+  mail: "post",
+  ems: "post",
 };
+
+/**
+ * People do not type a keyword, they type a sentence: "coin laundry", "send a
+ * parcel home", "where can I leave my bags". Exact-key lookup matched the first
+ * of those and missed the rest, dropping them into the generic essentials menu.
+ * Longest alias first, so "conveniencestore" cannot be beaten by "convenience".
+ */
+const ALIASES_BY_LENGTH = Object.keys(NEED_BY_ALIAS).sort((a, b) => b.length - a.length);
 
 function resolveNeed(input?: string): Need | undefined {
   if (!input) return undefined;
-  const k = input.toLowerCase().replace(/[^a-z]/g, "");
-  return NEED_BY_ALIAS[k];
+  const k = input.toLowerCase().replace(/[^a-z가-힣]/g, "");
+  if (NEED_BY_ALIAS[k]) return NEED_BY_ALIAS[k];
+  const hit = ALIASES_BY_LENGTH.find((a) => a.length >= 3 && k.includes(a));
+  return hit ? NEED_BY_ALIAS[hit] : undefined;
 }
 
 const CHOICES: Choice[] = [

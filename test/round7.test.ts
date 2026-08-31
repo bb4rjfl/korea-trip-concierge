@@ -168,3 +168,50 @@ describe("intercity departures", () => {
     expect(upcoming(list, 2).length).toBeGreaterThan(0);
   });
 });
+
+describe("the practical problems of a trip", () => {
+  it("answers where to put the bags, wash clothes, pray, and post things home", async () => {
+    const { findForeignerFriendlyStore } = await import("../src/tools/findForeignerFriendlyStore.js");
+    const cases: [string, string][] = [
+      ["luggage storage", "Luggage storage"],
+      ["where can I leave my bags", "Luggage storage"],
+      ["coin laundry", "Laundry"],
+      ["send a parcel home", "Post"],
+      ["prayer room", "Prayer room"],
+    ];
+    for (const [need, expected] of cases) {
+      const text = (await findForeignerFriendlyStore.handler({ need, area: "Myeongdong" })).content[0].text;
+      expect(text, need).toContain(expected);
+    }
+  });
+
+  it("still shows the essentials menu for something it doesn't recognise", async () => {
+    const { findForeignerFriendlyStore } = await import("../src/tools/findForeignerFriendlyStore.js");
+    const text = (await findForeignerFriendlyStore.handler({ need: "zzz nonsense", area: "Myeongdong" })).content[0].text;
+    expect(text).toContain("essentials");
+  });
+
+  it("routes them in every language", async () => {
+    const { routeText } = await import("../web/server/router.js");
+    expect(routeText("where can I store my luggage?", "en")?.args.need).toBe("luggage");
+    expect(routeText("荷物を預けたい", "ja")?.args.need).toBe("luggage");
+    expect(routeText("행리 아니고 짐 보관", "ko")?.args.need).toBe("luggage");
+    expect(routeText("is there a coin laundry nearby", "en")?.args.need).toBe("laundry");
+  });
+});
+
+describe("fares are the ones actually charged", () => {
+  it("uses the current base fare, not the one from two rises ago", async () => {
+    const { getGraph, planRoute } = await import("../src/lib/sources/subwayGraph.js");
+    const graph = await getGraph();
+    // Checked against live routing: a two-stop ride is ₩1,550.
+    expect(planRoute(graph, "서울역", "명동")!.fareWon).toBe(1550);
+  });
+
+  it("adds the Sinbundang Line surcharge", async () => {
+    const { getGraph, planRoute } = await import("../src/lib/sources/subwayGraph.js");
+    const graph = await getGraph();
+    // Gangnam→Sinsa prices at ₩2,250 on the Sinbundang Line against ₩1,550 on 2+3.
+    expect(planRoute(graph, "강남", "신사")!.fareWon).toBe(2250);
+  });
+});

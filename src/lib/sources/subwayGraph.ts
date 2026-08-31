@@ -68,7 +68,20 @@ const MIN_PER_STOP = 2.2;
 // timetable gap, and under-pricing them made the planner prefer a two-transfer
 // detour over a direct ride.
 const MIN_PER_TRANSFER = 6;
-const BASE_FARE = 1400;
+/**
+ * Seoul's card fare, checked against live routing rather than remembered: a
+ * two-stop ride prices at ₩1,550, not the ₩1,400 this used to claim — the base
+ * went up and we were quoting under it on every single answer.
+ */
+const BASE_FARE = 1550;
+
+/**
+ * The Sinbundang Line bills a separate surcharge on top of the normal fare, and
+ * it is steep enough to matter: Gangnam→Sinsa is ₩2,250 on it against ₩1,550 on
+ * lines 2 and 3. Someone who tapped in expecting the base fare finds out at the
+ * gate.
+ */
+const SINBUNDANG_SURCHARGE = 700;
 
 /**
  * Not every "stop" is the same distance. The airport line runs 5-8 km between
@@ -470,6 +483,7 @@ export function planRoute(graph: SubwayGraph, fromName: string, toName: string):
   // total keeps the quoted time honest for express lines.
   const minutes = Math.round(dist.get(goal) ?? stops * MIN_PER_STOP + transfers * MIN_PER_TRANSFER);
   // Seoul fare: the base covers 10km, then ~100 won per 5km. Stops approximate distance.
-  const fareWon = BASE_FARE + Math.max(0, Math.floor((stops - 10) / 5)) * 100;
+  const premium = legs.some((l) => /신분당/.test(l.line)) ? SINBUNDANG_SURCHARGE : 0;
+  const fareWon = BASE_FARE + Math.max(0, Math.floor((stops - 10) / 5)) * 100 + premium;
   return { legs, stops, transfers, minutes, fareWon };
 }

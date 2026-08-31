@@ -284,6 +284,18 @@ const STORE_NEEDS: [RegExp, string][] = [
   [/convenience|편의점|コンビニ|便利店/i, "convenience"],
   [/tourist (?:info|information)|관광안내|観光案内|游客中心|旅游咨询/i, "touristInfo"],
   [/foreign card (?:dining|restaurant)|해외카드.*(?:식당|되는)/i, "foreignCardDining"],
+  // The practical problems of a trip: where to put the bags, wash the clothes,
+  // pray, and post the shopping home.
+  [
+    /luggage|left ?luggage|coin ?locker|store my bag|leave my bag|drop my bag|짐 ?(?:보관|맡)|물품보관|荷物.{0,4}(?:預|置)|コインロッカー|行李.{0,4}(?:寄存|存放)/i,
+    "luggage",
+  ],
+  [/laundr|laundromat|wash(?:ing)? (?:my )?clothes|빨래|세탁|コインランドリー|洗濯|洗衣/i, "laundry"],
+  [/prayer ?room|mosque|masjid|muslim|halal|기도실|모스크|이슬람|할랄|礼拝|モスク|ハラル|祈祷室|清真/i, "prayer"],
+  [
+    /post ?office|\bems\b|ship .{0,24}(?:home|overseas|abroad)|send .{0,24}(?:home|overseas|abroad)|send (?:a )?(?:parcel|package|box)|우체국|택배|소포|郵便局|邮局|寄回/i,
+    "post",
+  ],
 ];
 
 const ruleStore: Rule = (text) => {
