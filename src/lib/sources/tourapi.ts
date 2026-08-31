@@ -330,3 +330,81 @@ export async function getPlaceIntro(
     };
   });
 }
+
+/** A dated event, from the tourism board's festival service. */
+export interface Festival extends Place {
+  startDate: string; // YYYYMMDD
+  endDate: string;
+}
+
+const festivalCache = new TtlCache<Festival[]>(60 * 60_000); // dates move slowly
+
+/**
+ * Festivals and events running around a given date.
+ *
+ * "What's on while I'm here?" is one of the first things a visitor asks and one
+ * of the few where the tourism board's data is unambiguously the best source:
+ * dated, nationwide, already translated, and updated by the organisers. The
+ * keyword search we had could not answer it — a festival is defined by when it
+ * runs, not by what it is called.
+ *
+ * Source: 한국관광공사 TourAPI searchFestival2 (ⓒ한국관광공사).
+ */
+export async function searchFestivals(opts: {
+  /** YYYYMMDD; events still running on this date, or starting after it. */
+  from: string;
+  language?: Lang;
+  limit?: number;
+}): Promise<Festival[]> {
+  const lang = opts.language ?? "en";
+  const limit = opts.limit ?? 6;
+  // Look back a month so events already under way are included, not just ones
+  // that start today — most festivals a visitor can attend are mid-run.
+  const lookback = shiftYmd(opts.from, -35);
+  return festivalCache.getOrLoad(`fest:${lang}:${opts.from}`, async () => {
+    const url = buildUrl(
+      "searchFestival2",
+      { eventStartDate: lookback, numOfRows: "60", arrange: "A" },
+      lang,
+    );
+    const json = await fetchJson<TourApiResponse>(url);
+    const places = parsePlaces(json, lang);
+    const raw = json.response?.body?.items;
+    const rawArr = !raw || !raw.item ? [] : Array.isArray(raw.item) ? raw.item : [raw.item];
+    return places
+      .map((place, i) => {
+        const it = rawArr[i] as (RawItem & { eventstartdate?: string; eventenddate?: string }) | undefined;
+        return {
+          ...place,
+          startDate: String(it?.eventstartdate ?? ""),
+          endDate: String(it?.eventenddate ?? ""),
+        };
+      })
+      .filter((f) => f.endDate >= opts.from && f.startDate <= shiftYmd(opts.from, 60))
+      // A twelve-month "Saturday performance" programme is technically an event
+      // running today, and it is not what someone means by "what's on while I'm
+      // here". Short, dated festivals lead; standing programmes fill the tail.
+      .sort((a, b) => {
+        const span = (f: Festival): number => Math.max(0, daysBetween(f.startDate, f.endDate));
+        const isFestival = (f: Festival): number => (span(f) <= 45 ? 0 : 1);
+        return isFestival(a) - isFestival(b) || a.startDate.localeCompare(b.startDate);
+      })
+      .slice(0, limit);
+  });
+}
+
+/** YYYYMMDD arithmetic in whole days, kept local to avoid a date library. */
+function shiftYmd(ymd: string, days: number): string {
+  const y = Number(ymd.slice(0, 4));
+  const m = Number(ymd.slice(4, 6));
+  const d = Number(ymd.slice(6, 8));
+  const t = new Date(Date.UTC(y, m - 1, d + days));
+  return `${t.getUTCFullYear()}${String(t.getUTCMonth() + 1).padStart(2, "0")}${String(t.getUTCDate()).padStart(2, "0")}`;
+}
+
+/** Whole days between two YYYYMMDD stamps. */
+function daysBetween(a: string, b: string): number {
+  const at = Date.UTC(Number(a.slice(0, 4)), Number(a.slice(4, 6)) - 1, Number(a.slice(6, 8)));
+  const bt = Date.UTC(Number(b.slice(0, 4)), Number(b.slice(4, 6)) - 1, Number(b.slice(6, 8)));
+  return Number.isFinite(at) && Number.isFinite(bt) ? Math.round((bt - at) / 86_400_000) : 0;
+}

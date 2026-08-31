@@ -2,7 +2,15 @@ import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
-import { searchPlacesAny, searchPlacesNearby, normalizeLang, type Place } from "../lib/sources/tourapi.js";
+import {
+  searchPlacesAny,
+  searchPlacesNearby,
+  searchFestivals,
+  normalizeLang,
+  type Place,
+  type Festival,
+} from "../lib/sources/tourapi.js";
+import { todayKST } from "../lib/holidays.js";
 import { searchForeignerPois, hasPoiProvider, type PoiPlace } from "../lib/sources/poi.js";
 import {
   searchSeoulContent,
@@ -127,6 +135,30 @@ function foodKeyword(query: string): string {
 /** Chains people ask for by name — usually for a familiar breakfast or a toilet. */
 const BRAND =
   /starbucks|스타벅스|tous les jours|뚜레쥬르|paris ?baguette|파리바게[뜨트]|mcdonald'?s?|맥도날드|burger king|버거킹|kfc|lotteria|롯데리아|mom'?s touch|맘스터치|twosome|투썸|ediya|이디야|gong ?cha|공차|domino'?s?|도미노|pizza hut|피자헛/i;
+
+/** Is this "what's on / any festivals" rather than "find me a place"? */
+export function asksAboutEvents(text: string): boolean {
+  return /festival|what'?s on|events? (?:on|happening|near|this)|anything happening|celebration|matsuri|축제|행사|열리는|イベント|祭り|お祭り|活[动動]|[节節]日|慶典|庆典/i.test(
+    text ?? "",
+  );
+}
+
+/** Dated events, with the dates leading — that is what makes them useful. */
+function renderFestivals(list: Festival[], areaLabel?: string): string {
+  const fmt = (ymd: string): string => `${ymd.slice(4, 6)}/${ymd.slice(6, 8)}`;
+  const lines = list.map((f, i) => {
+    const when = f.startDate === f.endDate ? fmt(f.startDate) : `${fmt(f.startDate)}–${fmt(f.endDate)}`;
+    const where = f.address ? `\n   📍 ${f.address}` : "";
+    return `**${i + 1}. ${f.title}** · _${when}_${where}\n   ${mapLinks(f.title)}`;
+  });
+  return [
+    `🎉 **On around ${areaLabel ?? "Korea"} right now** — _festivals from Korea Tourism data_`,
+    "",
+    ...lines,
+    "",
+    "_Dates come from the organisers via the tourism board; check the venue page before a long trip._",
+  ].join("\n");
+}
 
 /** Infer a TourAPI category from the natural-language query when not given. */
 function inferCategory(query: string, explicit?: string): string | undefined {
@@ -634,6 +666,20 @@ export const searchPlaceForeigner: ToolDef = {
     // whichever result path runs.
     const program = guidedTourLead(query) || templeStayLead(query);
     const mustSee = program || (cat !== "food" ? cityMustSeeLead(query, area) : "");
+
+    // "What's on while I'm here?" is a question about dates, not names, and the
+    // keyword search could never answer it — a festival is defined by when it
+    // runs. The tourism board's festival service is dated, nationwide and already
+    // translated, which makes it the right source and an unambiguously better
+    // answer than anything a general search returns.
+    if (asksAboutEvents(query)) {
+      const festivals = await searchFestivals({ from: todayKST().replace(/-/g, ""), language, limit: 6 }).catch(
+        () => [],
+      );
+      if (festivals.length) {
+        return ok(renderFestivals(festivals, areaLabel), searchChoices(areaLabel, false));
+      }
+    }
 
     // No query and no area → ask, instead of letting an empty search run (N3).
     if (!query.trim() && !area.trim()) {

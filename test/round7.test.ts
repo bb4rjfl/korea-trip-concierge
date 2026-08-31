@@ -140,3 +140,13 @@ describe("questions that used to be deflected now reach a card", () => {
     expect(asksHowToGetAround("how do I get around Busan?")).toBe(true);
   });
 });
+
+describe("what's on while I'm here", () => {
+  it("recognizes an event question in every language, and not a place search", async () => {
+    const { asksAboutEvents } = await import("../src/tools/searchPlaceForeigner.js");
+    for (const q of ["any festivals happening now?", "축제 뭐 있어?", "今どんなお祭りがありますか", "有什么活动吗"]) {
+      expect(asksAboutEvents(q), q).toBe(true);
+    }
+    expect(asksAboutEvents("find me a cafe in Hongdae")).toBe(false);
+  });
+});

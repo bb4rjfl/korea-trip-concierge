@@ -138,6 +138,7 @@ export function seasonCard(month: number, today = new Date()): string {
     `🎒 **Pack:** ${s.pack}`,
   ];
   if (s.caveat) lines.push("", `⚠️ ${s.caveat}`);
+  lines.push("", "_Ask me **what festivals are on** for the dated list from the tourism board._");
   if (holiday) {
     lines.push(
       "",

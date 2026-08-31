@@ -12,6 +12,7 @@
 import { asksHowToGetAround } from "../../src/lib/gettingAround.js";
 import { asksAboutEtiquette, asksAboutAccess } from "../../src/lib/culture.js";
 import { asksAboutSeason } from "../../src/lib/seasons.js";
+import { asksAboutEvents } from "../../src/tools/searchPlaceForeigner.js";
 
 export type Lang = "en" | "ja" | "zh" | "ko";
 
@@ -427,6 +428,11 @@ export function criticalRoute(text: string): RouteHit | null {
   }
   // "Is now a good time to visit?" is a season question; the weather rule below
   // answered it by asking which city they meant.
+  // Dated events come from the tourism board's festival service, which the
+  // keyword search cannot reach — route them before the season card claims them.
+  if (asksAboutEvents(t)) {
+    return { tool: "searchPlaceForeigner", args: { query: t.slice(0, 120) } };
+  }
   if (asksAboutSeason(t)) {
     return { tool: "getWeatherAndAir", args: { when: t.slice(0, 200) } };
   }
