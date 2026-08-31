@@ -159,13 +159,22 @@ function inferCategory(query: string, explicit?: string): string | undefined {
   return undefined;
 }
 
-function renderPois(query: string, pois: PoiPlace[]): string {
+/**
+ * A heading that reads properly when the router extracted an area but no keyword —
+ * `Places for ""` was appearing on perfectly good result lists.
+ */
+function searchHeading(icon: string, query: string, area: string | undefined, source: string): string {
+  const what = (query ?? "").trim() || (area ?? "").trim();
+  return what ? `${icon} **Places for** _"${what}"_ — _${source}_` : `${icon} **Places to go** — _${source}_`;
+}
+
+function renderPois(query: string, pois: PoiPlace[], area?: string): string {
   const lines = pois.map((p, i) => {
     const tel = p.tel ? ` · ☎ ${p.tel}` : "";
     const cat = p.category ? ` · _${p.category}_` : "";
     return `**${i + 1}. ${p.name}**${cat}\n   📍 ${p.address}${tel}\n   ${mapLinks(p.name)}`;
   });
-  const out = [`🔎 **Places for** _"${query}"_ — _live local search_`, "", ...lines];
+  const out = [searchHeading("🔎", query, area, "live local search"), "", ...lines];
   // Diet honesty: search can't verify vegan/halal — tell the visitor to confirm (Y2).
   if (/\b(vegan|vegetarian|halal|kosher)\b/i.test(query)) {
     out.push("", "> ⚠️ I can't verify dietary options remotely — confirm vegan/halal etc. with the restaurant.");
@@ -248,7 +257,7 @@ return (
     return `**${i + 1}. ${p.title}**\n   📍 ${p.address}${tel}\n   ${mapLinks(p.title)}`;
   });
   return [
-    `🔎 **Places for** _"${query}"_ — _from Korea Tourism data_`,
+    searchHeading("🔎", query, undefined, "from Korea Tourism data"),
     "",
     ...lines,
   ].join("\n");
@@ -452,7 +461,7 @@ function renderSeoul(query: string, items: SeoulCard[], indoor = false): string 
   return [
     indoor
       ? `🔎 **Seoul — indoor picks for** _"${query}"_ · _stay dry_ — _official Seoul Tourism_`
-      : `🔎 **Seoul ideas for** _"${query}"_ — _official Seoul Tourism_`,
+      : searchHeading("🔎", query, undefined, "official Seoul Tourism").replace("Places for", "Seoul ideas for").replace("Places to go", "Seoul ideas"),
     "",
     ...lines,
   ].join("\n");
@@ -669,7 +678,7 @@ export const searchPlaceForeigner: ToolDef = {
           coord: coord ? { lat: coord.lat, lng: coord.lng } : undefined,
           limit: 6,
         });
-        if (pois.length) return ok(renderPois(query, pois), searchChoices(areaLabel, true));
+        if (pois.length) return ok(renderPois(query, pois, areaLabel ?? area), searchChoices(areaLabel, true));
       } catch {
         /* fall through to TourAPI */
       }

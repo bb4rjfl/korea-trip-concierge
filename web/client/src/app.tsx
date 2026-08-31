@@ -39,6 +39,10 @@ export function App() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [statusText, setStatusText] = useState<string | null>(null);
+  // A card that is readable while its translation is still being fetched. Shown in
+  // place of the typing dots so a Korean or Japanese user isn't left waiting on a
+  // translation for an answer that already exists.
+  const [draft, setDraft] = useState<{ toolMarkdown: string; chips: Chip[] } | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -80,11 +84,13 @@ export function App() {
     setMsgs(nextMsgs);
     setBusy(true);
     setStatusText(null);
+    setDraft(null);
     try {
       const res = await sendChat(
         [...history, { role: "user", content: trimmed }],
         lang,
         (e) => setStatusText(statusLabel(e)),
+        (d) => setDraft(d),
       );
       const content = res.toolMarkdown ?? res.reply ?? "";
       setMsgs([
@@ -103,6 +109,7 @@ export function App() {
     } finally {
       setBusy(false);
       setStatusText(null);
+      setDraft(null);
     }
   }
 
@@ -243,7 +250,16 @@ export function App() {
             </div>
           ))}
 
-          {busy && (
+          {busy && draft && (
+            <div class="bubble assistant">
+              <div class="md-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(draft.toolMarkdown) }} />
+              <p class="draft-note">
+                <span class="dot" /><span class="dot" /><span class="dot" /> {t.statusLocalizing}
+              </p>
+            </div>
+          )}
+
+          {busy && !draft && (
             <div class="bubble assistant typing" aria-label={statusText ?? t.thinking}>
               <span class="dot" /><span class="dot" /><span class="dot" />
               <span class="typing-label">{statusText ?? t.thinking}</span>

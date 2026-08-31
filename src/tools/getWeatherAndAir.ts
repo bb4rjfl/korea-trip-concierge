@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { asksAboutSeason, seasonCard } from "../lib/seasons.js";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
@@ -56,6 +57,14 @@ export const getWeatherAndAir: ToolDef = {
       .string()
       .optional()
       .describe("Korean city, e.g. 'Seoul', 'Busan', 'Jeju'. Defaults to Seoul."),
+    when: z
+      .string()
+      .optional()
+      .describe(
+        "Optional. Pass the visitor's own wording when they ask about timing rather than today — " +
+          "'is now a good time to visit', 'what should I pack', 'when do the cherry blossoms open', " +
+          "'autumn leaves'. Adds a card for the season they are asking about.",
+      ),
   },
   annotations: {
     title: "Weather & Air Quality",
@@ -66,6 +75,7 @@ export const getWeatherAndAir: ToolDef = {
   },
   handler: async (args) => {
     const cityArg = args.city ? String(args.city) : undefined;
+    const when = args.when ? String(args.when) : "";
 
     if (!hasKey("BUS_API_KEY")) {
       return notConnected(
@@ -93,7 +103,15 @@ export const getWeatherAndAir: ToolDef = {
       );
     }
 
-    const lines = [`🌤️ **${city.label} — weather & air**`, ""];
+    // "Is now a good time to come?" is a question about the season, not about this
+    // afternoon — so the season leads and today's numbers follow it.
+    const season = asksAboutSeason(when)
+      ? `${seasonCard(new Date(Date.now() + 9 * 3600_000).getUTCMonth() + 1)}
+
+---
+`
+      : "";
+    const lines = [season, `🌤️ **${city.label} — weather & air**`, ""].filter((l) => l !== "");
 
     // Don't silently pass off Seoul as a typo'd/unknown city (Y8).
     if (cityArg && !recognizesCity(cityArg)) {

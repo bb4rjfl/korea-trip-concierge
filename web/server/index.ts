@@ -79,7 +79,11 @@ app.post("/api/chat", rateLimit, async (req: Request, res: Response) => {
       res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
     try {
-      const response = await handleChat({ messages, uiLang: body.uiLang }, (e) => send("status", e));
+      const response = await handleChat(
+        { messages, uiLang: body.uiLang },
+        (e) => send("status", e),
+        (d) => send("draft", d),
+      );
       send("result", response);
       logMeta(response);
     } catch (err) {

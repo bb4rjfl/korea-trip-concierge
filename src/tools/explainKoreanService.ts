@@ -1,5 +1,12 @@
 import { z } from "zod";
 import { asksHowToGetAround, gettingAroundCard } from "../lib/gettingAround.js";
+import {
+  asksAboutEtiquette,
+  asksAboutAccess,
+  renderCard,
+  ETIQUETTE_CARD,
+  ACCESSIBILITY_CARD,
+} from "../lib/culture.js";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok } from "../lib/responses.js";
 import { todayKST } from "../lib/holidays.js";
@@ -326,6 +333,22 @@ export const explainKoreanService: ToolDef = {
         { emoji: "💳", cmdEn: "How do I pay for transit?", cmdKo: "교통 결제 방법", descEn: "T-money and cards" },
         { emoji: "🚇", cmdEn: "Plan a route for me", cmdKo: "경로 알려줘", descEn: "point to point" },
         { emoji: "🚕", cmdEn: "How do taxis work here?", cmdKo: "택시 이용법", descEn: "apps and fares" },
+      ]);
+    }
+    // Accessibility is checked before etiquette: "is it rude to ask for a ramp"
+    // is an access question, and the access card answers it better.
+    if (asksAboutAccess(q)) {
+      return ok(renderCard(ACCESSIBILITY_CARD), [
+        { emoji: "🚇", cmdEn: "Plan a step-free route", cmdKo: "무장애 경로", descEn: "subway with lifts" },
+        { emoji: "🏛️", cmdEn: "Which palaces are easiest to visit?", cmdKo: "가기 쉬운 궁궐", descEn: "flat, wheelchairs lent" },
+        { emoji: "📞", cmdEn: "How do I get help in English?", cmdKo: "영어 도움 받기", descEn: "1330 and more" },
+      ]);
+    }
+    if (asksAboutEtiquette(q)) {
+      return ok(renderCard(ETIQUETTE_CARD), [
+        { emoji: "🍽️", cmdEn: "What's on a Korean menu?", cmdKo: "메뉴 해설", descEn: "dishes and allergens" },
+        { emoji: "💳", cmdEn: "Do I tip? How do I pay?", cmdKo: "결제·팁", descEn: "payment guide" },
+        { emoji: "🗺️", cmdEn: "Where should I go first?", cmdKo: "어디부터 갈까", descEn: "a course for you" },
       ]);
     }
     const matched = SERVICES.find((s) => s.match.test(q));

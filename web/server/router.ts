@@ -10,6 +10,8 @@
  */
 
 import { asksHowToGetAround } from "../../src/lib/gettingAround.js";
+import { asksAboutEtiquette, asksAboutAccess } from "../../src/lib/culture.js";
+import { asksAboutSeason } from "../../src/lib/seasons.js";
 
 export type Lang = "en" | "ja" | "zh" | "ko";
 
@@ -163,11 +165,14 @@ const ruleSubway: Rule = (text) => {
 };
 
 const reRouteWord =
-  /how (?:do|can) i get|how to get|get to|way to|directions?|route|itinerary from|가는 법|가는 길|어떻게 가|경로|길찾기|行き方|乗り換え|怎么去|路线|路線/i;
+  /how (?:do|can) i get|how to get|get to|get there|way to|directions?|route|itinerary from|가는 법|가는 길|어떻게 가|거기 어떻게|경로|길찾기|行き方|どうやって行|どう行|まで行|乗り換え|怎[么麼](?:去|走)|如何前往|怎[么麼]到|路线|路線/i;
 
 const ruleRoute: Rule = (text) => {
   const pair = extractFromTo(text);
-  if (!pair) return null;
+  // "How do I get there?" / "そこまでどうやって行きますか" — the destination is in the
+  // conversation, not in the sentence. Route anyway and let the slots fill it in;
+  // asking "which place?" when the previous card named one reads as amnesia.
+  if (!pair) return reRouteWord.test(text) ? { tool: "getTransitRoute", args: {} } : null;
   if (!reRouteWord.test(text) && !(pair.from && pair.to)) return null;
   const args: Record<string, unknown> = {};
   if (pair.from) args.from = pair.from;
@@ -414,6 +419,16 @@ export function criticalRoute(text: string): RouteHit | null {
   // rules read the city name and answered with a neighbourhood guide instead.
   if (asksHowToGetAround(t)) {
     return { tool: "explainKoreanService", args: { service: t.slice(0, 200) } };
+  }
+  // Manners and accessible travel: both used to be refused outright or answered
+  // with a request for a departure station.
+  if (asksAboutAccess(t) || asksAboutEtiquette(t)) {
+    return { tool: "explainKoreanService", args: { service: t.slice(0, 200) } };
+  }
+  // "Is now a good time to visit?" is a season question; the weather rule below
+  // answered it by asking which city they meant.
+  if (asksAboutSeason(t)) {
+    return { tool: "getWeatherAndAir", args: { when: t.slice(0, 200) } };
   }
   if (LAST_TRAIN.test(t)) {
     const station = firstMatch(t, [

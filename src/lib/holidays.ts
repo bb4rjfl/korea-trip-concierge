@@ -83,3 +83,27 @@ export function holidayBanner(h: KoreanHoliday | undefined): string {
     ? `🎌 **Today is ${h.name}** — during this holiday many shops, restaurants, and traditional markets **close or run reduced hours**, and cities empty out. Palaces/attractions, convenience stores, and big malls usually stay open — but call ahead or check before you go.`
     : `🎌 _Today is a Korean public holiday (${h.name}). Banks and offices are closed; most attractions, shops, and restaurants stay open, though some may keep holiday hours._`;
 }
+
+/**
+ * The next big closure-causing holiday, if one is close enough to plan around.
+ *
+ * Seollal and Chuseok empty the cities, sell out every intercity train weeks
+ * ahead, and shut small restaurants for days — which makes them the single most
+ * useful thing to tell someone deciding when to travel.
+ */
+export function upcomingMajorHoliday(
+  today = new Date(),
+  withinDays = 45,
+): { name: string; date: string; daysAway: number } | undefined {
+  const kst = new Date(today.getTime() + 9 * 3600_000);
+  const start = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate());
+  let best: { name: string; date: string; daysAway: number } | undefined;
+  for (const [date, h] of Object.entries(HOLIDAYS)) {
+    if (!h.major) continue;
+    const [y, m, d] = date.split("-").map(Number);
+    const days = Math.round((Date.UTC(y, m - 1, d) - start) / 86_400_000);
+    if (days < 0 || days > withinDays) continue;
+    if (!best || days < best.daysAway) best = { name: h.name, date, daysAway: days };
+  }
+  return best;
+}

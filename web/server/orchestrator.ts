@@ -365,7 +365,17 @@ const DEFAULT_CHIPS_BY_LANG: Record<Lang, Chip[]> = {
 
 /* --------------------------------- pipeline --------------------------------- */
 
-export async function handleChat(req: ChatRequest, onStatus?: (e: StatusEvent) => void): Promise<ChatResponse> {
+/** A card that is ready to read while its translation is still in flight. */
+export interface ChatDraft {
+  toolMarkdown: string;
+  chips: Chip[];
+}
+
+export async function handleChat(
+  req: ChatRequest,
+  onStatus?: (e: StatusEvent) => void,
+  onDraft?: (d: ChatDraft) => void,
+): Promise<ChatResponse> {
   const start = Date.now();
   const history = (req.messages ?? []).filter((m) => typeof m?.content === "string");
   const lastUser = [...history].reverse().find((m) => m.role === "user");
@@ -517,7 +527,18 @@ ${partial.reply ?? ""}`.trim(),
     }
 
     const { body, chips } = parseToolMarkdown(result.markdown);
-    if (lang !== "en" && llmEnabled()) onStatus?.({ stage: "localizing" });
+    if (lang !== "en" && llmEnabled()) {
+      onStatus?.({ stage: "localizing" });
+      // Translating a full card of restaurants costs about four seconds, on top of
+      // routing and the tool call — long enough that a Korean or Japanese user is
+      // left staring at dots while the answer already exists. Send what we have
+      // immediately (our own labels are translated by table, and the place names
+      // and addresses are the part they need most), then replace it with the
+      // translated version when it lands.
+      const draftBody = hant ? toTraditional(localizeLabels(body, lang)) : localizeLabels(body, lang);
+      const draftChips = lang === "ko" ? chips.map((c) => (c.cmdKo ? { ...c, cmdEn: c.cmdKo } : c)) : chips;
+      onDraft?.({ toolMarkdown: draftBody, chips: draftChips });
+    }
     // Translation and photo lookup run concurrently — photos ride inside the
     // translation window instead of adding latency. Chips travel with the body so
     // localizing them costs no extra round-trip: they are the primary interaction

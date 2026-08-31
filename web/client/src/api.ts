@@ -37,6 +37,8 @@ export async function sendChat(
   messages: ChatTurn[],
   uiLang: Lang,
   onStatus?: (e: StatusEvent) => void,
+  /** Fires with a readable card before its translation lands. */
+  onDraft?: (d: { toolMarkdown: string; chips: Chip[] }) => void,
 ): Promise<ChatApiResponse> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 40_000);
@@ -73,6 +75,7 @@ export async function sendChat(
         try {
           const parsed = JSON.parse(data) as unknown;
           if (event === "status") onStatus?.(parsed as StatusEvent);
+          else if (event === "draft") onDraft?.(parsed as { toolMarkdown: string; chips: Chip[] });
           else if (event === "result") result = parsed as ChatApiResponse;
         } catch {
           /* skip malformed frame */
