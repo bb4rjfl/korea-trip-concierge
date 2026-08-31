@@ -248,7 +248,7 @@ function buildDay(
   const ranked = rank(pool);
   const wider = rank(fallback.filter((s) => !pool.includes(s)));
   const stops: Stop[] = [];
-  for (const slot of template) {
+  for (const [slotIndex, slot] of template.entries()) {
     const suits = (s: Spot): boolean =>
       !used.has(s.id) &&
       fits(s, slot.block) &&
@@ -264,7 +264,11 @@ function buildDay(
     const usedThemes = stops.map((st) => st.spot.themes[0]);
     const fresh = candidates.filter((c) => !usedThemes.includes(c.themes[0]));
     const shortlist = fresh.length ? fresh : candidates;
-    const pick = shortlist[offset % shortlist.length];
+    // Walk further down the list at every variant, and a different distance in
+    // each slot — otherwise the one crowd-pleasing venue wins the morning of
+    // every variant and three "different" courses share the same first stop.
+    const step = offset * template.length + slotIndex * offset;
+    const pick = shortlist[step % shortlist.length];
     used.add(pick.id);
     const alt = shortlist.find((s) => !used.has(s.id) && s.id !== pick.id);
     if (alt) used.add(alt.id);
