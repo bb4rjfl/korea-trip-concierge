@@ -76,7 +76,7 @@ describe("explainKoreanService routing + chips (P5/P6)", () => {
   });
   it("still routes 'book a popular restaurant' to reservations (P5)", () => {
     const r = explainKoreanService.handler({ service: "book a popular restaurant" });
-    expect(text(r)).toContain("Restaurant reservations");
+    expect(text(r)).toContain("Booking a table");
   });
   it("emergency chips drop the off-topic kiosk chip (P6)", () => {
     const r = explainKoreanService.handler({ service: "medical emergency at 2am" });

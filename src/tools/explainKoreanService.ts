@@ -87,12 +87,17 @@ const SERVICES: ServiceGuide[] = [
   {
     // Require a determiner-ish word after "book" so "book a (popular) restaurant"
     // matches but "I read a book about restaurants" doesn't (P5).
-    match: /(reserv|booking|book(?:ing)?\s+(?!about|on\b|by\b)[\w\s]{0,15}?(?:table|seat|spot|restaurant|reservation)|waitlist|catch ?table|tabling|naver booking|예약|웨이팅|catchtable)/i,
-    label: "Restaurant reservations & waitlists",
+    match: /(reserv|booking|book(?:ing)?\s+(?!about|on\b|by\b)[\w\s]{0,15}?(?:table|seat|spot|restaurant|reservation|hotel|room|stay|ticket)|book me|waitlist|catch ?table|tabling|naver booking|예약|웨이팅|catchtable)/i,
+    label: "Booking a table, a room or a ticket",
     emoji: "🍽️",
     blocker:
       "Popular restaurants book via **Naver / CatchTable(KR) / Tabling**, which require a **Korean-phone-verified** account in Korean.",
-    workaround: ["Book popular and Michelin spots with **Google/Apple/email** sign-up and a **foreign card** — no Korean number."],
+    workaround: [
+      "Book popular and Michelin spots with **Google/Apple/email** sign-up and a **foreign card** — no Korean number.",
+      "**Hotels and guesthouses**: the international platforms (Agoda, Booking.com, Airbnb) work normally with a foreign card and cover Korea well. Korean-only apps like Yanolja and Yeogi Eottae are cheaper for motels but need a Korean number.",
+      "**Attraction and show tickets**: Klook and Trazy sell the foreigner-facing versions with English support; Interpark is the Korean original and needs verification.",
+      "_I don't book anything for you — I can only tell you which door actually opens for a foreign visitor._",
+    ],
     twin: "**CatchTable Global** (EN/JA/ZH, foreign cards). For Tabling waitlists, use the **on-site kiosk's “Foreigner” / QR** option.",
     fallback: "Call the restaurant, ask your hotel concierge to book, or simply **walk in and wait** (많은 곳이 워크인 가능).",
   },
