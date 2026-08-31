@@ -274,7 +274,9 @@ export const findForeignerFriendlyStore: ToolDef = {
       .optional()
       .describe(
         "What you need: currencyExchange, atm (foreign-card), pharmacy, convenience, touristInfo, " +
-          "foreignCardDining, or emergency (medical/119/1330) — synonyms understood. Omit for an overview.",
+          "foreignCardDining, emergency (medical/119/1330), luggage (storage/coin lockers), " +
+          "laundry (coin laundry), prayer (prayer room, mosque, halal), or post (sending things home, EMS) " +
+          "— synonyms and whole sentences understood. Omit for an overview.",
       ),
   },
   annotations: {

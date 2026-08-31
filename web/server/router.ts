@@ -442,6 +442,22 @@ export function criticalRoute(text: string): RouteHit | null {
   // answered it by asking which city they meant.
   // Dated events come from the tourism board's festival service, which the
   // keyword search cannot reach — route them before the season card claims them.
+  // The practical problems of a trip. The model reliably sends these somewhere
+  // else — "where can I pray as a Muslim" came back as an art museum, and "how do
+  // I ship a box home" as a generic app-blocker card — and the rules already know
+  // the answer, so they are decided here.
+  const practical = STORE_NEEDS.find(
+    ([re, need]) => (need === "luggage" || need === "laundry" || need === "prayer" || need === "post") && re.test(t),
+  );
+  if (practical) {
+    const args: Record<string, unknown> = { need: practical[1] };
+    const where = firstMatch(t, [
+      /\b(?:in|near|around|at)\s+(.+?)(?:\?|$)/i,
+      /(.+?)(?:에서|근처|주변)/,
+    ]);
+    if (where) args.area = where;
+    return { tool: "findForeignerFriendlyStore", args };
+  }
   if (asksAboutEvents(t)) {
     return { tool: "searchPlaceForeigner", args: { query: t.slice(0, 120) } };
   }

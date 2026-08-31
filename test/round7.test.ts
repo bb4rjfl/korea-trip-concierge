@@ -256,3 +256,28 @@ describe("Korean readers don't need the romanization", () => {
     expect(ja).toContain("남산 촛불1978");
   });
 });
+
+describe("the model doesn't get to misroute the practical needs", () => {
+  it("decides them before the model runs", async () => {
+    const { criticalRoute } = await import("../web/server/router.js");
+    // "Where can I pray as a Muslim" came back as an art museum; "how do I ship a
+    // box home" as a generic app-blocker card. Both have a real card already.
+    const cases: [string, string][] = [
+      ["where can I pray as a Muslim in Seoul?", "prayer"],
+      ["how do I ship a box home?", "post"],
+      ["where can I leave my luggage in Seoul Station?", "luggage"],
+      ["is there a coin laundry near Hongdae?", "laundry"],
+    ];
+    for (const [q, need] of cases) {
+      const hit = criticalRoute(q);
+      expect(hit?.tool, q).toBe("findForeignerFriendlyStore");
+      expect(hit?.args.need, q).toBe(need);
+    }
+  });
+
+  it("leaves the ordinary questions to the normal path", async () => {
+    const { criticalRoute } = await import("../web/server/router.js");
+    expect(criticalRoute("how do I get to Myeongdong")).toBeNull();
+    expect(criticalRoute("I need a pharmacy")).toBeNull();
+  });
+});
