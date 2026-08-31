@@ -113,3 +113,30 @@ describe("traditional Chinese", () => {
     expect(toTraditional("韩国当前时间 · 营业时间 · 无需换乘")).toBe("韓國當前時間 · 營業時間 · 無需換乘");
   });
 });
+
+describe("questions that used to be deflected now reach a card", () => {
+  it("routes them before the model gets a chance to decline", async () => {
+    const { criticalRoute } = await import("../web/server/router.js");
+    const cases: [string, string][] = [
+      ["How do I get around Jeju without a car?", "explainKoreanService"],
+      ["I use a wheelchair. Is the Seoul subway accessible?", "explainKoreanService"],
+      ["What rules should I know so I don't offend anyone?", "explainKoreanService"],
+      ["Do I need a visa to visit Korea from Brazil?", "explainKoreanService"],
+      ["Can you book me a hotel?", "explainKoreanService"],
+      ["Is now a good time to visit Korea?", "getWeatherAndAir"],
+    ];
+    for (const [q, tool] of cases) expect(criticalRoute(q)?.tool, q).toBe(tool);
+  });
+
+  it("does not hijack a declined card as an entry question", async () => {
+    const { criticalRoute } = await import("../web/server/router.js");
+    // "Visa" is a card brand far more often than an entry document in this app.
+    expect(criticalRoute("My Visa card was declined at a restaurant")).toBeNull();
+  });
+
+  it("keeps a route question a route question", async () => {
+    const { asksHowToGetAround } = await import("../src/lib/gettingAround.js");
+    expect(asksHowToGetAround("how do I get from Hongdae to Myeongdong?")).toBe(false);
+    expect(asksHowToGetAround("how do I get around Busan?")).toBe(true);
+  });
+});

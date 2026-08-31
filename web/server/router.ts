@@ -430,6 +430,18 @@ export function criticalRoute(text: string): RouteHit | null {
   if (asksAboutSeason(t)) {
     return { tool: "getWeatherAndAir", args: { when: t.slice(0, 200) } };
   }
+  // Entry rules and "can you book me…" were being answered by the model with a
+  // polite deflection, when both have a card that says what actually works.
+  // "visa" is guarded against the card brand — "my Visa was declined" is payment.
+  if (
+    (/\bvisas?\b(?!\s*(?:card|was|is|got|declin))|k-?eta|arrival card|q-?code|immigration|입국|비자|ビザ|入国|签证|簽證|入境/i.test(
+      t,
+    ) &&
+      !/declin|reject|card|결제|payment/i.test(t)) ||
+    /\bbook (?:me|us|a)\b|make a (?:booking|reservation)|reserve (?:me|us|a)/i.test(t)
+  ) {
+    return { tool: "explainKoreanService", args: { service: t.slice(0, 200) } };
+  }
   if (LAST_TRAIN.test(t)) {
     const station = firstMatch(t, [
       /(?:from|at)\s+(.+?)(?:\s+station)?\s*(?:\?|$)/i,
