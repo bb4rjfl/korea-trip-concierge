@@ -23,7 +23,11 @@ app.use(express.json({ limit: "64kb" }));
 // Small in-memory token bucket per IP: protects upstream API keys and the LLM
 // quota from abuse; sized generously above any human chat cadence.
 // Configurable so a QA sweep can be raised temporarily without a code change.
-const RATE_PER_MIN = Number(process.env.RATE_LIMIT_PER_MIN ?? 20) || 20;
+// Korean mobile carriers and hotel wifi put many phones behind one public IP, so
+// a per-IP budget sized for one person throttles a whole floor of a guesthouse.
+// A human sends four or five messages a minute; this leaves room for a dozen of
+// them while still capping a script.
+const RATE_PER_MIN = Number(process.env.RATE_LIMIT_PER_MIN ?? 60) || 60;
 const BUCKET_CAPACITY = RATE_PER_MIN; // burst
 const REFILL_PER_MS = RATE_PER_MIN / 60_000;
 const buckets = new Map<string, { tokens: number; ts: number }>();
