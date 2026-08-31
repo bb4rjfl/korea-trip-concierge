@@ -56,7 +56,12 @@ export function deriveContext(history: ChatTurn[]): ConvoContext {
     }
     if (!ctx.station) {
       const m = /\*\*([^*\n]{1,30}?)\s*(?:Station|역)\*\*/i.exec(t) ?? /([가-힣A-Za-z]{2,20})\s*(?:Station|역)\b/.exec(t);
-      if (m) ctx.station = clean(m[1]);
+      // Same "<what> in <where>" trap as the hero title: "**Luggage storage in
+      // Seoul Station**" must yield Seoul, not the whole heading.
+      if (m) {
+        const raw = clean(m[1]);
+        ctx.station = /^(.{3,40}?)\s+in\s+(.{2,30})$/.exec(raw)?.[2]?.trim() ?? raw;
+      }
     }
     if (!ctx.area) {
       // Area-guide header: "🗺️ **Hongdae (홍대)**"
@@ -73,7 +78,13 @@ export function deriveContext(history: ChatTurn[]): ConvoContext {
       const entries = [...t.matchAll(/^\*\*\d+\.\s+([^*\n]+?)\*\*/gm)].map((m) => clean(m[1]));
       const hero = /\*\*([^*\n]{2,60})\*\*/.exec(t)?.[1];
       for (const p of [...entries, hero ? clean(hero) : ""]) {
-        if (p && p.length > 1 && !/^\d/.test(p) && !ctx.places.includes(p)) ctx.places.push(p);
+        // Our own card titles read "<what> in <where>" — "Luggage storage in Seoul
+        // Station". Carrying the whole title forward as a place produced "Post &
+        // shipping home in Luggage storage in Seoul", so keep only the where.
+        const place = /^(.{3,40}?)\s+in\s+(.{2,30})$/.exec(p)?.[2]?.trim() ?? p;
+        if (place && place.length > 1 && !/^\d/.test(place) && !ctx.places.includes(place)) {
+          ctx.places.push(place);
+        }
       }
     }
   }

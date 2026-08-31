@@ -281,3 +281,22 @@ describe("the model doesn't get to misroute the practical needs", () => {
     expect(criticalRoute("I need a pharmacy")).toBeNull();
   });
 });
+
+describe("our own card titles are not places", () => {
+  it("keeps only the where from a '<what> in <where>' heading", async () => {
+    const { deriveContext } = await import("../web/server/context.js");
+    // Carrying the whole title forward produced "Post & shipping home in Luggage
+    // storage in Seoul" on the next answer.
+    const ctx = deriveContext([
+      { role: "assistant", content: "🧳 **Luggage storage in Seoul Station**\n\nAsk your hotel first…" },
+    ]);
+    expect(ctx.places[0]).toBe("Seoul Station");
+    expect(ctx.station).toBe("Seoul");
+  });
+
+  it("leaves a real place title alone", async () => {
+    const { deriveContext } = await import("../web/server/context.js");
+    const ctx = deriveContext([{ role: "assistant", content: "🕒 **Gyeongbokgung Palace — right now**" }]);
+    expect(ctx.places[0]).toBe("Gyeongbokgung Palace");
+  });
+});
