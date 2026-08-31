@@ -119,8 +119,14 @@ function foodKeyword(query: string): string {
     const q = m?.[1]?.toLowerCase();
     return q && q !== kw ? `${q} ${kw}` : kw;
   }
-  return "restaurant";
+  // Someone who names a brand wants that brand, not "a restaurant near there".
+  const brand = BRAND.exec(query)?.[0];
+  return brand ?? "restaurant";
 }
+
+/** Chains people ask for by name — usually for a familiar breakfast or a toilet. */
+const BRAND =
+  /starbucks|스타벅스|tous les jours|뚜레쥬르|paris ?baguette|파리바게[뜨트]|mcdonald'?s?|맥도날드|burger king|버거킹|kfc|lotteria|롯데리아|mom'?s touch|맘스터치|twosome|투썸|ediya|이디야|gong ?cha|공차|domino'?s?|도미노|pizza hut|피자헛/i;
 
 /** Infer a TourAPI category from the natural-language query when not given. */
 function inferCategory(query: string, explicit?: string): string | undefined {
