@@ -18,7 +18,8 @@
     "start:web": "node dist-web/web/server/index.js",
     "inspect": "npx -y @modelcontextprotocol/inspector",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "audit:facts": "tsx scripts/audit-facts.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
