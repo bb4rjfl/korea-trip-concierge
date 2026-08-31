@@ -215,3 +215,19 @@ describe("fares are the ones actually charged", () => {
     expect(planRoute(graph, "강남", "신사")!.fareWon).toBe(2250);
   });
 });
+
+describe("a four-language service reads all four languages", () => {
+  it("anchors a city named in Japanese or Chinese", async () => {
+    const { searchTerms } = await import("../src/tools/searchPlaceForeigner.js");
+    // The query cleaner used to skip ja/zh entirely, so a whole sentence reached
+    // the keyword search and matched nothing.
+    expect(searchTerms("弘大の近くでカフェを探しています")).toBe("弘大 カフェ");
+    expect(searchTerms("首爾有什麼好吃的？")).toBe("首爾");
+    expect(searchTerms("best cafe in Hongdae please")).toBe("cafe Hongdae");
+  });
+
+  it("keeps a query that is already just terms", async () => {
+    const { searchTerms } = await import("../src/tools/searchPlaceForeigner.js");
+    expect(searchTerms("성수동 카페")).toBe("성수동 카페");
+  });
+});

@@ -223,15 +223,19 @@ interface CityAnchor {
   /** How the city appears in an address, so a result can be sanity-checked. */
   addr: RegExp;
 }
+// Every city is named in all four languages. Listing only English and Korean meant
+// a Japanese visitor writing ソウル or a Taiwanese one writing 首爾 produced no
+// anchor at all, which switched off the coordinate search their query depended on
+// — "ソウルで韓国料理のおすすめは？" came back "nothing matched".
 const CITY_CENTER: [RegExp, CityAnchor][] = [
-  [/\bseoul\b|서울/i, { lat: 37.5665, lng: 126.978, addr: /seoul|서울/i }],
-  [/\bbusan\b|부산/i, { lat: 35.1796, lng: 129.0756, addr: /busan|부산/i }],
-  [/\bjeju\b|제주/i, { lat: 33.4996, lng: 126.5312, addr: /jeju|제주/i }],
-  [/\bincheon\b|인천/i, { lat: 37.4563, lng: 126.7052, addr: /incheon|인천/i }],
-  [/\bdaegu\b|대구/i, { lat: 35.8714, lng: 128.6014, addr: /daegu|대구/i }],
-  [/\bdaejeon\b|대전/i, { lat: 36.3504, lng: 127.3845, addr: /daejeon|대전/i }],
-  [/\bgwangju\b|광주/i, { lat: 35.1595, lng: 126.8526, addr: /gwangju|광주/i }],
-  [/\bgyeongju\b|경주/i, { lat: 35.8562, lng: 129.2247, addr: /gyeongju|경주/i }],
+  [/\bseoul\b|서울|ソウル|首[尔爾]/i, { lat: 37.5665, lng: 126.978, addr: /seoul|서울/i }],
+  [/\bbusan\b|부산|プサン|釜山/i, { lat: 35.1796, lng: 129.0756, addr: /busan|부산/i }],
+  [/\bjeju\b|제주|チェジュ|[済濟济]州/i, { lat: 33.4996, lng: 126.5312, addr: /jeju|제주/i }],
+  [/\bincheon\b|인천|インチョン|仁川/i, { lat: 37.4563, lng: 126.7052, addr: /incheon|인천/i }],
+  [/\bdaegu\b|대구|テグ|大邱/i, { lat: 35.8714, lng: 128.6014, addr: /daegu|대구/i }],
+  [/\bdaejeon\b|대전|テジョン|大田/i, { lat: 36.3504, lng: 127.3845, addr: /daejeon|대전/i }],
+  [/\bgwangju\b|광주|クァンジュ|光州/i, { lat: 35.1595, lng: 126.8526, addr: /gwangju|광주/i }],
+  [/\bgyeongju\b|경주|キョンジュ|[慶庆]州/i, { lat: 35.8562, lng: 129.2247, addr: /gyeongju|경주/i }],
 ];
 
 function cityCenter(text: string): CityAnchor | undefined {
@@ -317,13 +321,36 @@ const QUERY_FILLER =
 const QUERY_FILLER_KO =
   /(?:알려줘|추천(?:해줘|좀|해)?|있어|있나요|있을까|어디|뭐|무슨|좀|해줘|해주세요|하고 ?싶어|가고 ?싶어|갈 ?만한|갈 ?데|괜찮은|지금|오늘|이|가|을|를|에|에서|은|는|의|같은|정도|말고)/g;
 
+// The same job for Japanese and Chinese, which this used to skip entirely — so
+// "ソウルで韓国料理のおすすめは？" reached the search verbatim and matched nothing.
+// Only multi-character fillers are stripped: Japanese particles are single
+// characters that also live inside words, and shredding them costs more than the
+// filler does.
+const QUERY_FILLER_JA =
+  /(?:おすすめ|オススメ|お勧め|教えてください|教えて|ください|下さい|ありますか|ありませんか|でしょうか|ですか|したいです|したい|行きたい|食べたい|探しています|探して|人気の|人気|有名な|有名|近くの|近く|周辺の|周辺|辺り|どこか|どこ|どんな|なにか|何か|いいところ|良いところ|ところ|場所|ですか|です|ます)/g;
+const QUERY_FILLER_ZH =
+  /(?:推荐|推薦|請問|请问|有什[么麼]|有哪些|哪[里裡儿兒]|附近的|附近|周[边邊]|好吃的|好玩的|不[错錯]的|想去|想吃|我要|我想|可以|地方)/g;
+
+/**
+ * Particles left dangling once the filler around them is gone — "弘大の 近く で
+ * カフェ" loses its middle and leaves "の" and "で" floating between the words
+ * that matter. Dropped wherever they end up standing alone.
+ */
+const STRAY_PARTICLE = /[はがをにでのとやも吗嗎呢的]\s|\s[はがをにでのとやも吗嗎呢的]/g;
+const TRAILING_PARTICLE = /[はがをにでのとやも吗嗎呢的]\s*$/;
+
 /** Compact a free-text request into the terms a keyword search can actually use. */
 export function searchTerms(query: string): string {
   const compact = (query ?? "")
     .replace(/[?？!！.,，、]/g, " ")
     .replace(QUERY_FILLER, " ")
     .replace(QUERY_FILLER_KO, " ")
+    .replace(QUERY_FILLER_JA, " ")
+    .replace(QUERY_FILLER_ZH, " ")
+    .replace(STRAY_PARTICLE, " ")
+    .replace(STRAY_PARTICLE, " ") // removal creates new adjacencies
     .replace(/\s{2,}/g, " ")
+    .replace(TRAILING_PARTICLE, "")
     .trim();
   // If stripping ate everything, keep the original — a bad search beats no search.
   return compact.length >= 2 ? compact : (query ?? "").trim();
