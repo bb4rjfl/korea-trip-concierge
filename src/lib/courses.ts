@@ -181,7 +181,9 @@ export function wantedThemes(personas: PersonaDef[], explicit: string[]): string
 }
 
 function score(spot: Spot, themes: string[]): number {
-  let s = 0;
+  // The curated spots carry a hand-written reason to go; a live entry carries a
+  // category. On equal theme fit the written one is the better recommendation.
+  let s = /^(?:vs_|ta_)/.test(spot.id) ? 0 : 2;
   spot.themes.forEach((t) => {
     const idx = themes.indexOf(t);
     if (idx >= 0) s += Math.max(1, 6 - idx); // earlier wanted theme → higher
@@ -222,38 +224,73 @@ function fits(spot: Spot, block: Block): boolean {
   return spot.blocks.includes(block) || spot.blocks.includes("any");
 }
 
-/** Build one day from a candidate pool, filling the given block template. */
-function buildDay(title: string, pool: Spot[], themes: string[], template: { key: string; block: Block; food?: boolean }[], used: Set<string>): DayPlan {
-  const ranked = [...pool].sort((a, b) => score(b, themes) - score(a, themes) || a.id.localeCompare(b.id));
+/**
+ * Build one day from a candidate pool.
+ *
+ * `offset` is what makes "give me another one" mean anything: at 0 every slot
+ * takes its best-scoring candidate, and each step down takes the next one, so a
+ * second ask returns a different day rather than the same itinerary again.
+ *
+ * `fallback` is the wider pool used when the primary one cannot fill the day —
+ * a narrow filter (indoor, one zone) was producing two-stop "courses".
+ */
+function buildDay(
+  title: string,
+  pool: Spot[],
+  themes: string[],
+  template: { key: string; block: Block; food?: boolean; any?: string[] }[],
+  used: Set<string>,
+  offset = 0,
+  fallback: Spot[] = [],
+): DayPlan {
+  const rank = (list: Spot[]): Spot[] =>
+    [...list].sort((a, b) => score(b, themes) - score(a, themes) || a.id.localeCompare(b.id));
+  const ranked = rank(pool);
+  const wider = rank(fallback.filter((s) => !pool.includes(s)));
   const stops: Stop[] = [];
   for (const slot of template) {
-    const ok = ranked.filter((s) => !used.has(s.id) && fits(s, slot.block) && (!slot.food ? true : s.themes.includes("food") || s.themes.includes("market")));
-    if (!ok.length) continue;
-    const pick = ok[0];
+    const suits = (s: Spot): boolean =>
+      !used.has(s.id) &&
+      fits(s, slot.block) &&
+      (!slot.food || s.themes.includes("food") || s.themes.includes("market")) &&
+      // An evening is dinner, a bar or a view — not a stationery shop that
+      // happened to be the next candidate in the list.
+      (!slot.any || slot.any.some((t) => s.themes.includes(t)));
+    const ok = ranked.filter(suits);
+    const candidates = ok.length ? ok : wider.filter(suits);
+    if (!candidates.length) continue;
+    // A day of three markets is a list, not an itinerary. Prefer a stop whose
+    // lead theme hasn't been used yet, and fall back if that leaves nothing.
+    const usedThemes = stops.map((st) => st.spot.themes[0]);
+    const fresh = candidates.filter((c) => !usedThemes.includes(c.themes[0]));
+    const shortlist = fresh.length ? fresh : candidates;
+    const pick = shortlist[offset % shortlist.length];
     used.add(pick.id);
-    const alt = ok.find((s) => !used.has(s.id) && s.id !== pick.id);
+    const alt = shortlist.find((s) => !used.has(s.id) && s.id !== pick.id);
     if (alt) used.add(alt.id);
     stops.push({ block: BLOCK_LABEL[slot.key] ?? slot.key, spot: pick, alt });
   }
   return { title, stops };
 }
 
-const ONE_DAY_TEMPLATE: { key: string; block: Block; food?: boolean }[] = [
+const EVENING_THEMES = ["food", "nightlife", "view", "market", "cafe"];
+
+const ONE_DAY_TEMPLATE: { key: string; block: Block; food?: boolean; any?: string[] }[] = [
   { key: "morning", block: "morning" },
   { key: "lunch", block: "afternoon", food: true },
   { key: "afternoon", block: "afternoon" },
-  { key: "evening", block: "evening" },
+  { key: "evening", block: "evening", any: EVENING_THEMES },
 ];
-const HALF_DAY_TEMPLATE: { key: string; block: Block; food?: boolean }[] = [
+const HALF_DAY_TEMPLATE: { key: string; block: Block; food?: boolean; any?: string[] }[] = [
   { key: "morning", block: "any" },
   { key: "food", block: "any", food: true },
   { key: "afternoon", block: "any" },
 ];
 
 /** Top zones in a city by total theme score (so each day clusters to minimise travel). */
-function rankZones(themes: string[], city: City): string[] {
+function rankZones(themes: string[], city: City, catalogue: Spot[] = ALL_SPOTS): string[] {
   const byZone = new Map<string, number>();
-  for (const s of ALL_SPOTS) {
+  for (const s of catalogue) {
     if (cityOf(s) !== city || s.zone === "any") continue;
     byZone.set(s.zone, (byZone.get(s.zone) ?? 0) + score(s, themes));
   }
@@ -311,40 +348,86 @@ export interface Course {
   themes: string[];
 }
 
+/** One entry per place, keeping the first (curated) of any duplicate name. */
+function dedupeByName(spots: Spot[]): Spot[] {
+  const seen = new Set<string>();
+  const out: Spot[] = [];
+  for (const s of spots) {
+    // "Tongin Market" and "Tongin Market (coin lunchbox)" are one place.
+    const key = s.name
+      .toLowerCase()
+      .replace(/\([^)]*\)/g, "")
+      .replace(/[^a-z가-힣0-9]/g, "");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
+}
+
 /** Compose a course for the (personas, duration, themes, city) request. */
-export function composeCourse(personas: PersonaDef[], duration: Duration, explicitThemes: string[], city: City = "Seoul", indoor = false): Course {
+export function composeCourse(
+  personas: PersonaDef[],
+  duration: Duration,
+  explicitThemes: string[],
+  city: City = "Seoul",
+  indoor = false,
+  /** 0 is the best answer; each step is a different one, for "give me another". */
+  variant = 0,
+  /** Live candidates from the city's tourism data, behind the curated ones. */
+  extra: Spot[] = [],
+): Course {
   const themes = wantedThemes(personas, explicitThemes);
-  const zones = rankZones(themes, city);
+  // Curated and live overlap — "Tongin Market" arrives from both, and a day that
+  // sends you to the same market twice is worse than one that never mentions it.
+  // Curated wins, because it is the entry with the reason to go written on it.
+  const catalogue = extra.length ? dedupeByName([...ALL_SPOTS, ...extra]) : ALL_SPOTS;
+  const zones = rankZones(themes, city, catalogue);
   const used = new Set<string>();
   const inZones = (zs: string[]) => {
-    const pool = ALL_SPOTS.filter((s) => cityOf(s) === city && (zs.includes(s.zone) || s.zone === "any"));
+    const pool = catalogue.filter((s) => cityOf(s) === city && (zs.includes(s.zone) || s.zone === "any"));
     // Raining? Keep only sheltered stops — unless that leaves too few to fill a day,
     // in which case lead with them and let the rest follow.
     if (!indoor) return pool;
     const sheltered = pool.filter(isIndoorSpot);
     return sheltered.length >= 3 ? sheltered : [...sheltered, ...pool.filter((s) => !isIndoorSpot(s))];
   };
-  const band = (i: number) => (zones.slice(i, i + 2).length ? zones.slice(i, i + 2) : zones.slice(0, 2)); // a day's 1-2 adjacent zones
+  // Every whole city in the pool, for when a narrow filter starves a day.
+  const cityPool = catalogue.filter((s) => cityOf(s) === city);
+  // A day's 1-2 adjacent zones. The variant rotates which part of the city
+  // anchors the day, so "another" moves you across town rather than shuffling
+  // the same three streets.
+  const band = (i: number) => {
+    if (!zones.length) return zones;
+    const start = (i + variant * 2) % zones.length;
+    const picked = [...zones, ...zones].slice(start, start + 2);
+    return picked.length ? picked : zones.slice(0, 2);
+  };
   const days: DayPlan[] = [];
 
   if (duration === "half-day") {
-    days.push(buildDay("Half-day", inZones(zones.slice(0, 1).length ? zones.slice(0, 1) : zones), themes, HALF_DAY_TEMPLATE, used));
+    days.push(buildDay("Half-day", inZones(band(0)), themes, HALF_DAY_TEMPLATE, used, variant, cityPool));
   } else if (duration === "2-day") {
-    days.push(buildDay("Day 1", inZones(band(0)), themes, ONE_DAY_TEMPLATE, used));
-    days.push(buildDay("Day 2", inZones(band(2)), themes, ONE_DAY_TEMPLATE, used));
+    days.push(buildDay("Day 1", inZones(band(0)), themes, ONE_DAY_TEMPLATE, used, variant, cityPool));
+    days.push(buildDay("Day 2", inZones(band(2)), themes, ONE_DAY_TEMPLATE, used, variant, cityPool));
   } else if (duration === "3-day") {
-    days.push(buildDay("Day 1", inZones(band(0)), themes, ONE_DAY_TEMPLATE, used));
-    days.push(buildDay("Day 2", inZones(band(2)), themes, ONE_DAY_TEMPLATE, used));
-    days.push(buildDay("Day 3", inZones(band(4)), themes, ONE_DAY_TEMPLATE, used));
+    days.push(buildDay("Day 1", inZones(band(0)), themes, ONE_DAY_TEMPLATE, used, variant, cityPool));
+    days.push(buildDay("Day 2", inZones(band(2)), themes, ONE_DAY_TEMPLATE, used, variant, cityPool));
+    days.push(buildDay("Day 3", inZones(band(4)), themes, ONE_DAY_TEMPLATE, used, variant, cityPool));
   } else {
     // 1-day: Seoul single-persona signature (golden), else engine.
     // Signature days are fixed outdoor sequences — skip them when shelter is the point.
-    const sig = !indoor && city === "Seoul" && personas.length === 1 ? SIGNATURES[`${personas[0].key}:1-day`] : undefined;
+    // The signature is the single best answer, so it is variant 0 only — asking
+    // for another must not hand back the same hand-written day.
+    const sig =
+      variant === 0 && !indoor && city === "Seoul" && personas.length === 1
+        ? SIGNATURES[`${personas[0].key}:1-day`]
+        : undefined;
     if (sig) {
       const stops = sig.map((x) => ({ block: x.block, spot: SPOT_BY_ID.get(x.id)! })).filter((st) => st.spot);
       days.push({ title: "1-day", stops });
     } else {
-      days.push(buildDay("1-day", inZones(band(0)), themes, ONE_DAY_TEMPLATE, used));
+      days.push(buildDay("1-day", inZones(band(0)), themes, ONE_DAY_TEMPLATE, used, variant, cityPool));
     }
   }
   return { days, themes };

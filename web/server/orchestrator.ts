@@ -515,6 +515,18 @@ ${partial.reply ?? ""}`.trim(),
     // 4) Execute (zod-validated); missing required args → friendly clarify.
     onStatus?.({ stage: "tool", tool: toolCall.name });
     const filled = backfillArgs(toolCall.name, toolCall.args, ctx);
+
+    // "Another one" has to mean another one. The course builder returns its
+    // strongest day at variant 0 and a different day in a different part of the
+    // city at each step after that, so asking again walks forward instead of
+    // handing back the same itinerary — which is what a visitor saw three times
+    // in a row before this existed.
+    if (toolCall.name === "recommendTripCourse" && filled.variant == null) {
+      const alreadyShown = history.filter(
+        (h) => h.role === "assistant" && /course\s+—|코스\s*—|コース|课程|課程/.test(h.content ?? ""),
+      ).length;
+      if (alreadyShown > 0) filled.variant = alreadyShown;
+    }
     const result = await executeTool(toolCall.name, filled);
     if (!result.ok) {
       const asks = result.invalidArgs

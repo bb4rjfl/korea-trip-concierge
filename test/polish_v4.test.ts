@@ -224,55 +224,55 @@ describe("v5 fixes (D-022)", () => {
 });
 
 // ── recommendTripCourse (13th tool, persona courses, D-025) ───────────────────
-describe("recommendTripCourse — combinable persona courses (D-025)", () => {
-  const t13 = (persona?: string, duration?: string, themes?: string, location?: string) =>
-    text(recommendTripCourse.handler({ persona, duration, themes, location }));
-  it("routes personas to labels and COMBINES them", () => {
-    expect(t13("20s woman")).toMatch(/K-beauty & photo/);
-    expect(t13("K-pop fan")).toMatch(/K-pop fan/);
-    expect(t13("family")).toMatch(/Family/);
-    const combo = t13("20s woman, foodie");
+describe("recommendTripCourse — combinable persona courses (D-025)", async () => {
+  const t13 = async (persona?: string, duration?: string, themes?: string, location?: string) =>
+    text(await recommendTripCourse.handler({ persona, duration, themes, location }));
+  it("routes personas to labels and COMBINES them", async () => {
+    expect(await t13("20s woman")).toMatch(/K-beauty & photo/);
+    expect(await t13("K-pop fan")).toMatch(/K-pop fan/);
+    expect(await t13("family")).toMatch(/Family/);
+    const combo = await t13("20s woman, foodie");
     expect(combo).toMatch(/K-beauty & photo/);
     expect(combo).toMatch(/Foodie/);
   });
-  it("scales by duration", () => {
-    const two = t13("foodie", "2-day");
+  it("scales by duration", async () => {
+    const two = await t13("foodie", "2-day");
     expect(two).toMatch(/Day 1/);
     expect(two).toMatch(/Day 2/);
-    expect(t13("couple", "half-day")).toMatch(/Half-day/);
+    expect(await t13("couple", "half-day")).toMatch(/Half-day/);
   });
-  it("falls back to first-timer with no persona", () => {
-    expect(t13()).toMatch(/first-timer/i);
+  it("falls back to first-timer with no persona", async () => {
+    expect(await t13()).toMatch(/first-timer/i);
   });
-  it("supports Busan & Jeju courses; steers other cities (Phase 2)", () => {
-    expect(t13("foodie", "1-day", "", "Busan")).toMatch(/Busan course/);
-    expect(t13("couple", "2-day", "", "Jeju")).toMatch(/Jeju course/);
-    expect(t13("foodie", "1-day", "", "Daegu")).toMatch(/coming soon/i);
+  it("supports Busan & Jeju courses; steers other cities (Phase 2)", async () => {
+    expect(await t13("foodie", "1-day", "", "Busan")).toMatch(/Busan course/);
+    expect(await t13("couple", "2-day", "", "Jeju")).toMatch(/Jeju course/);
+    expect(await t13("foodie", "1-day", "", "Daegu")).toMatch(/coming soon/i);
   });
-  it("names the first two stops in the route chip (one-click routing)", () => {
-    const out = t13("culture lover", "1-day", "", "Seoul");
+  it("names the first two stops in the route chip (one-click routing)", async () => {
+    const out = await t13("culture lover", "1-day", "", "Seoul");
     expect(out).toMatch(/How do I get from .+ to .+\?/);
   });
-  it("offers the free guided-tour chip on a Seoul history/culture course (D-034)", () => {
-    expect(t13("history lover", "1-day", "", "Seoul")).toMatch(/free official guided tours/i);
+  it("offers the free guided-tour chip on a Seoul history/culture course (D-034)", async () => {
+    expect(await t13("history lover", "1-day", "", "Seoul")).toMatch(/free official guided tours/i);
     // A Busan course (no Seoul dobo program) should NOT show it.
-    expect(t13("history lover", "1-day", "", "Busan")).not.toMatch(/free official guided tours/i);
+    expect(await t13("history lover", "1-day", "", "Busan")).not.toMatch(/free official guided tours/i);
   });
-  it("supports Gyeongju courses and new personas (Phase 3)", () => {
-    expect(t13("culture", "1-day", "", "Gyeongju")).toMatch(/Gyeongju course/);
-    expect(t13("history lover", "1-day", "", "경주")).toMatch(/Bulguksa|Daereungwon|Cheomseongdae/);
-    expect(t13("nightlife")).toMatch(/Nightlife/);
-    expect(t13("solo backpacker")).toMatch(/Solo traveler/);
-    expect(t13("nature lover")).toMatch(/Nature & healing/);
+  it("supports Gyeongju courses and new personas (Phase 3)", async () => {
+    expect(await t13("culture", "1-day", "", "Gyeongju")).toMatch(/Gyeongju course/);
+    expect(await t13("history lover", "1-day", "", "경주")).toMatch(/Bulguksa|Daereungwon|Cheomseongdae/);
+    expect(await t13("nightlife")).toMatch(/Nightlife/);
+    expect(await t13("solo backpacker")).toMatch(/Solo traveler/);
+    expect(await t13("nature lover")).toMatch(/Nature & healing/);
   });
-  it("supports 3-day (and 4+ → 3-day base)", () => {
-    const three = t13("history lover", "3-day");
+  it("supports 3-day (and 4+ → 3-day base)", async () => {
+    const three = await t13("history lover", "3-day");
     expect(three).toMatch(/Day 1/);
     expect(three).toMatch(/Day 3/);
-    expect(t13("foodie", "5-day")).toMatch(/Day 3/);
+    expect(await t13("foodie", "5-day")).toMatch(/Day 3/);
   });
-  it("never reads as an ad", () => {
-    expect(t13("foodie")).toMatch(/not ads/i);
+  it("never reads as an ad", async () => {
+    expect(await t13("foodie")).toMatch(/not ads/i);
   });
 });
 

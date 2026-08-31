@@ -10,6 +10,7 @@ import {
   type PersonaDef,
   type City,
 } from "../lib/courses.js";
+import { livePool } from "../lib/livePool.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -103,6 +104,13 @@ export const recommendTripCourse: ToolDef = {
       .describe("Traveler profile(s), combinable — e.g. '20s woman', 'family', 'couple', 'K-pop fan', 'foodie', 'history lover', or '20s woman, foodie'. Omit for first-timer."),
     duration: z.string().optional().describe("Trip length: 'half-day', '1-day', '2-day', '3-day' (4+ returns a 3-day base)."),
     themes: z.string().optional().describe("Optional focus, comma-separated — e.g. 'beauty, photo' or 'nature, nightlife'."),
+    variant: z
+      .number()
+      .optional()
+      .describe(
+        "Which alternative to return. 0 (default) is the strongest course; pass 1, 2, 3… when the traveler " +
+          "asks for another one, and each returns a different day in a different part of the city.",
+      ),
     location: z.string().optional().describe("City: Seoul, Busan, Jeju, or Gyeongju (default Seoul). Other cities steer to getAreaGuide."),
   },
   annotations: {
@@ -112,7 +120,7 @@ export const recommendTripCourse: ToolDef = {
     idempotentHint: true,
     openWorldHint: false,
   },
-  handler: (args) => {
+  handler: async (args) => {
     const personaRaw = String(args.persona ?? "").trim();
     const durationRaw = String(args.duration ?? "").trim();
     const themesRaw = String(args.themes ?? "").trim();
@@ -147,7 +155,11 @@ export const recommendTripCourse: ToolDef = {
     // Honour a stated weather constraint: a rainy-day course must actually be
     // sheltered, not the same itinerary with an 'indoors' label on it.
     const indoor = isIndoorIntent(blob);
-    const course = composeCourse(personas, dur, explicitThemes, city, indoor);
+    const variant = Math.max(0, Math.floor(Number(args.variant ?? 0)) || 0);
+    // The city's own tourism data behind the curated spots — a few hundred more
+    // candidates, which is what makes "give me another one" mean anything.
+    const extra = await livePool(city).catch(() => []);
+    const course = composeCourse(personas, dur, explicitThemes, city, indoor, variant, extra);
     const durLabel = dur === "half-day" ? "Half-day" : dur === "2-day" ? "2-day" : dur === "3-day" ? "3-day" : "1-day";
     const head = `🗺️ **${durLabel} ${city} course — for a ${personaTitle(personas)}**`;
     const lines = [head];

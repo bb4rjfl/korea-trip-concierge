@@ -24,6 +24,19 @@ export const WARM_URLS = [
 ];
 
 /** Fire one throwaway request per external origin to warm the connection pool. */
+import { livePool } from "./livePool.js";
+
+/**
+ * Build the course candidate pool before anyone asks for a course. It takes
+ * about ten seconds across a dozen calls, cached for hours — paid once at boot
+ * rather than by whoever asks first.
+ */
+export function warmCoursePool(): void {
+  for (const city of ["Seoul", "Busan", "Jeju"]) {
+    void livePool(city).catch(() => undefined);
+  }
+}
+
 export function warmUpSources(): void {
   // Pull the subway graph in the background so the first route request is instant.
   void getGraph();

@@ -237,12 +237,15 @@ export async function searchPlacesNearby(opts: NearbyOptions): Promise<Place[]> 
   const lang = opts.language ?? "en";
   const ctype = opts.category ? contentTypeFor(lang, opts.category) : undefined;
   const radius = opts.radius ?? 1000;
-  const key = `loc:${lang}:${opts.lng.toFixed(4)},${opts.lat.toFixed(4)}:${ctype ?? ""}:${radius}`;
+  const key = `loc:${lang}:${opts.lng.toFixed(4)},${opts.lat.toFixed(4)}:${ctype ?? ""}:${radius}:${opts.limit ?? 8}`;
   const params: Record<string, string> = {
     mapX: String(opts.lng),
     mapY: String(opts.lat),
     radius: String(radius),
     arrange: "E", // by distance
+    // The shared default is 8 rows, which is right for a search result and far
+    // too few when the caller is building a candidate pool.
+    numOfRows: String(Math.max(8, Math.min(opts.limit ?? 8, 100))),
   };
   if (ctype) params.contentTypeId = String(ctype);
 

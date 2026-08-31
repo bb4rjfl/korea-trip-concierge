@@ -327,3 +327,37 @@ describe("a mall question means the big complexes", () => {
     expect(asksAboutMalls("where can I buy cosmetics")).toBe(false);
   });
 });
+
+describe("asking for another course gives another course", () => {
+  it("returns a different day at each variant", async () => {
+    const { resolvePersonas, composeCourse } = await import("../src/lib/courses.js");
+    const personas = resolvePersonas("couple, foodie");
+    const names = (v: number) =>
+      composeCourse(personas, "1-day", [], "Seoul", false, v)
+        .days[0].stops.map((s) => s.spot.name)
+        .join("|");
+    // Three asks used to return the identical itinerary, which is what a visitor
+    // called out: "this isn't a recommendation, it's one course you keep pushing".
+    expect(names(1)).not.toBe(names(0));
+    expect(names(2)).not.toBe(names(1));
+  });
+
+  it("never sends you to the same place twice in one day", async () => {
+    const { resolvePersonas, composeCourse } = await import("../src/lib/courses.js");
+    const { livePool } = await import("../src/lib/livePool.js");
+    const extra = await livePool("Seoul").catch(() => []);
+    const course = composeCourse(resolvePersonas("couple, foodie"), "1-day", [], "Seoul", false, 0, extra);
+    const names = course.days[0].stops.map((s) => s.spot.name.replace(/\s*\([^)]*\)/, "").trim());
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("puts something evening-shaped in the evening slot", async () => {
+    const { resolvePersonas, composeCourse } = await import("../src/lib/courses.js");
+    const course = composeCourse(resolvePersonas("couple"), "1-day", [], "Seoul", false, 1);
+    const evening = course.days[0].stops.find((s) => s.block.includes("Evening"));
+    if (evening) {
+      // Not a stationery shop that happened to be next in the list.
+      expect(["food", "nightlife", "view", "market", "cafe"].some((t) => evening.spot.themes.includes(t))).toBe(true);
+    }
+  });
+});
