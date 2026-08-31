@@ -3,8 +3,9 @@ import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
 import { searchTopPlace } from "../lib/sources/tourapi.js";
+import { geocodePoiName } from "../lib/sources/poi.js";
 import { routesBetween, type TransitRoute } from "../lib/sources/odsay.js";
-import { romanizeText, resolveStationKo } from "../lib/romanize.js";
+import { romanizeText, resolveStationKo, stationLabel, formatSubwayDirection } from "../lib/romanize.js";
 import { resolvePlaceCoord } from "../lib/places.js";
 import { detectIntercity, renderIntercity } from "../lib/intercity.js";
 import { normalizeName } from "../lib/fuzzy.js";
@@ -21,7 +22,11 @@ async function geocode(name: string): Promise<{ lng: number; lat: number } | und
   const curated = resolvePlaceCoord(name);
   if (curated) return { lng: curated.lng, lat: curated.lat };
   const p = await searchTopPlace(name);
-  return p?.mapx != null && p?.mapy != null ? { lng: p.mapx, lat: p.mapy } : undefined;
+  if (p?.mapx != null && p?.mapy != null) return { lng: p.mapx, lat: p.mapy };
+  // The long tail — a café, a gallery, a shop someone just read off our own list.
+  // The tourism database only holds attractions; local search holds everything.
+  const poi = await geocodePoiName(name);
+  return poi ? { lng: poi.lng, lat: poi.lat } : undefined;
 }
 
 /**
@@ -61,7 +66,38 @@ const MODE_LABEL: Record<string, string> = {
   mixed: "🚇🚌 Subway + Bus",
 };
 
-function renderRoute(r: TransitRoute, idx: number): string {
+/**
+ * Choose which routes to show, and say what each one is for.
+ *
+ * The routing API sorts by journey time, and outside Seoul that buried the subway:
+ * "Busan Station → Haeundae" came back as two city buses whose stops are signed
+ * only in Korean, while the obvious answer — Line 1, change at Seomyeon, Line 2 —
+ * sat further down, a few minutes slower. For someone who cannot read a bus stop
+ * sign the subway is not the slower option, it is the only usable one. So we show
+ * the fastest and the easiest separately, and say which is which.
+ */
+function pickOptions(routes: TransitRoute[]): { route: TransitRoute; label: string }[] {
+  if (!routes.length) return [];
+  const picks: { route: TransitRoute; label: string }[] = [{ route: routes[0], label: "Fastest" }];
+
+  const legCount = (r: TransitRoute): number => r.legs.filter((l) => l.mode !== "walk").length;
+  const easiest = routes
+    .filter((r) => primaryMode(r) === "subway")
+    .sort((x, y) => legCount(x) - legCount(y) || x.totalMinutes - y.totalMinutes)[0];
+  if (easiest && easiest !== routes[0]) {
+    picks.push({ route: easiest, label: "Easiest — subway all the way, station names in English" });
+  }
+
+  // A materially cheaper option earns a line; a ₩100 difference does not.
+  const cheapest = [...routes].sort((x, y) => (x.fare ?? 1e9) - (y.fare ?? 1e9))[0];
+  const shown = Math.max(...picks.map((p) => p.route.fare ?? 0));
+  if (cheapest && !picks.some((p) => p.route === cheapest) && (cheapest.fare ?? 0) + 500 < shown) {
+    picks.push({ route: cheapest, label: "Cheapest" });
+  }
+  return picks.slice(0, 3);
+}
+
+function renderRoute(r: TransitRoute, label: string): string {
   const fare = r.fare ? ` · 💳 ₩${r.fare.toLocaleString()}` : "";
   const legs = r.legs
     .map((l) => {
@@ -70,11 +106,12 @@ function renderRoute(r: TransitRoute, idx: number): string {
       const line = l.line ? ` **${romanizeText(l.line)}**` : "";
       // Flag N-prefixed night buses so they're not mistaken for a daytime option (Y21).
       const night = l.mode === "bus" && /^N\d/i.test(l.line ?? "") ? " 🌙_(night bus, ~23:30–06:00)_" : "";
-      const seg = l.from && l.to ? ` ${romanizeText(l.from)} → ${romanizeText(l.to)}` : "";
+      // Both scripts: the romanization to say and type, the Hangul to match the sign.
+      const seg = l.from && l.to ? ` ${stationLabel(l.from)} → ${stationLabel(l.to)}` : "";
       return `   ${icon}${line}${seg}${night}`;
     })
     .join("\n");
-  return `**Option ${idx + 1} · ${MODE_LABEL[primaryMode(r)]} — ${r.totalMinutes} min${fare}**\n${legs}`;
+  return `**${label} · ${MODE_LABEL[primaryMode(r)]} — ${r.totalMinutes} min${fare}**\n${legs}`;
 }
 
 /**
@@ -202,9 +239,12 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
       const next = arrivals.slice(0, 2);
       if (next.length) {
         const board = next
-          .map((a) => `${a.towards || a.destination} — ${a.etaMinutes != null ? `${a.etaMinutes} min` : a.status}`)
+          .map(
+            (a) =>
+              `${formatSubwayDirection(a.towards || a.destination)} — ${a.etaMinutes != null ? `${a.etaMinutes} min` : a.status}`,
+          )
           .join(" · ");
-        live = `\n\n🟢 **Live at ${first.from} now:** ${board}`;
+        live = `\n\n🟢 **Live at ${stationLabel(first.from)} now:** ${board}`;
       }
     } catch {
       /* live board is a bonus, never a blocker */
@@ -218,7 +258,7 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
     // takes twice as long is not an alternative, it is a wrong turn.
     const busWorthIt = bus && bus.minutes <= route.minutes * 1.6 + 5;
     const busLine = busWorthIt && bus
-      ? `\n🚌 **Or one bus, no transfer —** **${bus.routeName}** from ${bus.boardAt} to ${bus.alightAt} _(${bus.stops} stops, about ${bus.minutes} min)_`
+      ? `\n🚌 **Or one bus, no transfer —** **${bus.routeName}** from ${stationLabel(bus.boardAt)} to ${stationLabel(bus.alightAt)} _(${bus.stops} stops, about ${bus.minutes} min)_`
       : "";
 
     // Arriving at the station is only half of it; the exit is what saves the walk.
@@ -226,7 +266,7 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
 
     const lines = route.legs.map((l, i) => {
       const label = lineLabel(l.line);
-      return `${i === 0 ? "🚇" : "🔁"} **${label}** ${l.from} → ${l.to} _(${l.stops} stop${l.stops === 1 ? "" : "s"})_`;
+      return `${i === 0 ? "🚇" : "🔁"} **${label}** ${stationLabel(l.from)} → ${stationLabel(l.to)} _(${l.stops} stop${l.stops === 1 ? "" : "s"})_`;
     });
 
     // Quoting a 7-minute ride at 3am would be a lie: the trains are in the depot.
@@ -238,14 +278,14 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
 
     // The airport line charges its own fare, well above the metro base — quoting
     // ₩1,400 for a ride to Incheon is the kind of number someone budgets on.
-    const airportLeg = route.legs.find((l) => /공항철도/.test(l.line) && /인천공항/.test(l.to));
+    const airportLeg = route.legs.find((l) => /공항철도/.test(l.line) && /인천공항/.test(`${l.to}${l.from}`));
     const AREX_FARE: [RegExp, number][] = [
       [/김포공항/, 3750],
       [/마곡나루|계양|검암/, 4050],
       [/홍대입구|디지털미디어시티|공덕/, 4450],
     ];
     const fareWon = airportLeg
-      ? (AREX_FARE.find(([re]) => re.test(airportLeg.from))?.[1] ?? 4750)
+      ? (AREX_FARE.find(([re]) => re.test(/인천공항/.test(airportLeg.to) ? airportLeg.from : airportLeg.to))?.[1] ?? 4750)
       : route.fareWon;
     const arexNote = airportLeg
       ? "\n✈️ _That fare is the all-stop AREX train. The non-stop Express (Seoul Station → T1, 43 min) is about ₩11,000 and needs a seat reservation._"
@@ -263,7 +303,6 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
         closedNote,
         "",
         ...lines,
-        exit ? "" : "",
         exit ?? "",
         busLine,
         live,
@@ -382,7 +421,7 @@ export const getTransitRoute: ToolDef = {
           "",
           `⏱️ about **${onlyBus.minutes} min** · ${onlyBus.stops} stops · 💳 around **₩1,500**`,
           "",
-          `🚌 Take bus **${onlyBus.routeName}** at **${onlyBus.boardAt}**, get off at **${onlyBus.alightAt}**.`,
+          `🚌 Take bus **${onlyBus.routeName}** at **${stationLabel(onlyBus.boardAt)}**, get off at **${stationLabel(onlyBus.alightAt)}**.`,
           `Tap the stop name on the bus screen or count the stops — announcements are in English too.`,
           "",
           dir,
@@ -414,7 +453,8 @@ export const getTransitRoute: ToolDef = {
       if (routes.length === 0) {
         return fail("No transit route found", `No public-transit path from **${from}** to **${to}** was returned.\n\n${dir}`, RETRY);
       }
-      const top = routes.slice(0, 2).map(renderRoute).join("\n\n");
+      const options = pickOptions(routes);
+      const top = options.map((o) => renderRoute(o.route, o.label)).join("\n\n");
       // Use the user's own place wording in the header (geocoding may resolve to a
       // nearby shop with an ugly name; the route itself is correct).
       const body = [
@@ -426,7 +466,7 @@ export const getTransitRoute: ToolDef = {
         `📋 _For the walk to/from the stop, search **${to}** in **Naver Map** — Google Maps walking/driving directions don't work in Korea._`,
       ].join("\n");
       // Dynamic chips: tap a mode to jump into live tracking (journey UX, Phase 1).
-      return ok(body, trackChips(routes.slice(0, 2)));
+      return ok(body, trackChips(options.map((o) => o.route)));
     } catch {
       return fail(
         "Couldn't reach the routing service",

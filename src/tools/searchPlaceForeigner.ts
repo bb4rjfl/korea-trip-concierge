@@ -67,22 +67,22 @@ export function searchChoices(areaLabel?: string, isFood?: boolean): Choice[] {
 // Food sub-keywords → the concrete term we hand to the POI search, so "vegan
 // ramen" actually searches ramen instead of the literal word "restaurant".
 const FOOD_TERMS: [RegExp, string][] = [
-  [/ramen|라멘|라면/i, "ramen"],
-  [/sushi|초밥|스시/i, "sushi"],
-  [/bbq|barbecue|gogi|고기|구이|삼겹/i, "barbecue"],
-  [/pizza|피자/i, "pizza"],
-  [/burger|버거|햄버거/i, "burger"],
-  [/fried chicken|치킨|chimaek|치맥/i, "chicken"],
-  [/vegan|vegetarian|plant.?based|비건|채식/i, "vegan"],
-  [/halal|할랄/i, "halal"],
-  [/pho|쌀국수|vietnam/i, "pho"],
-  [/hot ?pot|전골|샤브|마라/i, "hotpot"],
-  [/dumpling|만두/i, "dumpling"],
-  [/seafood|해산물|회|sashimi/i, "seafood"],
-  [/dessert|디저트|케이크|cake/i, "dessert"],
-  [/bakery|베이커리|빵|bread/i, "bakery"],
-  [/bar|pub|호프|술집|이자카야|izakaya/i, "bar"],
-  [/noodle|국수|면요리/i, "noodles"],
+  [/ramen|라멘|라면|ラーメン|拉[面麵]/i, "ramen"],
+  [/sushi|초밥|스시|寿司|壽司/i, "sushi"],
+  [/bbq|barbecue|gogi|고기|구이|삼겹|焼肉|烤肉/i, "barbecue"],
+  [/pizza|피자|ピザ|披[萨薩]/i, "pizza"],
+  [/burger|버거|햄버거|バーガー|[汉漢]堡/i, "burger"],
+  [/fried chicken|치킨|chimaek|치맥|チキン|フライドチキン|炸[鸡雞]/i, "chicken"],
+  [/vegan|vegetarian|plant.?based|비건|채식|ビーガン|ベジタリアン|素食|[纯純]素/i, "vegan"],
+  [/halal|할랄|ハラル|清真/i, "halal"],
+  [/pho|쌀국수|vietnam|フォー|河粉|越南/i, "pho"],
+  [/hot ?pot|전골|샤브|마라|しゃぶ|火鍋|火锅/i, "hotpot"],
+  [/dumpling|만두|餃子|饺子/i, "dumpling"],
+  [/seafood|해산물|회|sashimi|刺身|海鮮|海鲜/i, "seafood"],
+  [/dessert|디저트|케이크|cake|デザート|ケーキ|甜[点點]|蛋糕/i, "dessert"],
+  [/bakery|베이커리|빵|bread|ベーカリー|パン屋|[面麵]包/i, "bakery"],
+  [/bar|pub|호프|술집|이자카야|izakaya|居酒屋|酒吧/i, "bar"],
+  [/noodle|국수|면요리|[麺麵]料理|面[条條]/i, "noodles"],
   // Specific Korean dishes — so a dish query routes to coordinate POI (real
   // restaurants) instead of VisitSeoul area-browse (R3). More specific first.
   [/tteokbokki|떡볶이/i, "tteokbokki"],
@@ -101,9 +101,9 @@ const FOOD_TERMS: [RegExp, string][] = [
   [/samgyetang|삼계탕|ginseng chicken/i, "samgyetang"],
   [/gukbap|국밥|해장국|haejangguk/i, "gukbap"],
   [/jjigae|찌개|stew/i, "jjigae"],
-  [/korean (food|cuisine|bbq|barbecue)|한식|local food/i, "korean restaurant"],
-  [/brunch|브런치/i, "brunch"],
-  [/cafe|coffee|카페|커피/i, "cafe"],
+  [/korean (food|cuisine|bbq|barbecue)|한식|local food|韓国料理|韓国グルメ|[韩韓][国國]料理|[韩韓]食/i, "korean restaurant"],
+  [/brunch|브런치|ブランチ|早午餐/i, "brunch"],
+  [/cafe|coffee|카페|커피|カフェ|コーヒー|咖啡/i, "cafe"],
 ];
 
 // Diet/style qualifiers we keep alongside the dish so "vegan ramen" searches
@@ -127,7 +127,16 @@ function inferCategory(query: string, explicit?: string): string | undefined {
   if (explicit) return explicit;
   const q = query.toLowerCase();
   if (
-    /cafe|coffee|restaurant|brunch|dining|eat|food|meal|lunch|dinner|breakfast|hungry|tasty|맛집|카페|레스토랑|식당|음식/.test(q) ||
+    // ja/zh food words belong here too: a Japanese visitor asking for 韓国料理 was
+    // getting a playground and an art gallery, because the intent never registered.
+    /cafe|coffee|restaurant|brunch|dining|eat|food|meal|lunch|dinner|breakfast|hungry|tasty|맛집|카페|레스토랑|식당|음식|グルメ|レストラン|食堂|美味し|おいしい|食べ|ご飯|[美好]食|好吃|餐[厅廳]|吃的|用餐|小吃/.test(
+      q,
+    ) ||
+    // Naming a chain is a dining query too — "where's a Starbucks?" was reaching
+    // the sightseeing curation and coming back with a hair salon.
+    /starbucks|스타벅스|tous les jours|뚜레쥬르|paris ?baguette|파리바게|mcdonald|맥도날드|burger king|버거킹|\bkfc\b|lotteria|롯데리아|mom'?s touch|맘스터치|twosome|투썸|ediya|이디야|gong ?cha|공차|domino|도미노|pizza hut|피자헛/.test(
+      q,
+    ) ||
     FOOD_TERMS.some(([re]) => re.test(q))
   )
     return "food";

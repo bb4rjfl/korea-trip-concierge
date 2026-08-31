@@ -212,5 +212,63 @@ export async function searchForeignerPois(opts: PoiSearchOptions): Promise<PoiPl
     // TODO(visitseoul): when VISITSEOUL_API_KEY is live, merge its (natively
     // multilingual) results here and dedupe for richer combined output (D-010).
   });
-  return denoise(places).slice(0, limit);
+  return demoteFranchises(denoise(places), what).slice(0, limit);
+}
+
+/**
+ * Global and national chains a visitor did not fly to Korea to eat at.
+ *
+ * "Where should I eat in Myeongdong?" answered with a Tous les Jours and a Paris
+ * Baguette — both real, both nearby, both a bakery they have at home. These are
+ * demoted rather than removed: someone who asks for Starbucks, or who wants a
+ * familiar chain at 6am, should still find one.
+ */
+const FRANCHISE =
+  /tous les jours|paris ?baguette|starbucks|twosome|ediya|hollys|angel.?in.?us|caffe ?bene|coffee ?bean|mega ?coffee|compose ?coffee|paik'?s|lotteria|mom'?s touch|isaac|subway|mcdonald|burger king|\bkfc\b|domino|pizza hut|bhc|bbq chicken|kyochon|pelicana|nene chicken|goobne|뚜레쥬르|파리바게[뜨트]|스타벅스|투썸|이디야|할리스|메가커피|컴포즈|빽다방|롯데리아|맘스터치|이삭|맥도날드|버거킹|도미노|피자헛|교촌|네네치킨|굽네/i;
+
+function demoteFranchises(places: PoiPlace[], query: string): PoiPlace[] {
+  // If they named the chain, they want the chain.
+  if (FRANCHISE.test(query)) return places;
+  const independent = places.filter((p) => !FRANCHISE.test(p.name));
+  return independent.length >= 2 ? [...independent, ...places.filter((p) => FRANCHISE.test(p.name))] : places;
+}
+
+/**
+ * Coordinates for a venue by name — the long tail the tourism database has never
+ * heard of.
+ *
+ * "How do I get to the first one?" after a café list used to dead-end, because
+ * the tourism API only indexes tourist attractions and our curated list only
+ * covers landmarks. The local-search index knows every shop with a signboard, and
+ * returns WGS84 coordinates scaled by 10^7.
+ */
+export async function geocodePoiName(
+  query: string,
+): Promise<{ lat: number; lng: number; name: string; address: string } | undefined> {
+  const q = (query ?? "").trim();
+  if (!q || !hasKey("NAVER_CLIENT_ID") || !hasKey("NAVER_CLIENT_SECRET")) return undefined;
+  try {
+    const url = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(q)}&display=1`;
+    const json = await fetchJson<NaverResponse & { items?: { mapx?: string; mapy?: string }[] }>(url, {
+      headers: {
+        "X-Naver-Client-Id": ENV.NAVER_CLIENT_ID,
+        "X-Naver-Client-Secret": ENV.NAVER_CLIENT_SECRET,
+      },
+    });
+    const it = json.items?.[0];
+    const lng = Number(it?.mapx) / 1e7;
+    const lat = Number(it?.mapy) / 1e7;
+    // Anything outside the peninsula means the index matched something unrelated.
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < 33 || lat > 39 || lng < 124 || lng > 132) {
+      return undefined;
+    }
+    return {
+      lat,
+      lng,
+      name: stripTags(it!.title ?? q),
+      address: (it as { roadAddress?: string; address?: string }).roadAddress ?? (it as { address?: string }).address ?? "",
+    };
+  } catch {
+    return undefined;
+  }
 }

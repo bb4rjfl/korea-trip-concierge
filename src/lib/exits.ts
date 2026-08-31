@@ -12,6 +12,7 @@
  */
 
 import { normalizeName } from "./fuzzy.js";
+import { stationLabel } from "./romanize.js";
 
 export interface ExitHint {
   /** Korean station name, as printed on the platform. */
@@ -181,7 +182,10 @@ export function exitFor(place: string): ExitHint | undefined {
 export function exitLine(place: string): string | undefined {
   const h = exitFor(place);
   if (!h) return undefined;
-  return `🚪 **Exit ${h.exit}** at ${h.station} Station — ${h.walk}`;
+  // "Myeongdong Station (명동)" — the word Station belongs to the English name, not
+  // wedged between it and the Hangul on the sign.
+  const label = stationLabel(h.station).replace(/^([^(]+?)\s*\((.+)\)$/, "$1 Station ($2)");
+  return `🚪 **Exit ${h.exit}** at ${label} — ${h.walk}`;
 }
 
 /** Does this message look like "which exit do I take?" — in any of our languages. */

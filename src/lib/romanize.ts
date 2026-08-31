@@ -320,3 +320,21 @@ export function formatSubwayDirection(trainLineNm: string): string {
   }
   return romanizeText(s) + speed;
 }
+
+/**
+ * A station as a foreign visitor needs to see it: the name they can pronounce and
+ * type, next to the Hangul printed on the platform sign they have to match.
+ *
+ * One without the other fails in a different way — romanization alone can't be
+ * matched against a sign, and Hangul alone can't be read, said to a taxi driver,
+ * or typed into a map.
+ */
+export function stationLabel(ko: string): string {
+  const raw = (ko ?? "").trim();
+  if (!raw || !/[가-힣]/.test(raw)) return raw;
+  // romanizeStation strips the 역 suffix before looking a name up, so 서울역 comes
+  // back as "Seoul" — the city, not the station. Put the word back when it was there.
+  const base = romanizeStation(raw);
+  const en = /역$/.test(raw) && !/\bstation$/i.test(base) ? `${base} Station` : base;
+  return en && en !== raw ? `${en} (${raw})` : raw;
+}

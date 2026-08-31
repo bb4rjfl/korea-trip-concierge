@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { asksHowToGetAround, gettingAroundCard } from "../lib/gettingAround.js";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok } from "../lib/responses.js";
 import { todayKST } from "../lib/holidays.js";
@@ -318,6 +319,15 @@ export const explainKoreanService: ToolDef = {
     const service = String(args.service ?? "");
     const detail = args.detail ? String(args.detail) : "";
     const q = `${service} ${detail}`.trim();
+    // "How do I get around Jeju?" is a question about a city's transport, not about
+    // getting past a Korean app — and it used to fall through to an area guide.
+    if (asksHowToGetAround(q)) {
+      return ok(gettingAroundCard(q), [
+        { emoji: "💳", cmdEn: "How do I pay for transit?", cmdKo: "교통 결제 방법", descEn: "T-money and cards" },
+        { emoji: "🚇", cmdEn: "Plan a route for me", cmdKo: "경로 알려줘", descEn: "point to point" },
+        { emoji: "🚕", cmdEn: "How do taxis work here?", cmdKo: "택시 이용법", descEn: "apps and fares" },
+      ]);
+    }
     const matched = SERVICES.find((s) => s.match.test(q));
     const g = matched ?? GENERIC;
     return ok(render(g, Boolean(matched)), serviceChips(g));

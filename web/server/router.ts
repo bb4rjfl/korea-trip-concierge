@@ -9,6 +9,8 @@
  * our own phrasings, so the patterns below are tuned to always catch them.
  */
 
+import { asksHowToGetAround } from "../../src/lib/gettingAround.js";
+
 export type Lang = "en" | "ja" | "zh" | "ko";
 
 export interface RouteHit {
@@ -408,6 +410,11 @@ const BODY_OR_SYMPTOM =
 
 export function criticalRoute(text: string): RouteHit | null {
   const t = text ?? "";
+  // "How do I get around Busan?" is a transport question about a city; the place
+  // rules read the city name and answered with a neighbourhood guide instead.
+  if (asksHowToGetAround(t)) {
+    return { tool: "explainKoreanService", args: { service: t.slice(0, 200) } };
+  }
   if (LAST_TRAIN.test(t)) {
     const station = firstMatch(t, [
       /(?:from|at)\s+(.+?)(?:\s+station)?\s*(?:\?|$)/i,
