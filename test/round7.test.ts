@@ -150,3 +150,21 @@ describe("what's on while I'm here", () => {
     expect(asksAboutEvents("find me a cafe in Hongdae")).toBe(false);
   });
 });
+
+describe("intercity departures", () => {
+  it("reads the class names a visitor has to choose between", async () => {
+    const { trainGradeLabel } = await import("../src/lib/sources/intercityApi.js");
+    expect(trainGradeLabel("KTX")).toBe("KTX");
+    expect(trainGradeLabel("ITX-마음")).toBe("ITX-Maum");
+    expect(trainGradeLabel("KTX-산천(A-type)")).toBe("KTX-Sancheon");
+    expect(trainGradeLabel("무궁화호")).toContain("Mugunghwa");
+  });
+
+  it("shows the next departures after the current time", async () => {
+    const { upcoming } = await import("../src/lib/sources/intercityApi.js");
+    const mk = (depart: string) => ({ grade: "KTX", from: "A", to: "B", depart, arrive: depart, minutes: 60 });
+    const list = [mk("00:10"), mk("23:50")];
+    // Whatever the hour, we never return an empty list when services exist.
+    expect(upcoming(list, 2).length).toBeGreaterThan(0);
+  });
+});

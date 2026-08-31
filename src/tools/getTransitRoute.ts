@@ -393,7 +393,7 @@ export const getTransitRoute: ToolDef = {
     const ic = detectIntercity(from, to);
     if (ic) {
       const far = (ic.dest ?? ic.origin)!.label;
-      return ok(renderIntercity(from, to, ic), [
+      return ok(await renderIntercity(from, to, ic), [
         { emoji: "💳", cmdEn: "How do I pay for KTX or the bus?", descEn: "intercity ticket payment" },
         { emoji: "🌤️", cmdEn: `Weather in ${far}`, descEn: "forecast + air quality" },
         { emoji: "🗺️", cmdEn: `What's worth seeing in ${far}?`, descEn: "things to do there" },

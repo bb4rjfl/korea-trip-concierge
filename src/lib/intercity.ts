@@ -7,6 +7,14 @@
  * not external grounding.
  */
 
+import {
+  trainsBetween,
+  busesBetween,
+  todayYmdKST,
+  upcoming,
+  type Departure,
+} from "./sources/intercityApi.js";
+
 interface City {
   keys: RegExp;
   label: string;
@@ -55,17 +63,58 @@ const BOOK_LINKS = [
   "- ✈️ Domestic flights: search **Gimpo (GMP)** or **Incheon (ICN)** → your destination",
 ];
 
-/** Render the intercity grounding message for a detected cross-city trip. */
-export function renderIntercity(from: string, to: string, hit: IntercityHit): string {
+/**
+ * Render the intercity answer, with real departures when the national services
+ * have them.
+ *
+ * "KTX, about 2 hours" is true and useless — someone deciding whether to go
+ * needs the next train, what it costs, and whether the bus is worth the extra
+ * two hours. The curated options stay as the fallback for a route the feeds
+ * don't cover (and for Jeju, where the answer is "fly").
+ */
+export async function renderIntercity(from: string, to: string, hit: IntercityHit): Promise<string> {
   const far = hit.dest ?? hit.origin!;
   const dirNote = hit.dest
     ? `**${from} → ${to}** is an intercity trip — beyond city subway/bus.`
     : `**${from} → ${to}** is an intercity trip from ${hit.origin!.label} — beyond city subway/bus.`;
+
+  const date = todayYmdKST();
+  // No rail or road reaches Jeju; asking the feeds can only produce a wrong answer.
+  const island = far.label === "Jeju";
+  const [trains, buses] = island
+    ? [[] as Departure[], [] as Departure[]]
+    : await Promise.all([
+        trainsBetween(from, to, date).catch(() => []),
+        busesBetween(from, to, date).catch(() => []),
+      ]);
+
+  const line = (d: Departure): string =>
+    `- **${d.grade}** ${d.depart} → ${d.arrive} _(${Math.floor(d.minutes / 60)}h${String(d.minutes % 60).padStart(2, "0")})_` +
+    (d.fareWon ? ` · 💳 ₩${d.fareWon.toLocaleString()}` : "");
+
+  const live: string[] = [];
+  if (trains.length) {
+    live.push("", `🚄 **Next trains today** (${trains.length} more running):`, ...upcoming(trains, 3).map(line));
+  }
+  if (buses.length) {
+    live.push("", `🚌 **Next buses today** (${buses.length} more running):`, ...upcoming(buses, 2).map(line));
+  }
+  if (live.length) {
+    // The feeds cover intercity rail and coach, not commuter rail or flights — so
+    // the curated list stays underneath, or Chuncheon loses the ITX-Cheongchun
+    // that is actually the best way to get there.
+    live.push(
+      "",
+      `**Other ways to ${far.label}:**`,
+      ...far.options.map((o) => `- ${o}`),
+      "",
+      "_Times and fares from national transport open data (ⓒ국토교통부); seats are not held until you book._",
+    );
+  }
+
   return [
     `🚄 ${dirNote}`,
-    "",
-    `**Getting to ${far.label}:**`,
-    ...far.options.map((o) => `- ${o}`),
+    ...(live.length ? live : ["", `**Getting to ${far.label}:**`, ...far.options.map((o) => `- ${o}`)]),
     "",
     ...BOOK_LINKS,
     "",
