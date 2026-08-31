@@ -675,6 +675,7 @@ export const searchPlaceForeigner: ToolDef = {
         const pois = await searchForeignerPois({
           area: area || searchTerms(query) || query,
           query: what,
+          nativeQuery: query,
           coord: coord ? { lat: coord.lat, lng: coord.lng } : undefined,
           limit: 6,
         });

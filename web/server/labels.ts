@@ -17,6 +17,16 @@ type Target = Exclude<Lang, "en">;
 const LABELS: [RegExp, Record<Target, string>][] = (
   [
     ["Current Korea time", { ko: "현재 한국 시각", ja: "現在の韓国時間", zh: "韩国当前时间" }],
+    ["live local search", { ko: "실시간 현지 검색", ja: "現地リアルタイム検索", zh: "实时本地搜索" }],
+    ["from Korea Tourism data", { ko: "한국관광공사 데이터", ja: "韓国観光公社データ", zh: "韩国观光公社数据" }],
+    ["official Seoul Tourism", { ko: "서울시 공식 관광정보", ja: "ソウル市公式観光情報", zh: "首尔市官方旅游信息" }],
+    ["Seoul ideas for", { ko: "서울 추천 —", ja: "ソウルのおすすめ —", zh: "首尔推荐 —" }],
+    ["Places to go", { ko: "가볼 만한 곳", ja: "行ってみたい場所", zh: "值得去的地方" }],
+    ["Seoul ideas", { ko: "서울 추천", ja: "ソウルのおすすめ", zh: "首尔推荐" }],
+    ["Places for", { ko: "장소 —", ja: "スポット —", zh: "地点 —" }],
+    ["Top spots", { ko: "주요 명소", ja: "主なスポット", zh: "主要景点" }],
+    ["What's on", { ko: "지금 열리는 것", ja: "開催中", zh: "近期活动" }],
+    ["Worth knowing", { ko: "알아두면 좋은 점", ja: "知っておくと良いこと", zh: "值得注意" }],
     ["Opening hours", { ko: "영업시간", ja: "営業時間", zh: "营业时间" }],
     ["Getting there", { ko: "가는 길", ja: "行き方", zh: "怎么去" }],
     ["Directions", { ko: "길찾기", ja: "ルート案内", zh: "路线" }],
@@ -40,7 +50,16 @@ const LABELS: [RegExp, Record<Target, string>][] = (
   ] as [string, Record<Target, string>][]
 )
   .sort((a, b) => b[0].length - a[0].length)
-  .map(([en, tr]) => [new RegExp(`\\b${en.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g"), tr]);
+  // Markdown italics wrap labels in underscores, and `\b` does not fire between
+  // `_` and a letter because `_` is a word character — so `_live local search_`
+  // slipped through untranslated. Bound on "not a letter or digit" instead.
+  .map(([en, tr]) => {
+    const escaped = en.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return [new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "gu"), tr] as [
+      RegExp,
+      Record<Target, string>,
+    ];
+  });
 
 /** Weekday abbreviations we print next to Korea time, e.g. "Sun 19:07 KST". */
 const WEEKDAYS: Record<string, Record<Target, string>> = {

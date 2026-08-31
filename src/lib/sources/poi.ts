@@ -178,6 +178,8 @@ async function foursquareSearch(lat: number, lng: number, query: string): Promis
 // ---------- Orchestration ----------
 
 export interface PoiSearchOptions {
+  /** The visitor's own words, used verbatim when they are already Korean. */
+  nativeQuery?: string;
   area: string;
   query?: string; // e.g. "restaurant", "cafe"
   coord?: { lat: number; lng: number };
@@ -191,11 +193,16 @@ export interface PoiSearchOptions {
 export async function searchForeignerPois(opts: PoiSearchOptions): Promise<PoiPlace[]> {
   const what = (opts.query ?? "restaurant").trim();
   const limit = opts.limit ?? 5;
-  const key = `poi:${opts.area}:${what}`;
+  const key = `poi:${opts.area}:${what}:${opts.nativeQuery ?? ""}`;
 
   const naverOk = hasKey("NAVER_CLIENT_ID") && hasKey("NAVER_CLIENT_SECRET");
   const fsqOk = hasKey("FOURSQUARE_API_KEY") && !!opts.coord;
-  const naver = () => naverSearch(`${opts.area} ${what}`.trim());
+  // Naver is a Korean search engine: "명동 맛집" is a far better query for it than
+  // "Myeongdong restaurant", which is what the English keyword mapping produces.
+  // A Korean-language visitor was getting hotel Western restaurants for 맛집.
+  const nativeKo = (opts.nativeQuery ?? "").trim();
+  const naverQuery = /[가-힣]/.test(nativeKo) ? nativeKo : `${opts.area} ${what}`.trim();
+  const naver = () => naverSearch(naverQuery);
   const fsq = () => foursquareSearch(opts.coord!.lat, opts.coord!.lng, what);
 
   const places = await cache.getOrLoad(key, async () => {

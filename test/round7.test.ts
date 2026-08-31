@@ -93,6 +93,13 @@ describe("our own labels never stay English", () => {
     expect(ja).not.toContain("Kakao Map");
   });
 
+  it("translates a label wrapped in markdown italics", () => {
+    // `\b` does not fire between `_` and a letter, so every `_label_` in a card —
+    // the source credit on every search result — was silently staying English.
+    expect(localizeLabels('🔎 **Places for** _"명동"_ — _live local search_', "ko")).toContain("실시간 현지 검색");
+    expect(localizeLabels("— _official Seoul Tourism_", "ja")).toContain("ソウル市公式観光情報");
+  });
+
   it("leaves an English body alone", () => {
     const card = "⏰ Current Korea time: **Sun 19:07 KST**";
     expect(localizeLabels(card, "en")).toBe(card);
