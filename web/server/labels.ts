@@ -81,6 +81,14 @@ export function localizeLabels(text: string, lang: Lang): string {
   const target = lang as Target;
   let out = text;
 
+  // We print names as "Romanized (한글)" so a visitor can both say the name and
+  // match it against the sign. A Korean reader needs neither half explained, and
+  // on a phone the romanization doubles the length of every entry in a list — so
+  // it comes off. Only when the parenthetical is pure Hangul and what precedes it
+  // is pure Latin, which leaves hanja readings and "(2+1 seats)" alone.
+  if (target === "ko") {
+    out = out.replace(/\b[A-Za-z][A-Za-z0-9''.\- ]*\(([가-힣][가-힣0-9\s.\-]*)\)/g, "$1");
+  }
   // "Sun 19:07 KST" → "일 19:07 KST": the day name is the only English left in it.
   out = out.replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b(?=\s+\d{1,2}:\d{2})/g, (d) => WEEKDAYS[d][target]);
 
@@ -89,6 +97,7 @@ export function localizeLabels(text: string, lang: Lang): string {
   out = out.replace(/\babout\b(?=\s+\**\d)/g, APPROX[target]);
 
   for (const [re, tr] of LABELS) out = out.replace(re, tr[target]);
+
   return out;
 }
 

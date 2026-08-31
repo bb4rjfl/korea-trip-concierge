@@ -231,3 +231,28 @@ describe("a four-language service reads all four languages", () => {
     expect(searchTerms("성수동 카페")).toBe("성수동 카페");
   });
 });
+
+describe("Korean readers don't need the romanization", () => {
+  it("drops the Latin half of a bilingual name, and only that", () => {
+    const card = [
+      "**1. Namsan Chotbul 1978 (남산 촛불1978)**",
+      "🚇 Seoul Station (서울역) → Myeongdong (명동)",
+      "**3. Damijuk (多味粥) (다미죽 (多味粥))**",
+      "- **Excellent (2+1 seats)** 21:00",
+    ].join("\n");
+    const ko = localizeLabels(card, "ko");
+    expect(ko).toContain("남산 촛불1978");
+    expect(ko).not.toContain("Namsan Chotbul");
+    expect(ko).toContain("서울역");
+    expect(ko).not.toContain("Seoul Station");
+    // A hanja reading and an English qualifier are not romanizations.
+    expect(ko).toContain("多味粥");
+    expect(ko).toContain("2+1 seats");
+  });
+
+  it("leaves the other languages bilingual", () => {
+    const ja = localizeLabels("**1. Namsan Chotbul 1978 (남산 촛불1978)**", "ja");
+    expect(ja).toContain("Namsan Chotbul 1978");
+    expect(ja).toContain("남산 촛불1978");
+  });
+});
