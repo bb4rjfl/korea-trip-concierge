@@ -13,6 +13,7 @@ import { asksHowToGetAround } from "../../src/lib/gettingAround.js";
 import { asksAboutEtiquette, asksAboutAccess } from "../../src/lib/culture.js";
 import { asksAboutSeason } from "../../src/lib/seasons.js";
 import { asksAboutEvents } from "../../src/tools/searchPlaceForeigner.js";
+import { asksAboutMalls } from "../../src/lib/malls.js";
 
 export type Lang = "en" | "ja" | "zh" | "ko";
 
@@ -457,6 +458,10 @@ export function criticalRoute(text: string): RouteHit | null {
     ]);
     if (where) args.area = where;
     return { tool: "findForeignerFriendlyStore", args };
+  }
+  // A mall question means the big complexes, not whatever shop matched the word.
+  if (asksAboutMalls(t)) {
+    return { tool: "searchPlaceForeigner", args: { query: t.slice(0, 120) } };
   }
   if (asksAboutEvents(t)) {
     return { tool: "searchPlaceForeigner", args: { query: t.slice(0, 120) } };

@@ -11,6 +11,7 @@ import {
   type Festival,
 } from "../lib/sources/tourapi.js";
 import { todayKST } from "../lib/holidays.js";
+import { asksAboutMalls, mallsCard } from "../lib/malls.js";
 import { searchForeignerPois, hasPoiProvider, type PoiPlace } from "../lib/sources/poi.js";
 import {
   searchSeoulContent,
@@ -699,6 +700,13 @@ export const searchPlaceForeigner: ToolDef = {
     // runs. The tourism board's festival service is dated, nationwide and already
     // translated, which makes it the right source and an unambiguously better
     // answer than anything a general search returns.
+    // "big mall" was answering with a sneaker shop and a pharmacy — the tourism
+    // categories file a 600-store complex and a boutique under the same label, so
+    // the dozen places anyone actually means are named directly.
+    if (asksAboutMalls(query) || asksAboutMalls(area)) {
+      return ok(mallsCard(`${query} ${area}`), searchChoices(areaLabel, false));
+    }
+
     if (asksAboutEvents(query)) {
       const festivals = await searchFestivals({ from: todayKST().replace(/-/g, ""), language, limit: 6 }).catch(
         () => [],

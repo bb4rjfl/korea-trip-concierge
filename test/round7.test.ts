@@ -300,3 +300,30 @@ describe("our own card titles are not places", () => {
     expect(ctx.places[0]).toBe("Gyeongbokgung Palace");
   });
 });
+
+describe("a mall question means the big complexes", () => {
+  it("names the places anyone actually means", async () => {
+    const { searchPlaceForeigner } = await import("../src/tools/searchPlaceForeigner.js");
+    // "big mall" was answering with a sneaker select shop, a character-goods store
+    // and a wellness pharmacy — all filed under "Specialty Shops & Stores".
+    const text = (await searchPlaceForeigner.handler({ query: "big mall" })).content[0].text;
+    expect(text).toContain("COEX");
+    expect(text).toContain("Times Square");
+    expect(text).toContain("IFC");
+    expect(text).not.toContain("Pharmacy");
+  });
+
+  it("answers for Busan when Busan is named", async () => {
+    const { searchPlaceForeigner } = await import("../src/tools/searchPlaceForeigner.js");
+    const text = (await searchPlaceForeigner.handler({ query: "department store in Busan" })).content[0].text;
+    expect(text).toContain("Centum City");
+  });
+
+  it("recognizes the question in every language, and not a shop question", async () => {
+    const { asksAboutMalls } = await import("../src/lib/malls.js");
+    for (const q of ["big mall", "department store", "쇼핑몰 어디", "大きいモールは？", "有什麼商場"]) {
+      expect(asksAboutMalls(q), q).toBe(true);
+    }
+    expect(asksAboutMalls("where can I buy cosmetics")).toBe(false);
+  });
+});
