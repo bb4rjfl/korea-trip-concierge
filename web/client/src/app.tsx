@@ -3,6 +3,7 @@ import { sendChat, type ChatTurn, type Chip, type Lang, type PlaceImage, type St
 import { STRINGS, SCENARIOS, SOURCE_CREDITS, TOOL_EMOJI, detectDefaultLang, type Scenario } from "./i18n.js";
 import { renderMarkdown } from "./markdown.js";
 import { nearestPlace } from "./geo.js";
+import { Mascot, mascotEnabled, MASCOT_CREDIT } from "./mascot.js";
 
 interface Msg {
   role: "user" | "assistant";
@@ -172,7 +173,11 @@ export function App() {
     <div class="shell">
       <header class="hdr">
         <div class="hdr-brand">
-          <img class="hdr-logo" src="/logo.png" alt="" width="36" height="36" />
+          {mascotEnabled() ? (
+            <Mascot pose="greet" size={40} label="Haechi, your Seoul guide" />
+          ) : (
+            <img class="hdr-logo" src="/logo.png" alt="" width="36" height="36" />
+          )}
           <div>
             <h1>Korea Trip Concierge</h1>
             <p class="hdr-tag">{t.tagline}</p>
@@ -202,6 +207,11 @@ export function App() {
       <div class="chat" ref={scrollRef}>
         <div class="chat-inner" aria-live="polite">
           <div class="bubble assistant">
+            {mascotEnabled() && (
+              <div class="mascot-row">
+                <Mascot pose="greet" size={56} />
+              </div>
+            )}
             <div class="md-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(t.welcome) }} />
           </div>
 
@@ -273,6 +283,7 @@ export function App() {
 
           {busy && !draft && (
             <div class="bubble assistant typing" aria-label={statusText ?? t.thinking}>
+              <Mascot pose="think" size={28} />
               <span class="dot" /><span class="dot" /><span class="dot" />
               <span class="typing-label">{statusText ?? t.thinking}</span>
             </div>
@@ -281,7 +292,11 @@ export function App() {
       </div>
 
       <footer class="composer-wrap">
-        {!online && <p class="notice offline-note">📡 {t.offline}</p>}
+        {!online && (
+          <p class="notice offline-note">
+            <Mascot pose="sorry" size={22} /> {t.offline}
+          </p>
+        )}
         {notice && <p class="notice">{notice}</p>}
         <form
           class="composer"
@@ -316,6 +331,7 @@ export function App() {
           <div class="modal" role="dialog" aria-modal="true" aria-label={t.aboutTitle} onClick={(e) => e.stopPropagation()}>
             <h2>{t.aboutTitle}</h2>
             <p>{t.aboutBody}</p>
+            {mascotEnabled() && <p class="mascot-credit">{MASCOT_CREDIT}</p>}
             <h3>{t.aboutSources}</h3>
             <ul>
               {SOURCE_CREDITS.map((s) => (
