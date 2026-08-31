@@ -139,7 +139,19 @@ app.get("/egress-ip", async (_req: Request, res: Response) => {
 const CLIENT_DIST = path.resolve(process.cwd(), "web/client/dist");
 const hasClient = existsSync(path.join(CLIENT_DIST, "index.html"));
 if (hasClient) {
-  app.use(express.static(CLIENT_DIST, { maxAge: "1h", index: "index.html" }));
+  app.use(
+    express.static(CLIENT_DIST, {
+      maxAge: "1h",
+      index: "index.html",
+      setHeaders: (res, filePath) => {
+        // A cached service worker pins the app at the version that installed it,
+        // so this one file has to be re-fetched every time.
+        if (filePath.endsWith("sw.js")) res.setHeader("Cache-Control", "no-cache");
+        // Hashed build assets are immutable by construction.
+        else if (/[/\\]assets[/\\]/.test(filePath)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      },
+    }),
+  );
   // SPA fallback for GET html navigations that didn't match a file or /api.
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.method === "GET" && !req.path.startsWith("/api") && (req.headers.accept ?? "").includes("text/html")) {

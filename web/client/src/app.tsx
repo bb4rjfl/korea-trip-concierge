@@ -43,10 +43,22 @@ export function App() {
   // place of the typing dots so a Korean or Japanese user isn't left waiting on a
   // translation for an answer that already exists.
   const [draft, setDraft] = useState<{ toolMarkdown: string; chips: Chip[] } | null>(null);
+  const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const t = STRINGS[lang];
+
+  useEffect(() => {
+    const up = (): void => setOnline(true);
+    const down = (): void => setOnline(false);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    return () => {
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
+    };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("ktc.lang", lang);
@@ -269,6 +281,7 @@ export function App() {
       </div>
 
       <footer class="composer-wrap">
+        {!online && <p class="notice offline-note">📡 {t.offline}</p>}
         {notice && <p class="notice">{notice}</p>}
         <form
           class="composer"

@@ -646,3 +646,10 @@ body {
   width: 4px;
   height: 4px;
 }
+
+.offline-note {
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 8px;
+  padding: 6px 10px;
+}

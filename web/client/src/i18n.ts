@@ -11,6 +11,7 @@ export interface Strings {
   statusTool: string;
   statusLocalizing: string;
   networkError: string;
+  offline: string;
   rateLimited: string;
   retry: string;
   newChat: string;
@@ -55,6 +56,7 @@ export const STRINGS: Record<Lang, Strings> = {
     statusTool: "Checking live data…",
     statusLocalizing: "Putting it in your language…",
     networkError: "Couldn't reach the server. Please try again.",
+    offline: "You're offline — answers need a connection. Saved messages are still here.",
     rateLimited: "A little too fast 🙂 Give it a few seconds and try again.",
     retry: "Retry",
     newChat: "New chat",
@@ -82,6 +84,7 @@ export const STRINGS: Record<Lang, Strings> = {
     statusTool: "실시간 데이터 확인 중…",
     statusLocalizing: "한국어로 정리하는 중…",
     networkError: "서버에 연결하지 못했어요. 다시 시도해 주세요.",
+    offline: "오프라인이에요 — 답변에는 연결이 필요합니다. 지난 대화는 그대로 있어요.",
     rateLimited: "조금 빨라요 🙂 몇 초 후 다시 시도해 주세요.",
     retry: "다시 시도",
     newChat: "새 대화",
@@ -109,6 +112,7 @@ export const STRINGS: Record<Lang, Strings> = {
     statusTool: "ライブデータを確認中…",
     statusLocalizing: "日本語にまとめています…",
     networkError: "サーバーに接続できませんでした。もう一度お試しください。",
+    offline: "オフラインです — 回答には接続が必要です。これまでの会話は残っています。",
     rateLimited: "少し早すぎます🙂 数秒後にもう一度どうぞ。",
     retry: "再試行",
     newChat: "新しい会話",
@@ -136,6 +140,7 @@ export const STRINGS: Record<Lang, Strings> = {
     statusTool: "正在查询实时数据…",
     statusLocalizing: "正在整理成中文…",
     networkError: "无法连接服务器，请重试。",
+    offline: "你处于离线状态 — 回答需要联网。之前的对话仍在。",
     rateLimited: "稍微快了一点🙂 请几秒后再试。",
     retry: "重试",
     newChat: "新对话",
