@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from "vitest";
 import { readProfile, isEmptyProfile, profileNote } from "../src/lib/profile.js";
-import { allowedBy, composeCourse, resolvePersonas, STRENUOUS, PRICEY } from "../src/lib/courses.js";
+import { allowedBy, composeCourse, distinctiveWords, resolvePersonas, STRENUOUS, PRICEY } from "../src/lib/courses.js";
 import { recommendTripCourse } from "../src/tools/recommendTripCourse.js";
 import { livePool } from "../src/lib/livePool.js";
 
@@ -181,15 +181,15 @@ describe("a day visits a place once", () => {
   it("never puts the same landmark in twice under two listings", () => {
     for (const persona of ["family", "foodie", "couple"]) {
       for (let v = 0; v < 4; v++) {
-        const course = composeCourse(resolvePersonas(persona), "1-day", [], "Seoul", false, v);
-        for (const day of course.days) {
-          const words = day.stops.map((st) =>
-            st.spot.name.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((w) => w.length > 3),
-          );
+        const course = composeCourse(resolvePersonas(persona), "3-day", [], "Seoul", false, v);
+        {
+          // Across the whole trip, not just within a day — "Gwangjang Market" on
+          // Monday and "Gwangjang Market street food" on Tuesday is one market.
+          const words = course.days.flatMap((d) => d.stops).map((st) => distinctiveWords(st.spot.name));
           for (let i = 0; i < words.length; i++)
             for (let j = i + 1; j < words.length; j++) {
               const shared = words[i].filter((w) => words[j].includes(w));
-              expect(shared.length, `${persona} v${v}: ${day.stops[i].spot.name} / ${day.stops[j].spot.name}`).toBeLessThan(2);
+              expect(shared.length, `${persona} v${v}`).toBeLessThan(2);
             }
         }
       }

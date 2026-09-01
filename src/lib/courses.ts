@@ -286,7 +286,7 @@ export function allowedBy(spot: Spot, profile?: TravelProfile): boolean {
 const GENERIC_NAME_WORD =
   /^(?:the|a|of|and|in|at|seoul|busan|jeju|gyeongju|korea|korean|market|park|street|food|village|museum|center|centre|hall|tour|tours|cafe|café|house|shop|store|art|old|new)$/i;
 
-function distinctiveWords(name: string): string[] {
+export function distinctiveWords(name: string): string[] {
   return name
     .toLowerCase()
     .replace(/[^a-z0-9가-힣 ]+/g, " ")
@@ -337,6 +337,8 @@ function buildDay(
   offset = 0,
   fallback: Spot[] = [],
   profile?: TravelProfile,
+  /** Stops already placed on earlier days — the same market twice is still twice. */
+  alreadyPlaced: Spot[] = [],
 ): DayPlan {
   const rank = (list: Spot[]): Spot[] =>
     [...list].sort((a, b) => score(b, themes) - score(a, themes) || a.id.localeCompare(b.id));
@@ -352,7 +354,7 @@ function buildDay(
       // An evening is dinner, a bar or a view — not a stationery shop that
       // happened to be the next candidate in the list.
       (!slot.any || slot.any.some((t) => s.themes.includes(t)));
-    const chosen = stops.map((st) => st.spot);
+    const chosen = [...alreadyPlaced, ...stops.map((st) => st.spot)];
     const notATwin = (s: Spot) => !samePlaceAs(s, chosen);
     const ok = ranked.filter(suits).filter(notATwin);
     const candidates = ok.length ? ok : wider.filter(suits).filter(notATwin);
@@ -541,18 +543,21 @@ export function composeCourse(
       return picked.length ? picked : zones.slice(0, 2);
     };
     const out: DayPlan[] = [];
-    if (duration === "half-day") {
-      out.push(buildDay("Half-day", inZones(bandAt(0)), themes, HALF_DAY_TEMPLATE, seen, v, cityPool, profile));
-    } else if (duration === "2-day") {
-      out.push(buildDay("Day 1", inZones(bandAt(0)), themes, dayTemplate, seen, v, cityPool, profile));
-      out.push(buildDay("Day 2", inZones(bandAt(2)), themes, dayTemplate, seen, v, cityPool, profile));
+    const placed: Spot[] = [];
+    const day = (title: string, bandIndex: number, tpl = dayTemplate) => {
+      const built = buildDay(title, inZones(bandAt(bandIndex)), themes, tpl, seen, v, cityPool, profile, placed);
+      placed.push(...built.stops.map((st) => st.spot));
+      out.push(built);
+    };
+    if (duration === "half-day") day("Half-day", 0, HALF_DAY_TEMPLATE);
+    else if (duration === "2-day") {
+      day("Day 1", 0);
+      day("Day 2", 2);
     } else if (duration === "3-day") {
-      out.push(buildDay("Day 1", inZones(bandAt(0)), themes, dayTemplate, seen, v, cityPool, profile));
-      out.push(buildDay("Day 2", inZones(bandAt(2)), themes, dayTemplate, seen, v, cityPool, profile));
-      out.push(buildDay("Day 3", inZones(bandAt(4)), themes, dayTemplate, seen, v, cityPool, profile));
-    } else {
-      out.push(buildDay("1-day", inZones(bandAt(0)), themes, dayTemplate, seen, v, cityPool, profile));
-    }
+      day("Day 1", 0);
+      day("Day 2", 2);
+      day("Day 3", 4);
+    } else day("1-day", 0);
     return out;
   };
 
