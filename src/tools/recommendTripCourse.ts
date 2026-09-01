@@ -233,8 +233,15 @@ export const recommendTripCourse: ToolDef = {
     // What they told us about how they want to travel — budget, pace, walking,
     // children, and anything they have already said no to.
     const profile = readProfile([String(args.notes ?? ""), personaRaw, themesRaw].filter(Boolean));
-    const course = composeCourse(personas, dur, explicitThemes, city, indoor, variant, extra, profile);
-    const durLabel = dur === "half-day" ? "Half-day" : dur === "2-day" ? "2-day" : dur === "3-day" ? "3-day" : "1-day";
+    // "What should we do on the first evening?" — a half-day that starts with a
+    // palace at 9am answers a different question.
+    const eveningOnly =
+      dur === "half-day" &&
+      /\b(?:this |first |tomorrow )?evening\b|\btonight\b|after dark|for dinner|첫날 ?저녁|오늘 ?저녁|저녁에|밤에|今夜|夜だけ|今晩|今晚|晚上/i.test(
+        `${blob} ${String(args.notes ?? "")}`,
+      );
+    const course = composeCourse(personas, dur, explicitThemes, city, indoor, variant, extra, profile, eveningOnly);
+    const durLabel = dur === "half-day" ? (eveningOnly ? "Evening" : "Half-day") : dur === "2-day" ? "2-day" : dur === "3-day" ? "3-day" : "1-day";
     const head = `🗺️ **${durLabel} ${city} course — for a ${personaTitle(personas)}**`;
     const lines = [head];
     if (course.themes.length) lines.push(`_Themes: ${course.themes.slice(0, 5).join(" · ")}_`);

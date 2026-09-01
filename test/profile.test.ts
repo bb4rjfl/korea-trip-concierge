@@ -216,3 +216,21 @@ describe("a stated diet steers the food stops", () => {
     expect(allowedBy(bbq, { dietary: [], dislikes: [], likes: [] })).toBe(true);
   });
 });
+
+describe("an evening question gets an evening", () => {
+  it("ends the plan after dark instead of starting it at breakfast", async () => {
+    const res = await recommendTripCourse.handler({
+      persona: "family",
+      duration: "half-day",
+      notes: "what should we do on the first evening near Insadong",
+    });
+    const text = res.content[0].text;
+    expect(text).toMatch(/Evening Seoul course/);
+    expect(text).not.toMatch(/Half-day Seoul course/);
+  });
+
+  it("leaves an ordinary half-day alone", async () => {
+    const res = await recommendTripCourse.handler({ persona: "family", duration: "half-day" });
+    expect(res.content[0].text).toMatch(/Half-day Seoul course/);
+  });
+});

@@ -393,6 +393,17 @@ const ONE_DAY_TEMPLATE: { key: string; block: Block; food?: boolean; any?: strin
   { key: "afternoon", block: "afternoon" },
   { key: "evening", block: "evening", any: EVENING_THEMES },
 ];
+/**
+ * Someone asking what to do "on our first evening" does not want a morning.
+ * The generic half-day starts at breakfast and reads as an answer to a question
+ * they did not ask.
+ */
+const EVENING_HALF_DAY_TEMPLATE: { key: string; block: Block; food?: boolean; any?: string[] }[] = [
+  { key: "afternoon", block: "any" },
+  { key: "food", block: "any", food: true },
+  { key: "evening", block: "evening", any: EVENING_THEMES },
+];
+
 const HALF_DAY_TEMPLATE: { key: string; block: Block; food?: boolean; any?: string[] }[] = [
   { key: "morning", block: "any" },
   { key: "food", block: "any", food: true },
@@ -490,6 +501,8 @@ export function composeCourse(
   extra: Spot[] = [],
   /** What the traveller told us about how they want to travel. */
   profile?: TravelProfile,
+  /** They asked about an evening specifically — anchor the plan there. */
+  eveningOnly = false,
 ): Course {
   const themes = wantedThemes(personas, explicitThemes);
   // Someone who asked to take it easy gets a day with room in it, not the same
@@ -549,7 +562,7 @@ export function composeCourse(
       placed.push(...built.stops.map((st) => st.spot));
       out.push(built);
     };
-    if (duration === "half-day") day("Half-day", 0, HALF_DAY_TEMPLATE);
+    if (duration === "half-day") day(eveningOnly ? "Evening" : "Half-day", 0, eveningOnly ? EVENING_HALF_DAY_TEMPLATE : HALF_DAY_TEMPLATE);
     else if (duration === "2-day") {
       day("Day 1", 0);
       day("Day 2", 2);
