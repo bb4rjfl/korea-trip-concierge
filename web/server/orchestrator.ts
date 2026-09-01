@@ -524,14 +524,30 @@ ${partial.reply ?? ""}`.trim(),
     // Hand the course builder what the traveller actually said. It reads budget,
     // pace, walking, children and anything already refused out of their own
     // words — which is the difference between a course for them and a course.
-    if (toolCall.name === "recommendTripCourse" && filled.notes == null) {
+    if (toolCall.name === "recommendTripCourse") {
+      // Always built from the transcript, never left to the model: it fills
+      // optional string parameters with "" more often than not, and a paraphrase
+      // of "my mother walks slowly" is not as good as the sentence itself.
       const said = history
         .filter((h) => h.role === "user")
         .slice(-8)
         .map((h) => h.content)
         .join(" · ")
         .slice(0, 600);
-      if (said) filled.notes = said;
+      const fromModel = typeof filled.notes === "string" ? filled.notes.trim() : "";
+      const merged = [said, fromModel].filter(Boolean).join(" · ");
+      if (merged) filled.notes = merged;
+      else delete filled.notes;
+
+      // A traveller who said "we want to see as much as possible" said nothing
+      // about how long they are here — the model read it as three days and
+      // handed back a 12-stop itinerary. Multi-day plans need someone to have
+      // actually mentioned more than one day.
+      const MULTI_DAY = /\b(?:\d+|two|three|four|five|a few|several)\s*(?:days?|nights?)\b|\bweek(?:end)?\b|박\s*\d|\d\s*박|\d+\s*일|이틀|사흘|며칠|일주일|泊|\d+\s*日|几天|一周|\d+\s*天/i;
+      const saidDays = history.some((h) => h.role === "user" && MULTI_DAY.test(h.content ?? ""));
+      if (!saidDays && typeof filled.duration === "string" && /^[234]-day$/.test(filled.duration)) {
+        filled.duration = "1-day";
+      }
     }
 
     if (toolCall.name === "recommendTripCourse" && filled.variant == null) {

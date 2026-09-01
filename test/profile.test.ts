@@ -196,3 +196,23 @@ describe("a day visits a place once", () => {
     }
   });
 });
+
+describe("a stated diet steers the food stops", () => {
+  const bbq = { id: "bbq", name: "Korean BBQ + somaek", note: "Grill samgyeopsal at the table", themes: ["food"], area: "Hongdae", zone: "west", blocks: ["evening"] } as never;
+  const jokbal = { id: "j", name: "Jokbal alley", note: "Braised pig trotters", themes: ["food"], area: "Jongno", zone: "old-north", blocks: ["evening"] } as never;
+  const bibim = { id: "b", name: "Tongin Market (coin lunchbox)", note: "Make-your-own dosirak", themes: ["food"], area: "Seochon", zone: "old-north", blocks: ["afternoon"] } as never;
+
+  it("keeps a vegetarian away from the grill", () => {
+    expect(allowedBy(bbq, { dietary: ["vegetarian"], dislikes: [], likes: [] })).toBe(false);
+    expect(allowedBy(bibim, { dietary: ["vegetarian"], dislikes: [], likes: [] })).toBe(true);
+  });
+
+  it("keeps pork off a halal traveller's day but leaves the rest", () => {
+    expect(allowedBy(jokbal, { dietary: ["halal"], dislikes: [], likes: [] })).toBe(false);
+    expect(allowedBy(bibim, { dietary: ["halal"], dislikes: [], likes: [] })).toBe(true);
+  });
+
+  it("leaves everything alone when no diet was mentioned", () => {
+    expect(allowedBy(bbq, { dietary: [], dislikes: [], likes: [] })).toBe(true);
+  });
+});

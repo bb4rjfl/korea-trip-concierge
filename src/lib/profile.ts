@@ -49,7 +49,7 @@ const RULES: { key: keyof TravelProfile | "dislike" | "like"; value?: string; re
   {
     key: "mobility",
     value: "easy",
-    re: /can'?t walk|hard to walk|bad (?:knee|back|leg|hip)|(?:knee|back|leg|hip|feet|foot|ankle)s? (?:is|are|'?s) (?:bad|sore|hurting|killing)|(?:knee|back|leg|hip|ankle)s? (?:hurt|ache)|sore feet|tired legs|not much walking|less walking|wheelchair|stroller|pram|elderly|grandmother|grandfather|my mother walks|walks slowly|많이 ?못 ?걷|걷기 ?힘들|다리(?:가)? ?아프|무릎|유모차|휠체어|어르신|노약자|歩けな|歩くのが|車椅子|ベビーカー|走不[动動]|[轮輪]椅|婴儿车|嬰兒車/i,
+    re: /can'?t walk|hard to walk|bad (?:knee|back|leg|hip)|(?:knee|back|leg|hip|feet|foot|ankle)s? (?:is|are|'?s) (?:bad|sore|hurting|killing)|(?:knee|back|leg|hip|ankle)s? (?:hurt|ache)|sore feet|tired legs|not much walking|less walking|wheelchair|stroller|pram|elderly|grandmother|grandfather|my mother walks|walks slowly|많이 ?(?:못|안) ?(?:걷|걸으|걸어)|잘 ?못 ?(?:걷|걸으|걸어)|오래 ?(?:못|안) ?(?:걷|걸으|걸어)|걷기 ?(?:힘들|어려)|다리(?:가)? ?아프|무릎|유모차|휠체어|어르신|노약자|歩けな|歩くのが|車椅子|ベビーカー|走不[动動]|[轮輪]椅|婴儿车|嬰兒車/i,
   },
   {
     key: "withKids",

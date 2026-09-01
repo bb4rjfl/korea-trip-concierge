@@ -186,6 +186,10 @@ function score(spot: Spot, themes: string[]): number {
   // The curated spots carry a hand-written reason to go; a live entry carries a
   // category. On equal theme fit the written one is the better recommendation.
   let s = /^(?:vs_|ta_)/.test(spot.id) ? 0 : 2;
+  // A live listing that arrived without an address cannot be clustered, so it
+  // matches every part of the city and a day built around them zig-zags across
+  // Seoul. Let them fill gaps, not lead the day.
+  if (spot.zone === "any" && /^(?:vs_|ta_)/.test(spot.id)) s -= 1;
   spot.themes.forEach((t) => {
     const idx = themes.indexOf(t);
     if (idx >= 0) s += Math.max(1, 6 - idx); // earlier wanted theme → higher
@@ -242,6 +246,13 @@ export const STRENUOUS = /uphill|steep|hike|hiking|trail|climb|mountain|stairs|s
 export const PRICEY =
   /department store|duty.?free|\bmalls?\b|luxury|boutique|\bspa\b|백화점|면세|명품|theme ?park|amusement ?park|water ?park|aquarium|observator|observation deck|cruise|ski resort|lotte world|everland|kidzania|seoul sky|n seoul tower/i;
 
+/** Stops whose entire reason to exist is the meat on the grill. */
+const MEAT_LED =
+  /\bbbq\b|barbecue|samgyeopsal|galbi|bulgogi|jokbal|bossam|chimaek|fried chicken|dakgalbi|gopchang|\bsundae\b|raw fish|sashimi|\bhoe\b|고기|삼겹|갈비|불고기|족발|보쌈|치킨|곱창|막창|회센터/i;
+
+/** The subset that matters for halal and no-pork travellers. */
+const PORK_LED = /\bpork\b|samgyeopsal|jokbal|bossam|돼지|삼겹|족발|보쌈|순대/i;
+
 /**
  * Does this stop survive what the traveller told us?
  *
@@ -255,6 +266,15 @@ export function allowedBy(spot: Spot, profile?: TravelProfile): boolean {
   if (profile.mobility === "easy" && STRENUOUS.test(hay)) return false;
   if (profile.budget === "low" && PRICEY.test(hay)) return false;
   if (profile.dislikes.some((d) => spot.themes.includes(d))) return false;
+  // Saying "we are vegetarian" and then being handed Korean BBQ is the kind of
+  // miss that costs the whole answer its credibility. We cannot vet every menu,
+  // but we can keep off the list the stops that are *defined* by the meat.
+  if (profile.dietary.length) {
+    const wantsNoMeat = profile.dietary.includes("vegetarian") || profile.dietary.includes("vegan");
+    const wantsNoPork = profile.dietary.includes("no-pork") || profile.dietary.includes("halal");
+    if (wantsNoMeat && MEAT_LED.test(hay)) return false;
+    if (wantsNoPork && PORK_LED.test(hay)) return false;
+  }
   return true;
 }
 
@@ -283,10 +303,13 @@ function distinctiveWords(name: string): string[] {
  */
 function samePlaceAs(candidate: Spot, chosen: Spot[]): boolean {
   const mine = distinctiveWords(candidate.name);
-  if (mine.length < 2) return false;
+  if (!mine.length) return false;
+  // "Gwangjang Market" and "Gwangjang Market street food" are one market. When a
+  // name carries only one word that identifies it, that word alone is the test.
+  const needed = mine.length === 1 ? 1 : 2;
   return chosen.some((s) => {
     const theirs = new Set(distinctiveWords(s.name));
-    return mine.filter((w) => theirs.has(w)).length >= 2;
+    return mine.filter((w) => theirs.has(w)).length >= needed;
   });
 }
 
