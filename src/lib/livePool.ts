@@ -90,7 +90,7 @@ function zoneFor(text: string): { zone: string; area: string } {
  * line this service does not cross (see D-025).
  */
 const NOT_A_STOP =
-  /exhibition|exhibit\b|fanfest|fan ?meet|concert|festival|fashion week|biennale|showcase|special ?show|screening|기획전|특별전|전시회|콘서트|페스티벌|ticket|reservation|package|coupon|voucher|rental|delivery|storage|locker|pharmacy|clinic|hospital|dental|surgery|surgical|plastic surg|dermatolog|aesthetic|medical|oriental medicine|한의원|의원|성형|피부과|치과|academy|office|예약|쿠폰|렌탈|보관|약국|병원|\b20\d\d\b|《|》|<[^>]{4,}>|^[^:]{3,44}\s?:\s/i;
+  /exhibition|exhibit\b|fanfest|fan ?meet|concert|festival|fashion week|biennale|showcase|special ?show|screening|기획전|특별전|전시회|콘서트|페스티벌|ticket|reservation|package|coupon|voucher|rental|delivery|storage|locker|pharmacy|drug ?store|drugstore|clinic|hospital|dental|surgery|surgical|plastic surg|dermatolog|aesthetic|medical|oriental medicine|한의원|의원|성형|피부과|치과|academy|office|예약|쿠폰|렌탈|보관|약국|병원|\b20\d\d\b|《|》|<[^>]{4,}>|^[^:]{3,44}\s?:\s/i;
 
 /**
  * Medical businesses hide in the blurb rather than the title — "Seoul Yangnyeong

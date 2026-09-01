@@ -244,7 +244,7 @@ export const STRENUOUS = /uphill|steep|hike|hiking|trail|climb|mountain|stairs|s
  * actually come up.
  */
 export const PRICEY =
-  /department store|duty.?free|\bmalls?\b|luxury|boutique|\bspa\b|백화점|면세|명품|theme ?park|amusement ?park|water ?park|aquarium|observator|observation deck|cruise|ski resort|lotte world|everland|kidzania|seoul sky|n seoul tower/i;
+  /department store|duty.?free|\bmalls?\b|luxury|boutique|\bspa\b|백화점|면세|명품|theme ?park|amusement ?park|water ?park|aquarium|observator|observation deck|cruise|ski resort|louis vuitton|gucci|chanel|herm|prada|balenciaga|lotte world|everland|kidzania|seoul sky|n seoul tower/i;
 
 /** Stops whose entire reason to exist is the meat on the grill. */
 const MEAT_LED =
