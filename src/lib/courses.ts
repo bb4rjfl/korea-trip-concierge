@@ -15,6 +15,8 @@ export type Block = "morning" | "afternoon" | "evening" | "any";
 export type Duration = "half-day" | "1-day" | "2-day" | "3-day";
 export type City = "Seoul" | "Busan" | "Jeju" | "Gyeongju";
 
+import { isEmptyProfile, type TravelProfile } from "./profile.js";
+
 export interface Spot {
   id: string;
   name: string;
@@ -219,6 +221,75 @@ export function isIndoorSpot(spot: Spot): boolean {
   if (/museum|gallery|aquarium|mall|department|library|cafe|café|spa|jjimjilbang|sauna|store|shop|arcade|cinema|theater|theatre|observatory|박물관|미술관|백화점|쇼핑/i.test(hay)) return true;
   return spot.themes.includes("cafe") || spot.themes.includes("beauty") || spot.themes.includes("shopping");
 }
+/**
+ * Places a visitor with a bad knee should not be sent to.
+ *
+ * "Bukchon is a 10-minute uphill walk" is charming in a guidebook and
+ * disqualifying for someone travelling with a parent who walks slowly — and they
+ * told us so.
+ */
+export const STRENUOUS = /uphill|steep|hike|hiking|trail|climb|mountain|stairs|summit|slope|등산|언덕|계단|가파/i;
+
+/**
+ * Places whose whole point is spending money — plus the paid attractions that
+ * cost more than a budget traveller's whole day.
+ *
+ * Someone who wrote "we're on a budget" was being handed Lotte World (₩62,000)
+ * and KidZania (₩50,000+) as their morning. Naming the big-ticket attractions is
+ * blunter than a price feed we do not have, and it is right about the ones that
+ * actually come up.
+ */
+export const PRICEY =
+  /department store|duty.?free|\bmalls?\b|luxury|boutique|\bspa\b|백화점|면세|명품|theme ?park|amusement ?park|water ?park|aquarium|observator|observation deck|cruise|ski resort|lotte world|everland|kidzania|seoul sky|n seoul tower/i;
+
+/**
+ * Does this stop survive what the traveller told us?
+ *
+ * A filter rather than a score, because these are things someone said out loud:
+ * a person who cannot manage a hill does not want the hill ranked lower, they
+ * want it gone.
+ */
+export function allowedBy(spot: Spot, profile?: TravelProfile): boolean {
+  if (!profile) return true;
+  const hay = `${spot.name} ${spot.note ?? ""}`;
+  if (profile.mobility === "easy" && STRENUOUS.test(hay)) return false;
+  if (profile.budget === "low" && PRICEY.test(hay)) return false;
+  if (profile.dislikes.some((d) => spot.themes.includes(d))) return false;
+  return true;
+}
+
+/**
+ * Words that say nothing about *which* place this is. Two stops both containing
+ * "market" are two markets; two both containing "lotte world tower" are one
+ * building listed twice.
+ */
+const GENERIC_NAME_WORD =
+  /^(?:the|a|of|and|in|at|seoul|busan|jeju|gyeongju|korea|korean|market|park|street|food|village|museum|center|centre|hall|tour|tours|cafe|café|house|shop|store|art|old|new)$/i;
+
+function distinctiveWords(name: string): string[] {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣 ]+/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 1 && !GENERIC_NAME_WORD.test(w));
+}
+
+/**
+ * Is this the same landmark under another listing?
+ *
+ * The feed carries "Lotte World Tower – Seoul Sky" and "Lotte World Tower & Mall"
+ * as separate entries, and a day that visits both is a day that visits one place
+ * twice. Name-equality dedup cannot see it; two shared distinctive words can.
+ */
+function samePlaceAs(candidate: Spot, chosen: Spot[]): boolean {
+  const mine = distinctiveWords(candidate.name);
+  if (mine.length < 2) return false;
+  return chosen.some((s) => {
+    const theirs = new Set(distinctiveWords(s.name));
+    return mine.filter((w) => theirs.has(w)).length >= 2;
+  });
+}
+
 function fits(spot: Spot, block: Block): boolean {
   if (block === "any") return true;
   return spot.blocks.includes(block) || spot.blocks.includes("any");
@@ -242,6 +313,7 @@ function buildDay(
   used: Set<string>,
   offset = 0,
   fallback: Spot[] = [],
+  profile?: TravelProfile,
 ): DayPlan {
   const rank = (list: Spot[]): Spot[] =>
     [...list].sort((a, b) => score(b, themes) - score(a, themes) || a.id.localeCompare(b.id));
@@ -252,12 +324,15 @@ function buildDay(
     const suits = (s: Spot): boolean =>
       !used.has(s.id) &&
       fits(s, slot.block) &&
+      allowedBy(s, profile) &&
       (!slot.food || s.themes.includes("food") || s.themes.includes("market")) &&
       // An evening is dinner, a bar or a view — not a stationery shop that
       // happened to be the next candidate in the list.
       (!slot.any || slot.any.some((t) => s.themes.includes(t)));
-    const ok = ranked.filter(suits);
-    const candidates = ok.length ? ok : wider.filter(suits);
+    const chosen = stops.map((st) => st.spot);
+    const notATwin = (s: Spot) => !samePlaceAs(s, chosen);
+    const ok = ranked.filter(suits).filter(notATwin);
+    const candidates = ok.length ? ok : wider.filter(suits).filter(notATwin);
     if (!candidates.length) continue;
     // A day of three markets is a list, not an itinerary. Prefer a stop whose
     // lead theme hasn't been used yet, and fall back if that leaves nothing.
@@ -267,7 +342,15 @@ function buildDay(
     // Walk further down the list at every variant, and a different distance in
     // each slot — otherwise the one crowd-pleasing venue wins the morning of
     // every variant and three "different" courses share the same first stop.
-    const step = offset * template.length + slotIndex * offset;
+    //
+    // The stride has to be 1 in the first slot. Multiplying the variant by the
+    // template length aliased the moment a shortlist was as short as the day
+    // (`3 % 3 === 6 % 3`), and a traveller who asked twice for something else got
+    // the same morning both times. Stepping by one guarantees a new headline stop
+    // for as many variants as there are candidates; the later slots keep their
+    // wider strides so the rest of the day moves too.
+    const stride = [1, 2, 3, 5, 7][slotIndex % 5];
+    const step = offset * stride;
     const pick = shortlist[step % shortlist.length];
     used.add(pick.id);
     const alt = shortlist.find((s) => !used.has(s.id) && s.id !== pick.id);
@@ -380,8 +463,18 @@ export function composeCourse(
   variant = 0,
   /** Live candidates from the city's tourism data, behind the curated ones. */
   extra: Spot[] = [],
+  /** What the traveller told us about how they want to travel. */
+  profile?: TravelProfile,
 ): Course {
   const themes = wantedThemes(personas, explicitThemes);
+  // Someone who asked to take it easy gets a day with room in it, not the same
+  // four stops at the same speed; someone who asked to see everything gets more.
+  const dayTemplate =
+    profile?.pace === "relaxed"
+      ? ONE_DAY_TEMPLATE.filter((t) => t.key !== "afternoon")
+      : profile?.pace === "packed"
+        ? [...ONE_DAY_TEMPLATE, { key: "evening", block: "evening" as Block, any: EVENING_THEMES }]
+        : ONE_DAY_TEMPLATE;
   // Curated and live overlap — "Tongin Market" arrives from both, and a day that
   // sends you to the same market twice is worse than one that never mentions it.
   // Curated wins, because it is the entry with the reason to go written on it.
@@ -407,32 +500,62 @@ export function composeCourse(
     const picked = [...zones, ...zones].slice(start, start + 2);
     return picked.length ? picked : zones.slice(0, 2);
   };
-  const days: DayPlan[] = [];
-
-  if (duration === "half-day") {
-    days.push(buildDay("Half-day", inZones(band(0)), themes, HALF_DAY_TEMPLATE, used, variant, cityPool));
-  } else if (duration === "2-day") {
-    days.push(buildDay("Day 1", inZones(band(0)), themes, ONE_DAY_TEMPLATE, used, variant, cityPool));
-    days.push(buildDay("Day 2", inZones(band(2)), themes, ONE_DAY_TEMPLATE, used, variant, cityPool));
-  } else if (duration === "3-day") {
-    days.push(buildDay("Day 1", inZones(band(0)), themes, ONE_DAY_TEMPLATE, used, variant, cityPool));
-    days.push(buildDay("Day 2", inZones(band(2)), themes, ONE_DAY_TEMPLATE, used, variant, cityPool));
-    days.push(buildDay("Day 3", inZones(band(4)), themes, ONE_DAY_TEMPLATE, used, variant, cityPool));
-  } else {
-    // 1-day: Seoul single-persona signature (golden), else engine.
-    // Signature days are fixed outdoor sequences — skip them when shelter is the point.
-    // The signature is the single best answer, so it is variant 0 only — asking
-    // for another must not hand back the same hand-written day.
-    const sig =
-      variant === 0 && !indoor && city === "Seoul" && personas.length === 1
-        ? SIGNATURES[`${personas[0].key}:1-day`]
-        : undefined;
-    if (sig) {
-      const stops = sig.map((x) => ({ block: x.block, spot: SPOT_BY_ID.get(x.id)! })).filter((st) => st.spot);
-      days.push({ title: "1-day", stops });
+  /**
+   * One whole course at a given variant, drawing from — and adding to — `seen`.
+   *
+   * Stepping further down a ranked list was not enough on its own: a different
+   * variant reshuffles which part of the city anchors the day, and the same
+   * crowd-pleaser can sit at index 1 of one shortlist and index 2 of the next.
+   * A traveller who asks twice for something else should never be handed a stop
+   * they have already been shown, so every earlier variant is composed first and
+   * its picks are struck off before this one is built.
+   */
+  const compose = (v: number, seen: Set<string>): DayPlan[] => {
+    const bandAt = (i: number) => {
+      if (!zones.length) return zones;
+      const start = (i + v * 2) % zones.length;
+      const picked = [...zones, ...zones].slice(start, start + 2);
+      return picked.length ? picked : zones.slice(0, 2);
+    };
+    const out: DayPlan[] = [];
+    if (duration === "half-day") {
+      out.push(buildDay("Half-day", inZones(bandAt(0)), themes, HALF_DAY_TEMPLATE, seen, v, cityPool, profile));
+    } else if (duration === "2-day") {
+      out.push(buildDay("Day 1", inZones(bandAt(0)), themes, dayTemplate, seen, v, cityPool, profile));
+      out.push(buildDay("Day 2", inZones(bandAt(2)), themes, dayTemplate, seen, v, cityPool, profile));
+    } else if (duration === "3-day") {
+      out.push(buildDay("Day 1", inZones(bandAt(0)), themes, dayTemplate, seen, v, cityPool, profile));
+      out.push(buildDay("Day 2", inZones(bandAt(2)), themes, dayTemplate, seen, v, cityPool, profile));
+      out.push(buildDay("Day 3", inZones(bandAt(4)), themes, dayTemplate, seen, v, cityPool, profile));
     } else {
-      days.push(buildDay("1-day", inZones(band(0)), themes, ONE_DAY_TEMPLATE, used, variant, cityPool));
+      out.push(buildDay("1-day", inZones(bandAt(0)), themes, dayTemplate, seen, v, cityPool, profile));
     }
+    return out;
+  };
+
+  // 1-day Seoul single-persona has a hand-written signature day, which is the
+  // single best answer — so it is variant 0 only, and only when the traveller has
+  // not told us anything a fixed sequence cannot honour (a bad knee, a budget,
+  // shelter from the rain).
+  const sig =
+    duration === "1-day" &&
+    variant === 0 &&
+    !indoor &&
+    city === "Seoul" &&
+    personas.length === 1 &&
+    (!profile || isEmptyProfile(profile))
+      ? SIGNATURES[`${personas[0].key}:1-day`]
+      : undefined;
+  if (sig) {
+    const stops = sig.map((x) => ({ block: x.block, spot: SPOT_BY_ID.get(x.id)! })).filter((st) => st.spot);
+    return { days: [{ title: "1-day", stops }], themes };
   }
+
+  for (let k = 0; k < variant; k++) compose(k, used);
+  let days = compose(variant, used);
+  // Every candidate struck off eventually — a two-stop "course" is worse than
+  // one that circles back, so start the rotation over rather than thinning out.
+  const total = days.reduce((n, d) => n + d.stops.length, 0);
+  if (total < days.length * 2) days = compose(variant, new Set<string>());
   return { days, themes };
 }

@@ -82,13 +82,29 @@ function zoneFor(text: string): { zone: string; area: string } {
  * offered "Photographer Kang Jae-gu Solo Exhibition" and "2027 S/S Seoul Fashion
  * Week" as stops on a day out — things that will have ended by the time anyone
  * reads the course. Dated events belong on the festival card, not here.
+ *
+ * It also keeps medical businesses out. The feed lists cosmetic clinics as
+ * tourism content, and a family asking for a cheap day with a grandmother was
+ * handed "SYNERGY Plastic Surgery" as an evening stop. Beyond being absurd as an
+ * itinerary, routing anyone to a named clinic is exactly the medical-advertising
+ * line this service does not cross (see D-025).
  */
 const NOT_A_STOP =
-  /exhibition|exhibit\b|fanfest|fan ?meet|concert|festival|fashion week|biennale|showcase|special ?show|screening|기획전|특별전|전시회|콘서트|페스티벌|ticket|reservation|package|coupon|voucher|rental|delivery|storage|locker|pharmacy|clinic|hospital|dental|academy|office|예약|쿠폰|렌탈|보관|약국|병원|\b20\d\d\b|《|》|<[^>]{4,}>|^[^:]{3,44}\s?:\s/i;
+  /exhibition|exhibit\b|fanfest|fan ?meet|concert|festival|fashion week|biennale|showcase|special ?show|screening|기획전|특별전|전시회|콘서트|페스티벌|ticket|reservation|package|coupon|voucher|rental|delivery|storage|locker|pharmacy|clinic|hospital|dental|surgery|surgical|plastic surg|dermatolog|aesthetic|medical|oriental medicine|한의원|의원|성형|피부과|치과|academy|office|예약|쿠폰|렌탈|보관|약국|병원|\b20\d\d\b|《|》|<[^>]{4,}>|^[^:]{3,44}\s?:\s/i;
+
+/**
+ * Medical businesses hide in the blurb rather than the title — "Seoul Yangnyeong
+ * Market is one of the most famous oriental medicine markets in Korea" arrived as
+ * a family's lunch stop. Only the medical words are worth reading the whole
+ * summary for; testing it against the full filter would throw away any place
+ * whose description happens to mention a hospital nearby.
+ */
+const MEDICAL_ANYWHERE = /oriental medicine|traditional medicine|plastic surg|cosmetic surg|dermatolog|한의|성형외과/i;
 
 function fromSeoul(c: SeoulContent, i: number): Spot | undefined {
   const title = (c.title ?? "").trim();
   if (!title || NOT_A_STOP.test(`${title} ${c.categoryPath ?? ""}`)) return undefined;
+  if (MEDICAL_ANYWHERE.test(`${title} ${c.summary ?? ""}`)) return undefined;
   // Themes come from what the place IS — its category and its name. Reading them
   // out of the blurb instead gave a children's play centre a nightlife theme,
   // because the description happened to mention the evening, and it turned up as
@@ -104,8 +120,22 @@ function fromSeoul(c: SeoulContent, i: number): Spot | undefined {
     zone,
     themes,
     blocks: blocksFor(themes),
-    note: (c.summary ?? "").replace(/\s+/g, " ").trim().slice(0, 160),
+    note: trimBlurb(c.summary ?? ""),
   };
+}
+
+/**
+ * A blurb that stops mid-word ("divided into three different spaces: a charact")
+ * reads like a broken page. Prefer the end of a sentence, then the end of a word.
+ */
+function trimBlurb(raw: string, max = 160): string {
+  const text = raw.replace(/\s+/g, " ").trim();
+  if (text.length <= max) return text;
+  const window = text.slice(0, max);
+  const sentence = Math.max(window.lastIndexOf(". "), window.lastIndexOf("! "), window.lastIndexOf("? "));
+  if (sentence > max * 0.5) return window.slice(0, sentence + 1);
+  const word = window.lastIndexOf(" ");
+  return `${(word > 0 ? window.slice(0, word) : window).replace(/[,;:]$/, "")}…`;
 }
 
 function fromTour(p: Place, i: number): Spot | undefined {

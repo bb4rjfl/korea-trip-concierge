@@ -46,4 +46,29 @@ describe("source hygiene", () => {
     }
     expect(offenders).toEqual([]);
   });
+
+  it("has no double-escaped word boundaries inside regex literals", () => {
+    // The same heredoc hazard in the other direction: writing the escape twice to
+    // survive the shell leaves `\\b` in the file, which a regex reads as a literal
+    // backslash followed by "b". `PRICEY` shipped that way and never matched
+    // "mall" — a budget traveller was still being sent to department stores.
+    const offenders: string[] = [];
+    for (const file of ROOTS.flatMap((r) => {
+      try {
+        return walk(r);
+      } catch {
+        return [];
+      }
+    })) {
+      if (file.includes("source_hygiene")) continue; // this file names the pattern on purpose
+      for (const line of readFileSync(file, "utf8").split("\n")) {
+        // `new RegExp("\\s")` is *correct* double-escaping — the string literal
+        // eats one level before the regex engine sees it. Only literals are wrong.
+        if (line.includes("RegExp(")) continue;
+        if (!line.includes("/") || !/\\\\[bBdDsSwW]/.test(line)) continue;
+        offenders.push(`${file}: ${line.trim().slice(0, 90)}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
 });

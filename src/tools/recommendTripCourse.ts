@@ -11,6 +11,9 @@ import {
   type City,
 } from "../lib/courses.js";
 import { livePool } from "../lib/livePool.js";
+import { readProfile, profileNote, isEmptyProfile } from "../lib/profile.js";
+import { getGraph, planRoute } from "../lib/sources/subwayGraph.js";
+import { resolveCity as geoForCity, getWeather } from "../lib/sources/weatherair.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -79,14 +82,62 @@ function personaTitle(personas: PersonaDef[]): string {
   return personas.map((p) => `${p.emoji} ${p.label}`).join(" + ");
 }
 
+/**
+ * "(Seoul)" next to a stop in a Seoul course tells the reader nothing — it is
+ * what we fall back to when a live listing arrived without an address. Say the
+ * neighbourhood or say nothing.
+ */
+function areaTag(area: string): string {
+  return !area || CITY_AS_AREA.test(area) ? "" : ` _(${area})_`;
+}
+
 function renderDay(d: DayPlan): string[] {
   const lines = [`**${d.title}**`];
   for (const s of d.stops) {
     lines.push(`${s.block}`);
-    lines.push(`- **${s.spot.name}** _(${s.spot.area})_ — ${s.spot.note}`);
-    if (s.alt) lines.push(`  ↔ _or:_ **${s.alt.name}** _(${s.alt.area})_`);
+    const note = s.spot.note ? ` — ${s.spot.note}` : "";
+    lines.push(`- **${s.spot.name}**${areaTag(s.spot.area)}${note}`);
+    if (s.alt) lines.push(`  ↔ _or:_ **${s.alt.name}**${areaTag(s.alt.area)}`);
   }
   return lines;
+}
+
+/**
+ * Price and time the hops between consecutive stops on the first day.
+ *
+ * The subway graph is already in memory, so this costs nothing and turns a list
+ * of place names into a plan someone can actually follow and budget for.
+ */
+/** A live listing with no address lands here — not a neighbourhood we can route. */
+const CITY_AS_AREA = /^(?:Seoul|Busan|Jeju|Gyeongju|Korea)$/i;
+
+async function legsBetweenStops(
+  stops: { spot: { name: string; area: string } }[],
+): Promise<{ label: string; minutes: number; fareWon: number }[]> {
+  if (stops.length < 2) return [];
+  try {
+    const graph = await getGraph();
+    const out: { label: string; minutes: number; fareWon: number }[] = [];
+    for (let i = 1; i < stops.length; i++) {
+      const from = stops[i - 1].spot.area;
+      const to = stops[i].spot.area;
+      if (!from || !to || from === to) continue;
+      // Live listings often carry no address, so their "area" is the city name.
+      // "Seoul → Myeongdong 4min" is a routing artefact, not a leg of anyone's
+      // day — better to show one honest hop than two and a fiction.
+      if (CITY_AS_AREA.test(from) || CITY_AS_AREA.test(to)) continue;
+      const route = planRoute(graph, from, to);
+      if (!route) continue;
+      out.push({
+        label: `${from} → ${to} ${route.minutes}min`,
+        minutes: route.minutes,
+        fareWon: route.fareWon,
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
 }
 
 export const recommendTripCourse: ToolDef = {
@@ -104,6 +155,14 @@ export const recommendTripCourse: ToolDef = {
       .describe("Traveler profile(s), combinable — e.g. '20s woman', 'family', 'couple', 'K-pop fan', 'foodie', 'history lover', or '20s woman, foodie'. Omit for first-timer."),
     duration: z.string().optional().describe("Trip length: 'half-day', '1-day', '2-day', '3-day' (4+ returns a 3-day base)."),
     themes: z.string().optional().describe("Optional focus, comma-separated — e.g. 'beauty, photo' or 'nature, nightlife'."),
+    notes: z
+      .string()
+      .optional()
+      .describe(
+        "Anything the traveler said about how they want to travel, in their own words — " +
+          "'we're on a budget', 'my mother walks slowly', 'not another market', 'we have a toddler'. " +
+          "Passed through verbatim; the course is filtered and paced by it.",
+      ),
     variant: z
       .number()
       .optional()
@@ -154,20 +213,53 @@ export const recommendTripCourse: ToolDef = {
 
     // Honour a stated weather constraint: a rainy-day course must actually be
     // sheltered, not the same itinerary with an 'indoors' label on it.
-    const indoor = isIndoorIntent(blob);
+    // A plan that ignores the sky is a brochure. If it is raining or the forecast
+    // says it will be, shelter the day without being asked — and say why, because
+    // a course that quietly changed shape is confusing.
+    let indoor = isIndoorIntent(blob);
+    let weatherNote = "";
+    if (!indoor) {
+      const wx = await getWeather(geoForCity(city)).catch(() => undefined);
+      const wet = /rain|shower|snow|drizzle/i.test(`${wx?.precip ?? ""}`) || (wx?.rainProb ?? 0) >= 60;
+      if (wet) {
+        indoor = true;
+        weatherNote = `_☔ It's ${wx?.precip ? wx.precip.toLowerCase() : "likely to rain"} in ${city} today (${wx?.rainProb ?? "?"}% chance), so this day stays under cover. Ask for the outdoor version if you'd rather risk it._`;
+      }
+    }
     const variant = Math.max(0, Math.floor(Number(args.variant ?? 0)) || 0);
     // The city's own tourism data behind the curated spots — a few hundred more
     // candidates, which is what makes "give me another one" mean anything.
     const extra = await livePool(city).catch(() => []);
-    const course = composeCourse(personas, dur, explicitThemes, city, indoor, variant, extra);
+    // What they told us about how they want to travel — budget, pace, walking,
+    // children, and anything they have already said no to.
+    const profile = readProfile([String(args.notes ?? ""), personaRaw, themesRaw].filter(Boolean));
+    const course = composeCourse(personas, dur, explicitThemes, city, indoor, variant, extra, profile);
     const durLabel = dur === "half-day" ? "Half-day" : dur === "2-day" ? "2-day" : dur === "3-day" ? "3-day" : "1-day";
     const head = `🗺️ **${durLabel} ${city} course — for a ${personaTitle(personas)}**`;
     const lines = [head];
     if (course.themes.length) lines.push(`_Themes: ${course.themes.slice(0, 5).join(" · ")}_`);
+    // Say back what we took from what they said, so the tailoring is visible and
+    // correctable rather than mysterious.
+    if (!isEmptyProfile(profile)) lines.push(profileNote(profile));
+    if (weatherNote) lines.push("", weatherNote);
     if (over) lines.push("", "_(Longer trip? Here's a strong 3-day base — extend by repeating a day with a fresh persona, theme, or city.)_");
     for (const d of course.days) {
       lines.push("", ...renderDay(d));
     }
+    // What the day costs to move around, from the same subway graph the route
+    // answers use — "how do I get there and what does it cost" is the question,
+    // and a course that skips it is a list of names.
+    const hops = await legsBetweenStops(course.days[0]?.stops ?? []);
+    if (hops.length) {
+      const total = hops.reduce((sum, h) => sum + h.fareWon, 0);
+      const minutes = hops.reduce((sum, h) => sum + h.minutes, 0);
+      lines.push(
+        "",
+        `🚇 **Getting between them:** ${hops.map((h) => h.label).join(" · ")}`,
+        `_About ${minutes} min and ₩${total.toLocaleString()} of transit across the day, before entry fees._`,
+      );
+    }
+
     lines.push(
       "",
       "_Tap any stop and I'll do hours, directions, the area, menus, or getting past a Korean-only app. These are popular patterns, not ads._",

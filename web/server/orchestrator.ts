@@ -521,6 +521,19 @@ ${partial.reply ?? ""}`.trim(),
     // city at each step after that, so asking again walks forward instead of
     // handing back the same itinerary — which is what a visitor saw three times
     // in a row before this existed.
+    // Hand the course builder what the traveller actually said. It reads budget,
+    // pace, walking, children and anything already refused out of their own
+    // words — which is the difference between a course for them and a course.
+    if (toolCall.name === "recommendTripCourse" && filled.notes == null) {
+      const said = history
+        .filter((h) => h.role === "user")
+        .slice(-8)
+        .map((h) => h.content)
+        .join(" · ")
+        .slice(0, 600);
+      if (said) filled.notes = said;
+    }
+
     if (toolCall.name === "recommendTripCourse" && filled.variant == null) {
       const alreadyShown = history.filter(
         (h) => h.role === "assistant" && /course\s+—|코스\s*—|コース|课程|課程/.test(h.content ?? ""),
