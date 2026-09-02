@@ -327,3 +327,23 @@ describe("proximity anchors on somewhere we can actually place", () => {
     expect(proximity(nowhere, [])).toBe(0);
   });
 });
+
+describe("named peaks are climbs even when nothing in the name says so", () => {
+  const inwangsan = { name: "Inwangsan Night Views", note: "", themes: ["view"], area: "Jongno", zone: "old-north", blocks: [], id: "x" } as never;
+  const naksan = { name: "Naksan Park", note: "", themes: ["nature"], area: "Jongno", zone: "old-north", blocks: [], id: "y" } as never;
+
+  it("keeps them off a day that has to be easy on the legs", () => {
+    expect(STRENUOUS.test("Inwangsan Night Views")).toBe(true);
+    expect(allowedBy(inwangsan, { mobility: "easy", dietary: [], dislikes: [], likes: [] })).toBe(false);
+    expect(allowedBy(naksan, { mobility: "easy", dietary: [], dislikes: [], likes: [] })).toBe(false);
+  });
+
+  it("keeps them off a day with a small child, unless the parents asked for nature", () => {
+    expect(allowedBy(inwangsan, { withKids: true, dietary: [], dislikes: [], likes: [] })).toBe(false);
+    expect(allowedBy(inwangsan, { withKids: true, dietary: [], dislikes: [], likes: ["nature"] })).toBe(true);
+  });
+
+  it("leaves everyone else alone", () => {
+    expect(allowedBy(inwangsan, { dietary: [], dislikes: [], likes: [] })).toBe(true);
+  });
+});

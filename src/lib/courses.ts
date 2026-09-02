@@ -232,7 +232,11 @@ export function isIndoorSpot(spot: Spot): boolean {
  * disqualifying for someone travelling with a parent who walks slowly — and they
  * told us so.
  */
-export const STRENUOUS = /uphill|steep|hike|hiking|trail|climb|mountain|stairs|summit|slope|등산|언덕|계단|가파/i;
+// The named peaks are here because the words above cannot see them: "Inwangsan
+// Night Views" was handed to a family with a five-year-old on a packed day, and
+// "Naksan Park" reads like any other park until you are on the fortress wall.
+export const STRENUOUS =
+  /uphill|steep|hike|hiking|trail|climb|mountain|stairs|summit|slope|등산|언덕|계단|가파|fortress wall|성곽길|둘레길|Inwangsan|Bukhansan|Bugaksan|Baegaksan|Naksan|Achasan|Yongmasan|Gwanaksan|Cheonggyesan|Umyeonsan|Maebong|인왕산|북한산|낙산|아차산|용마산|관악산/i;
 
 /**
  * Places whose whole point is spending money — plus the paid attractions that
@@ -263,7 +267,10 @@ const PORK_LED = /\bpork\b|samgyeopsal|jokbal|bossam|돼지|삼겹|족발|보쌈
 export function allowedBy(spot: Spot, profile?: TravelProfile): boolean {
   if (!profile) return true;
   const hay = `${spot.name} ${spot.note ?? ""}`;
-  if (profile.mobility === "easy" && STRENUOUS.test(hay)) return false;
+  // A five-year-old is a mobility constraint nobody thinks to state. Parents who
+  // do want the hike can say so, and saying so puts nature on the like list.
+  const noClimbing = profile.mobility === "easy" || (profile.withKids && !profile.likes.includes("nature"));
+  if (noClimbing && STRENUOUS.test(hay)) return false;
   if (profile.budget === "low" && PRICEY.test(hay)) return false;
   if (profile.dislikes.some((d) => spot.themes.includes(d))) return false;
   // Saying "we are vegetarian" and then being handed Korean BBQ is the kind of
