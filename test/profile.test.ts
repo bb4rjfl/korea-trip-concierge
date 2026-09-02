@@ -286,3 +286,44 @@ describe("proximity — a day should hold together geographically", () => {
     expect(new Set(labels).size).toBe(labels.length);
   });
 });
+
+describe("polarity belongs to a sentence, not to the whole conversation", () => {
+  it("does not let one refusal poison every theme mentioned earlier", () => {
+    // The web layer joins recent turns with " · " before handing them over.
+    const joined = "1 day course in Seoul for a foodie · not another market please, we did that yesterday";
+    const p = readProfile([joined]);
+    expect(p.dislikes).toContain("market");
+    expect(p.dislikes, "a foodie who skipped the market still wants lunch").not.toContain("food");
+  });
+
+  it("reads several things said in one breath", () => {
+    const p = readProfile(["we are on a budget and my mother walks slowly"]);
+    expect(p.budget).toBe("low");
+    expect(p.mobility).toBe("easy");
+  });
+
+  it("keeps a refusal in one clause off the other clause's theme", () => {
+    const p = readProfile(["we love cafes but not another market"]);
+    expect(p.likes).toContain("cafe");
+    expect(p.dislikes).toContain("market");
+    expect(p.dislikes).not.toContain("cafe");
+  });
+});
+
+describe("proximity anchors on somewhere we can actually place", () => {
+  const jongno = { name: "A", area: "Jongno", zone: "old-north", themes: [], blocks: [], id: "a", note: "" } as never;
+  const nowhere = { name: "E", area: "Seoul", zone: "any", themes: [], blocks: [], id: "e", note: "" } as never;
+  const alsoJongno = { name: "B", area: "Jongno", zone: "old-north", themes: [], blocks: [], id: "b", note: "" } as never;
+
+  it("measures from the last stop with a known location, not the last stop", () => {
+    // Morning placed, lunch unplaceable: the afternoon should still be pulled
+    // back towards the morning rather than treated as a fresh start.
+    expect(proximity(alsoJongno, [jongno, nowhere])).toBeGreaterThan(0);
+  });
+
+  it("prefers to open a compact day somewhere it can cluster around", () => {
+    const easy = { mobility: "easy" as const, dietary: [], dislikes: [], likes: [] };
+    expect(proximity(nowhere, [], easy)).toBeLessThan(proximity(jongno, [], easy));
+    expect(proximity(nowhere, [])).toBe(0);
+  });
+});

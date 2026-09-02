@@ -146,11 +146,19 @@ const MEDICAL_ANYWHERE = /oriental medicine|traditional medicine|plastic surg|co
  */
 const RETAIL_IN_BLURB = /character (?:store|goods|shop)|goods (?:store|shop)|massage chair|showroom|flagship store|캐릭터|안마의자/i;
 
+/**
+ * A run that ends. "Louis Vuitton Visionary Journeys Seoul" carries no word the
+ * title filter recognises and was offered to a family with a five-year-old as a
+ * stop on their day; the description is unambiguous that it is a show with dates.
+ */
+const EVENT_IN_BLURB = /\bexhibition\b|\bexhibits?\b|on (?:view|display) (?:until|through)|runs? (?:until|through)|pop-?up store|limited-time|기간 한정|전시(?:회|장)?|팝업/i;
+
 function fromSeoul(c: SeoulContent, i: number): Spot | undefined {
   const title = (c.title ?? "").trim();
   if (!title || NOT_A_STOP.test(`${title} ${c.categoryPath ?? ""}`)) return undefined;
   if (MEDICAL_ANYWHERE.test(`${title} ${c.summary ?? ""}`)) return undefined;
   if (RETAIL_IN_BLURB.test(`${title} ${c.summary ?? ""}`)) return undefined;
+  if (EVENT_IN_BLURB.test(`${title} ${c.summary ?? ""}`)) return undefined;
   // Themes come from what the place IS — its category and its name. Reading them
   // out of the blurb instead gave a children's play centre a nightlife theme,
   // because the description happened to mention the evening, and it turned up as

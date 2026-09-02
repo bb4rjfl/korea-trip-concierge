@@ -87,6 +87,21 @@ function themesIn(text: string): string[] {
 }
 
 /**
+ * Polarity belongs to a sentence, not to a conversation.
+ *
+ * The web layer hands us the recent turns joined with " · ", and reading that as
+ * one utterance put every theme mentioned anywhere under the one "not another"
+ * in it: a foodie who said "a day for a foodie" and then "not another market"
+ * came back with "skipping market, food" and a day with nothing to eat.
+ */
+function splitClauses(raw: string): string[] {
+  return (raw ?? "")
+    .split(/\s+·\s+|[.!?;\n]+|(?:,\s*)?(?:\band\b|\bbut\b|그리고|하지만|근데)\s+/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
  * Read the profile out of the conversation.
  *
  * Only user turns are read: the assistant's own cards mention markets and cafés
@@ -95,7 +110,7 @@ function themesIn(text: string): string[] {
  */
 export function readProfile(userTurns: string[]): TravelProfile {
   const p: TravelProfile = { dietary: [], dislikes: [], likes: [] };
-  for (const raw of userTurns) {
+  for (const raw of userTurns.flatMap(splitClauses)) {
     const t = (raw ?? "").trim();
     if (!t) continue;
 

@@ -333,9 +333,18 @@ function fits(spot: Spot, block: Block): boolean {
  * crossing the city is the thing that ruins the day, not a weaker second stop.
  */
 export function proximity(spot: Spot, sameDay: Spot[], profile?: TravelProfile): number {
-  if (!sameDay.length) return 0;
-  const anchor = sameDay[sameDay.length - 1];
-  const pull = profile?.mobility === "easy" || profile?.pace === "relaxed" ? 9 : 4;
+  const tight = profile?.mobility === "easy" || profile?.pace === "relaxed";
+  // The first stop sets where the day happens. For someone who needs it compact,
+  // opening on a listing we cannot place leaves the rest of the day nothing to
+  // cluster around, so prefer a stop with a known address to start from.
+  if (!sameDay.length) return tight && spot.zone === "any" ? -2 : 0;
+  // Anchor on the last stop we actually know the location of. When the morning
+  // was an unplaceable listing, measuring from it makes every candidate equally
+  // "far" and the pull collapses — which is how a slow-walker's day still went
+  // Seosomun → Seongsu → Nowon after the ranking was supposed to prevent it.
+  const anchor = [...sameDay].reverse().find((s) => s.zone !== "any");
+  if (!anchor) return 0;
+  const pull = tight ? 9 : 4;
   if (spot.area && spot.area !== "Seoul" && spot.area === anchor.area) return pull + 2;
   if (spot.zone !== "any" && spot.zone === anchor.zone) return pull;
   // We don't know where it is; it might be next door, it might be an hour away.
