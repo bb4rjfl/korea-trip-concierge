@@ -37,6 +37,17 @@ describe("readProfile — reading the traveller out of their own words", () => {
 
   it("hears children and diet", () => {
     expect(readProfile(["travelling with a toddler"]).withKids).toBe(true);
+    // How people actually phrase it, in the four languages we serve.
+    for (const said of [
+      "we want to see as much as possible with our 5 year old",
+      "with our little one",
+      "6살 아이랑 같이 가요",
+      "5歳の子と一緒です",
+      "带着3岁的孩子",
+    ]) {
+      expect(readProfile([said]).withKids, said).toBe(true);
+    }
+    expect(readProfile(["a day for two adults"]).withKids).toBeUndefined();
     expect(readProfile(["we are vegetarian"]).dietary).toContain("vegetarian");
     expect(readProfile(["halal food only please"]).dietary).toContain("halal");
   });

@@ -54,7 +54,10 @@ const RULES: { key: keyof TravelProfile | "dislike" | "like"; value?: string; re
   {
     key: "withKids",
     value: "true",
-    re: /\bkids?\b|children|toddler|baby|my son|my daughter|아이(?:들)?|어린이|애들|유아|子供|子ども|孩子|小孩/i,
+    // "with our 5 year old" is how people actually say it, and it matched none
+    // of the words below — so the day stayed a grown-up's day and put a
+    // five-year-old on Inwangsan after dark.
+    re: /\bkids?\b|children|toddler|baby|infant|my son|my daughter|little one|\b\d{1,2}[- ]?(?:year|yr)s?[- ]?old\b|kindergarten|preschool|아이(?:들)?|어린이|애들|유아|\d{1,2}살|살짜리|子供|子ども|\d{1,2}歳の子|孩子|小孩|\d{1,2}岁/i,
   },
 ];
 
