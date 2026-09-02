@@ -37,6 +37,38 @@ const SEOUL_ZONES: [RegExp, string, string][] = [
   [/서초|Seocho|Banpo/i, "south", "Seocho"],
   [/송파|Songpa|Jamsil/i, "south", "Songpa"],
   [/영등포|Yeongdeungpo|Yeouido/i, "central", "Yeouido"],
+  // The eleven districts above covered the tourist core and left a third of the
+  // live pool with zone "any" — and an unplaceable stop qualifies for every part
+  // of the city, which is how a day ran Seongsu → Noryangjin → Nowon. The rest of
+  // Seoul's twenty-five gu, plus the neighbourhood and landmark names that
+  // actually appear in venue titles, place most of what was left.
+  [/동대문구|Dongdaemun-gu|Cheongnyangni|Hoegi|Jegi/i, "east", "Dongdaemun-gu"],
+  [/성북|Seongbuk|Seongsin|Anam|Bomun/i, "north", "Seongbuk"],
+  [/강북구|Gangbuk|Suyu|Mia|Bukhansan/i, "north", "Gangbuk"],
+  [/도봉|Dobong|Ssangmun|Chang-dong/i, "north", "Dobong"],
+  [/노원|Nowon|Sanggye|Junggye|Hwarangdae/i, "north", "Nowon"],
+  [/중랑|Jungnang|Myeonmok|Yongmasan/i, "north", "Jungnang"],
+  [/은평|Eunpyeong|Yeonsinnae|Bulgwang/i, "northwest", "Eunpyeong"],
+  [/강동|Gangdong|Cheonho|Amsa|Godeok/i, "east", "Gangdong"],
+  [/동작|Dongjak|Noryangjin|Sadang|Heukseok/i, "southwest", "Dongjak"],
+  [/관악|Gwanak|Sillim|Seoul National University/i, "southwest", "Gwanak"],
+  [/강서|Gangseo|Gayang|Magok|Balsan|Gimpo Airport/i, "southwest", "Gangseo"],
+  [/양천|Yangcheon|Mok-?dong|Sinjeong/i, "southwest", "Yangcheon"],
+  [/구로|Guro|Sindorim|Gasan/i, "southwest", "Guro"],
+  [/금천|Geumcheon|Doksan/i, "southwest", "Geumcheon"],
+  // Landmarks last, so a district name in the same string still wins. Venue
+  // titles rarely name a gu — "Gyeongbokgung Palace Jibokjae" and "Jongmyo
+  // Shrine Stonewall Path" are unmistakably Jongno to a reader and were zone
+  // "any" to us.
+  [/Gyeongbokgung|Changdeokgung|Changgyeonggung|Jongmyo|Gwanghwamun|Cheong Wa Dae|Inwangsan|Naksan|경복궁|창덕궁|종묘/i, "old-north", "Jongno"],
+  [/Deoksugung|Cheonggyecheon|Namdaemun|Sungnyemun|Seoul Plaza|DDP|Dongdaemun Design/i, "downtown", "Jung-gu"],
+  [/Namsan|N Seoul Tower|남산/i, "central", "Namsan"],
+  [/War Memorial|Yongsan Family Park|Noksapyeong/i, "yongsan", "Yongsan"],
+  [/Olympic Park|Lotte World|Seokchon/i, "south", "Songpa"],
+  [/COEX|Bongeunsa|Seonjeongneung/i, "south", "Gangnam"],
+  [/Seoul Forest|Ttukseom|Achasan/i, "east", "Seongsu"],
+  [/World Cup Stadium|Haneul Park|Nanjicheon/i, "west", "Mapo"],
+  [/63 (?:Building|Square)|Saetgang|Bamseom/i, "central", "Yeouido"],
 ];
 
 /** Category path → the themes the course engine scores on. */
@@ -88,9 +120,15 @@ function zoneFor(text: string): { zone: string; area: string } {
  * handed "SYNERGY Plastic Surgery" as an evening stop. Beyond being absurd as an
  * itinerary, routing anyone to a named clinic is exactly the medical-advertising
  * line this service does not cross (see D-025).
+ *
+ * Last, chain outlets and showrooms. A packed family day came back with
+ * "Nabijam Massage Chair Gwanghwamun Signature Branch" as its afternoon and a
+ * character-goods shop called "Nagano Market SEOUL" as its evening — retail the
+ * feed carries because it is registered, not because anyone would plan around it.
+ * A named branch of a chain is the clearest signal: destinations rarely have one.
  */
 const NOT_A_STOP =
-  /exhibition|exhibit\b|fanfest|fan ?meet|concert|festival|fashion week|biennale|showcase|special ?show|screening|기획전|특별전|전시회|콘서트|페스티벌|ticket|reservation|package|coupon|voucher|rental|delivery|storage|locker|pharmacy|drug ?store|drugstore|clinic|hospital|dental|surgery|surgical|plastic surg|dermatolog|aesthetic|medical|oriental medicine|한의원|의원|성형|피부과|치과|academy|office|예약|쿠폰|렌탈|보관|약국|병원|\b20\d\d\b|《|》|<[^>]{4,}>|^[^:]{3,44}\s?:\s/i;
+  /exhibition|exhibit\b|fanfest|fan ?meet|concert|festival|fashion week|biennale|showcase|special ?show|screening|기획전|특별전|전시회|콘서트|페스티벌|ticket|reservation|package|coupon|voucher|rental|delivery|storage|locker|pharmacy|drug ?store|drugstore|clinic|hospital|dental|surgery|surgical|plastic surg|dermatolog|aesthetic|medical|oriental medicine|한의원|의원|성형|피부과|치과|academy|office|예약|쿠폰|렌탈|보관|약국|병원|massage chair|안마의자|showroom|signature branch|\bbranch\b|지점|character (?:store|goods|shop)|캐릭터 ?(?:샵|스토어)|phone ?case|nail ?shop|convenience store|편의점|\b20\d\d\b|《|》|<[^>]{4,}>|^[^:]{3,44}\s?:\s/i;
 
 /**
  * Medical businesses hide in the blurb rather than the title — "Seoul Yangnyeong
@@ -101,10 +139,18 @@ const NOT_A_STOP =
  */
 const MEDICAL_ANYWHERE = /oriental medicine|traditional medicine|plastic surg|cosmetic surg|dermatolog|한의|성형외과/i;
 
+/**
+ * Shops whose title hides what they are. "Nagano Market SEOUL" reads as a market
+ * and was picked as the evening food stop; the blurb says it is a character-goods
+ * store. The title lies, the description does not.
+ */
+const RETAIL_IN_BLURB = /character (?:store|goods|shop)|goods (?:store|shop)|massage chair|showroom|flagship store|캐릭터|안마의자/i;
+
 function fromSeoul(c: SeoulContent, i: number): Spot | undefined {
   const title = (c.title ?? "").trim();
   if (!title || NOT_A_STOP.test(`${title} ${c.categoryPath ?? ""}`)) return undefined;
   if (MEDICAL_ANYWHERE.test(`${title} ${c.summary ?? ""}`)) return undefined;
+  if (RETAIL_IN_BLURB.test(`${title} ${c.summary ?? ""}`)) return undefined;
   // Themes come from what the place IS — its category and its name. Reading them
   // out of the blurb instead gave a children's play centre a nightlife theme,
   // because the description happened to mention the evening, and it turned up as
@@ -198,7 +244,20 @@ async function withRetry<T>(run: () => Promise<T[]>): Promise<T[]> {
  * so a slow or missing source quietly narrows the field instead of breaking it.
  */
 export async function livePool(city: string): Promise<Spot[]> {
-  return pool.getOrLoad(`pool:${city}`, async () => {
+  const key = `pool:${city}`;
+  const hit = pool.get(key);
+  if (hit !== undefined) return hit;
+  const { spots, degraded } = await buildPool(city);
+  // A source that was merely rate-limited when we happened to build the pool
+  // should not narrow the whole afternoon. TourAPI's development quota runs out
+  // on a busy day and answers 429 for a while; caching that half-pool for six
+  // hours turns a passing outage into the rest of the day.
+  pool.set(key, spots, degraded ? 20 * 60_000 : undefined);
+  return spots;
+}
+
+async function buildPool(city: string): Promise<{ spots: Spot[]; degraded: boolean }> {
+  {
     const out: Spot[] = [];
     const seen = new Set<string>();
     const add = (s?: Spot): void => {
@@ -230,16 +289,26 @@ export async function livePool(city: string): Promise<Spot[]> {
       }
     }
 
-    for (const anchor of ANCHORS[city] ?? []) {
-      if (!hasKey("TOUR_API_KEY")) break;
+    const anchors = ANCHORS[city] ?? [];
+    const wantsTour = hasKey("TOUR_API_KEY") && anchors.length > 0;
+    let tourCalls = 0;
+    let tourEmpty = 0;
+    for (const anchor of anchors) {
+      if (!wantsTour) break;
+      // Thirty-two calls per cold build is what exhausts the daily quota in the
+      // first place. Once several sweeps in a row come back with nothing, the
+      // key is spent — keep going and we simply burn tomorrow's allowance too.
+      if (tourEmpty >= 4) break;
       for (const category of ["attraction", "culture", "shopping", "food"]) {
         const batch = await withRetry(() =>
           searchPlacesNearby({ ...anchor, radius: 3000, category, limit: 30, language: "en" }),
         );
+        tourCalls++;
+        if (!batch.length) tourEmpty++;
         batch.forEach((p, i) => add(fromTour(p, i)));
       }
     }
 
-    return out;
-  });
+    return { spots: out, degraded: wantsTour && tourCalls > 0 && tourEmpty === tourCalls };
+  }
 }

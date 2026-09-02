@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from "vitest";
 import { readProfile, isEmptyProfile, profileNote } from "../src/lib/profile.js";
-import { allowedBy, composeCourse, distinctiveWords, resolvePersonas, STRENUOUS, PRICEY } from "../src/lib/courses.js";
+import { allowedBy, composeCourse, distinctiveWords, proximity, resolvePersonas, STRENUOUS, PRICEY } from "../src/lib/courses.js";
 import { recommendTripCourse } from "../src/tools/recommendTripCourse.js";
 import { livePool } from "../src/lib/livePool.js";
 
@@ -232,5 +232,57 @@ describe("an evening question gets an evening", () => {
   it("leaves an ordinary half-day alone", async () => {
     const res = await recommendTripCourse.handler({ persona: "family", duration: "half-day" });
     expect(res.content[0].text).toMatch(/Half-day Seoul course/);
+  });
+});
+
+describe("proximity — a day should hold together geographically", () => {
+  const jongno1 = { name: "A", area: "Jongno", zone: "old-north", themes: [], blocks: [], id: "a", note: "" } as never;
+  const jongno2 = { name: "B", area: "Jongno", zone: "old-north", themes: [], blocks: [], id: "b", note: "" } as never;
+  const bukchon = { name: "C", area: "Bukchon", zone: "old-north", themes: [], blocks: [], id: "c", note: "" } as never;
+  const nowon = { name: "D", area: "Nowon", zone: "north", themes: [], blocks: [], id: "d", note: "" } as never;
+  const nowhere = { name: "E", area: "Seoul", zone: "any", themes: [], blocks: [], id: "e", note: "" } as never;
+
+  it("is neutral for the first stop of the day", () => {
+    expect(proximity(nowon, [])).toBe(0);
+  });
+
+  it("prefers the same neighbourhood, then the same zone, over across town", () => {
+    expect(proximity(jongno2, [jongno1])).toBeGreaterThan(proximity(bukchon, [jongno1]));
+    expect(proximity(bukchon, [jongno1])).toBeGreaterThan(proximity(nowon, [jongno1]));
+  });
+
+  it("pulls much harder for someone who said walking is hard", () => {
+    const easy = { mobility: "easy" as const, dietary: [], dislikes: [], likes: [] };
+    expect(proximity(nowon, [jongno1], easy)).toBeLessThan(proximity(nowon, [jongno1]));
+    expect(proximity(jongno2, [jongno1], easy)).toBeGreaterThan(proximity(jongno2, [jongno1]));
+  });
+
+  it("treats an unplaceable stop as a gamble, and as far away when distance is the problem", () => {
+    expect(proximity(nowhere, [jongno1])).toBe(-1);
+    const easy = { mobility: "easy" as const, dietary: [], dislikes: [], likes: [] };
+    expect(proximity(nowhere, [jongno1], easy)).toBeLessThan(-1);
+  });
+
+  it("keeps a relaxed day inside one part of the city", () => {
+    const course = composeCourse(resolvePersonas("culture"), "1-day", [], "Seoul", false, 0, [], {
+      pace: "relaxed",
+      mobility: "easy",
+      dietary: [],
+      dislikes: [],
+      likes: [],
+    });
+    const zones = new Set(course.days[0].stops.map((s) => s.spot.zone).filter((z) => z !== "any"));
+    expect(zones.size, [...zones].join(",")).toBeLessThanOrEqual(2);
+  });
+
+  it("does not print the same block label twice on a packed day", () => {
+    const course = composeCourse(resolvePersonas("family"), "1-day", [], "Seoul", false, 0, [], {
+      pace: "packed",
+      dietary: [],
+      dislikes: [],
+      likes: [],
+    });
+    const labels = course.days[0].stops.map((s) => s.block);
+    expect(new Set(labels).size).toBe(labels.length);
   });
 });

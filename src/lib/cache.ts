@@ -24,8 +24,8 @@ export class TtlCache<T> {
     return e.value;
   }
 
-  set(key: string, value: T): void {
-    this.store.set(key, { value, expiresAt: Date.now() + this.ttlMs });
+  set(key: string, value: T, ttlMs = this.ttlMs): void {
+    this.store.set(key, { value, expiresAt: Date.now() + ttlMs });
   }
 
   /** Get from cache or compute+store via loader. */

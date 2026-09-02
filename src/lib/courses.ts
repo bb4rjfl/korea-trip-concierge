@@ -207,7 +207,7 @@ export interface DayPlan {
   stops: Stop[];
 }
 
-const BLOCK_LABEL: Record<string, string> = { morning: "🌅 Morning", afternoon: "☀️ Afternoon", evening: "🌃 Evening", lunch: "🍜 Lunch / market", food: "🍽️ Eat" };
+const BLOCK_LABEL: Record<string, string> = { morning: "🌅 Morning", afternoon: "☀️ Afternoon", evening: "🌃 Evening", lunch: "🍜 Lunch / market", food: "🍽️ Eat", late: "🍻 Late" };
 
 /**
  * Is this stop somewhere you stay dry?
@@ -319,6 +319,34 @@ function fits(spot: Spot, block: Block): boolean {
 }
 
 /**
+ * How well a candidate sits with the day already planned.
+ *
+ * Theme fit alone produced a day that ran Gayang-dong → Yeonnam → Nowon: three
+ * fine places and ninety minutes of subway between them, handed to someone who
+ * had just said their mother walks slowly. Restricting the pool to a band of
+ * zones was supposed to prevent that, but a live listing whose address we could
+ * not parse carries zone "any" and so qualifies for every band.
+ *
+ * So the day pulls itself together as it goes: once a stop is placed, the next
+ * one is ranked partly on being near it. Someone who asked to take it easy —
+ * or told us walking is hard — gets that pull much harder, because for them
+ * crossing the city is the thing that ruins the day, not a weaker second stop.
+ */
+export function proximity(spot: Spot, sameDay: Spot[], profile?: TravelProfile): number {
+  if (!sameDay.length) return 0;
+  const anchor = sameDay[sameDay.length - 1];
+  const pull = profile?.mobility === "easy" || profile?.pace === "relaxed" ? 9 : 4;
+  if (spot.area && spot.area !== "Seoul" && spot.area === anchor.area) return pull + 2;
+  if (spot.zone !== "any" && spot.zone === anchor.zone) return pull;
+  // We don't know where it is; it might be next door, it might be an hour away.
+  // For most travellers that gamble is worth a good stop. For the ones who told
+  // us distance is the problem it is not — a slow-walker's day came back as
+  // Seongsu → Noryangjin → Nowon, every hop an unplaceable listing.
+  if (spot.zone === "any") return pull > 4 ? -pull : -1;
+  return -pull;
+}
+
+/**
  * Build one day from a candidate pool.
  *
  * `offset` is what makes "give me another one" mean anything: at 0 every slot
@@ -363,7 +391,17 @@ function buildDay(
     // lead theme hasn't been used yet, and fall back if that leaves nothing.
     const usedThemes = stops.map((st) => st.spot.themes[0]);
     const fresh = candidates.filter((c) => !usedThemes.includes(c.themes[0]));
-    const shortlist = fresh.length ? fresh : candidates;
+    // Re-rank against the day so far, so the second stop is near the first.
+    const sameDay = stops.map((st) => st.spot);
+    const shortlist = (fresh.length ? fresh : candidates)
+      .slice()
+      .sort(
+        (a, b) =>
+          score(b, themes) +
+          proximity(b, sameDay, profile) -
+          (score(a, themes) + proximity(a, sameDay, profile)) ||
+          a.id.localeCompare(b.id),
+      );
     // Walk further down the list at every variant, and a different distance in
     // each slot — otherwise the one crowd-pleasing venue wins the morning of
     // every variant and three "different" courses share the same first stop.
@@ -511,7 +549,7 @@ export function composeCourse(
     profile?.pace === "relaxed"
       ? ONE_DAY_TEMPLATE.filter((t) => t.key !== "afternoon")
       : profile?.pace === "packed"
-        ? [...ONE_DAY_TEMPLATE, { key: "evening", block: "evening" as Block, any: EVENING_THEMES }]
+        ? [...ONE_DAY_TEMPLATE, { key: "late", block: "evening" as Block, any: EVENING_THEMES }]
         : ONE_DAY_TEMPLATE;
   // Curated and live overlap — "Tongin Market" arrives from both, and a day that
   // sends you to the same market twice is worse than one that never mentions it.
