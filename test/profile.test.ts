@@ -448,3 +448,34 @@ describe("asking again never returns the day already given", () => {
     }
   });
 });
+
+describe("a day that has to be walkable stays in one place", () => {
+  const tight = { mobility: "easy" as const, pace: "relaxed" as const, dietary: [], dislikes: [], likes: [] };
+
+  it("rotates to a different part of the city on every ask", () => {
+    // The rotation stepped by two, which is a no-op whenever the zone count
+    // divides it — with two zones in play, "something else please" came back
+    // byte-identical.
+    const days = [0, 1, 2, 3].map((v) =>
+      composeCourse(resolvePersonas("family"), "1-day", [], "Seoul", false, v, [], tight)
+        .days[0].stops.map((s) => s.spot.id)
+        .join(","),
+    );
+    expect(new Set(days).size).toBe(days.length);
+  });
+
+  it("keeps the whole day in one part of the city", () => {
+    for (let v = 0; v < 4; v++) {
+      const stops = composeCourse(resolvePersonas("family"), "1-day", [], "Seoul", false, v, [], tight).days[0].stops;
+      const zones = new Set(stops.map((s) => s.spot.zone).filter((z) => z !== "any"));
+      expect(zones.size, `variant ${v}: ${[...zones].join("/")}`).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("would rather give a shorter day than one that crosses town", () => {
+    for (let v = 0; v < 4; v++) {
+      const stops = composeCourse(resolvePersonas("family"), "1-day", [], "Seoul", false, v, [], tight).days[0].stops;
+      expect(stops.length, `variant ${v}`).toBeGreaterThanOrEqual(2);
+    }
+  });
+});

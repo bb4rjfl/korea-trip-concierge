@@ -128,7 +128,7 @@ function zoneFor(text: string): { zone: string; area: string } {
  * A named branch of a chain is the clearest signal: destinations rarely have one.
  */
 const NOT_A_STOP =
-  /exhibition|exhibit\b|fanfest|fan ?meet|concert|festival|fashion week|biennale|showcase|special ?show|screening|기획전|특별전|전시회|콘서트|페스티벌|ticket|reservation|package|coupon|voucher|rental|delivery|storage|locker|pharmacy|drug ?store|drugstore|clinic|hospital|dental|surgery|surgical|plastic surg|dermatolog|aesthetic|medical|oriental medicine|한의원|의원|성형|피부과|치과|academy|office|예약|쿠폰|렌탈|보관|약국|병원|massage chair|안마의자|showroom|signature branch|\bbranch\b|지점|character (?:store|goods|shop)|캐릭터 ?(?:샵|스토어)|phone ?case|nail ?shop|convenience store|편의점|\b20\d\d\b|《|》|<[^>]{4,}>|^[^:]{3,44}\s?:\s/i;
+  /exhibition|exhibit\b|fanfest|fan ?meet|concert|festival|fashion week|biennale|showcase|special ?show|screening|기획전|특별전|전시회|콘서트|페스티벌|ticket|reservation|package|coupon|voucher|rental|delivery|storage|locker|pharmacy|drug ?store|drugstore|clinic|hospital|dental|surgery|surgical|plastic surg|dermatolog|aesthetic|medical|oriental medicine|eye (?:center|centre)|ophthalm|lasik|lasek|vision correction|health ?(?:care|pedia)|checkup|check-?up|한의원|의원|성형|피부과|치과|안과|검진|의료|재활|academy|office|예약|쿠폰|렌탈|보관|약국|병원|massage chair|안마의자|showroom|signature branch|\bbranch\b|지점|character (?:store|goods|shop)|캐릭터 ?(?:샵|스토어)|phone ?case|nail ?shop|convenience store|편의점|\b20\d\d\b|《|》|<[^>]{4,}>|^[^:]{3,44}\s?:\s/i;
 
 /**
  * Medical businesses hide in the blurb rather than the title — "Seoul Yangnyeong
@@ -321,7 +321,15 @@ async function locate(spots: Spot[]): Promise<void> {
       // The line and exit are the single most useful thing we can tell someone
       // holding a place name, and the same call already carries them. Kept apart
       // from the blurb so a card can show it without losing the reason to go.
-      if (detail.subway) spot.access = detail.subway.replace(/\s+/g, " ").trim();
+      if (detail.subway) {
+        // Some entries list every station within a kilometre, which arrives as
+        // one run-on sentence: "…Junghwa Station Exit 3, 685m Subway Line 1
+        // Singimun Station Exit 3, 523m Subway Line 1 Hankuk University…".
+        // The nearest one is the answer; the rest is noise on a phone.
+        const flat = detail.subway.replace(/\s+/g, " ").trim();
+        const first = /^(.*?\d+(?:\.\d+)?\s*k?m)\b/.exec(flat);
+        spot.access = (first?.[1] ?? flat).trim();
+      }
     }
   } finally {
     locating = false;

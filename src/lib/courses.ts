@@ -463,9 +463,16 @@ function buildDay(
   const stops: Stop[] = [];
   /** Alternatives already offered today — shown once, but still pickable later. */
   const shownAlts = new Set<string>();
+  const tightDay = profile?.mobility === "easy" || profile?.pace === "relaxed";
   for (const [slotIndex, slot] of template.entries()) {
+    // Where the day has settled. The first stop may come from anywhere in the
+    // city; after that, a day promised as walkable has to stay put — the zone
+    // band alone did not guarantee it, because the opening stop could be drawn
+    // from the city-wide fallback and drag the day across two districts.
+    const anchorZone = tightDay ? stops.map((st) => st.spot.zone).find((z) => z !== "any") : undefined;
     const suits = (s: Spot): boolean =>
       !used.has(s.id) &&
+      (!anchorZone || s.zone === anchorZone || s.zone === "any") &&
       fits(s, slot.block) &&
       allowedBy(s, profile) &&
       (!s.onlyIf || themes.includes(s.onlyIf)) &&
@@ -476,7 +483,12 @@ function buildDay(
     const chosen = [...alreadyPlaced, ...stops.map((st) => st.spot)];
     const notATwin = (s: Spot) => !samePlaceAs(s, chosen);
     const ok = ranked.filter(suits).filter(notATwin);
-    let candidates = ok.length ? ok : wider.filter(suits).filter(notATwin);
+    // The city-wide fallback exists so a narrow filter cannot produce a two-stop
+    // "course". For someone who told us walking is hard it does the opposite:
+    // it reaches across Seoul to fill a slot, and a day of three stops in three
+    // districts is worse for them than a day of two they can manage. Let it fill
+    // the first stop, then keep the day where it started.
+    let candidates = ok.length ? ok : tightDay && stops.length ? [] : wider.filter(suits).filter(notATwin);
     if (!candidates.length) continue;
     // Keep the day about what they asked for. As the best matches get struck off
     // across variants, the fallback used to hand a foodie asking for another day
@@ -689,9 +701,13 @@ export function composeCourse(
   // A day's 1-2 adjacent zones. The variant rotates which part of the city
   // anchors the day, so "another" moves you across town rather than shuffling
   // the same three streets.
+  //
+  // The step is one, not two. Two is a no-op whenever the zone count divides it
+  // — with two zones in play every variant landed on the same band, and a
+  // traveller asking "something else please" got back a byte-identical day.
   const band = (i: number) => {
     if (!zones.length) return zones;
-    const start = (i + variant * 2) % zones.length;
+    const start = (i + variant) % zones.length;
     const picked = [...zones, ...zones].slice(start, start + 2);
     return picked.length ? picked : zones.slice(0, 2);
   };
@@ -708,8 +724,12 @@ export function composeCourse(
   const compose = (v: number, seen: Set<string>): DayPlan[] => {
     const bandAt = (i: number) => {
       if (!zones.length) return zones;
-      const start = (i + v * 2) % zones.length;
-      const picked = [...zones, ...zones].slice(start, start + 2);
+      const start = (i + v) % zones.length;
+      // One zone for someone who told us distance is the problem, two for
+      // everyone else. Two adjacent zones is still half of Seoul when the day
+      // has to be walkable — a "less walking" plan came back Jungnang → Mapo.
+      const width = profile?.mobility === "easy" || profile?.pace === "relaxed" ? 1 : 2;
+      const picked = [...zones, ...zones].slice(start, start + width);
       return picked.length ? picked : zones.slice(0, 2);
     };
     const out: DayPlan[] = [];
