@@ -498,6 +498,15 @@ function buildDay(
       const onTheme = candidates.filter((c) => c.themes.some((t) => themes.includes(t)));
       if (onTheme.length) candidates = onTheme;
     }
+    // The first stop is the one that has to sell the day. Later variants were
+    // opening on entries the feed gave us as a bare name — "Garden of
+    // Gratitude", "Cheonggye 5-ga Underground Shopping Center" — which reads as
+    // a directory listing, not a recommendation. Lead with something we can say
+    // a sentence about, and only drop the rule if nothing qualifies.
+    if (!stops.length) {
+      const withReason = candidates.filter((c) => c.note);
+      if (withReason.length) candidates = withReason;
+    }
     // A day of three markets is a list, not an itinerary. Prefer a stop whose
     // lead theme hasn't been used yet, and fall back if that leaves nothing.
     const usedThemes = stops.map((st) => st.spot.themes[0]);
