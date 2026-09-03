@@ -656,6 +656,34 @@ body {
 
 /* Seoul's Haechi, placed as supplied — no filter, transform or recolour here:
    the licence forbids modifying the artwork. */
+/* Haru, our own guardian pup. Palette lives here rather than in the SVG so the
+   character follows the theme instead of being the one white blob in dark mode. */
+:root {
+  --haru-mane: #f6b352;
+  --haru-face: #fff6e6;
+  --haru-snout: #ffe3bd;
+  --haru-blush: #ffc9c2;
+  --haru-horn: #e08a3c;
+  --haru-bell: #ffd479;
+  --haru-ink: #3a2a18;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --haru-mane: #d99340;
+    --haru-face: #f3e3ca;
+    --haru-snout: #e6c79a;
+    --haru-blush: #e0a49c;
+    --haru-horn: #b96f2c;
+    --haru-bell: #e0b65f;
+    --haru-ink: #2c2013;
+  }
+}
+.haru {
+  display: inline-block;
+  vertical-align: middle;
+  flex: none;
+}
+
 .mascot {
   width: auto;
   height: auto;

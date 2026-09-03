@@ -1,16 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    {
-      "name": "web-chat",
-      "url": "http://localhost:8790",
-      "port": 8790
-    },
-    {
-      "name": "web-chat-dev",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:web"],
-      "port": 8790
-    }
+    { "name": "ktc-web", "runtimeExecutable": "npm", "runtimeArgs": ["run", "start:web"], "port": 8790 }
   ]
 }
