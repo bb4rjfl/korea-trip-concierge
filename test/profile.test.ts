@@ -6,7 +6,18 @@
 
 import { describe, it, expect } from "vitest";
 import { readProfile, isEmptyProfile, profileNote } from "../src/lib/profile.js";
-import { allowedBy, composeCourse, distinctiveWords, proximity, resolvePersonas, STRENUOUS, PRICEY } from "../src/lib/courses.js";
+import {
+  allowedBy,
+  composeCourse,
+  distinctiveWords,
+  haversineKm,
+  proximity,
+  resolvePersonas,
+  ALL_SPOTS,
+  STRENUOUS,
+  PRICEY,
+} from "../src/lib/courses.js";
+import { stationFromAccess } from "../src/tools/recommendTripCourse.js";
 import { recommendTripCourse } from "../src/tools/recommendTripCourse.js";
 import { livePool } from "../src/lib/livePool.js";
 
@@ -356,5 +367,84 @@ describe("named peaks are climbs even when nothing in the name says so", () => {
 
   it("leaves everyone else alone", () => {
     expect(allowedBy(inwangsan, { dietary: [], dislikes: [], likes: [] })).toBe(true);
+  });
+});
+
+describe("a day is planned on where places actually are", () => {
+  const gyeongbokgung = { lat: 37.5796, lng: 126.977 };
+  const bukchon = { lat: 37.5826, lng: 126.9834 };
+  const haeundae = { lat: 35.1587, lng: 129.1604 };
+
+  it("measures the walk between two Seoul landmarks to within a few hundred metres", () => {
+    const km = haversineKm(gyeongbokgung, bukchon);
+    expect(km).toBeGreaterThan(0.4);
+    expect(km).toBeLessThan(1.2);
+  });
+
+  it("knows Busan is not around the corner", () => {
+    expect(haversineKm(gyeongbokgung, haeundae)).toBeGreaterThan(300);
+  });
+
+  it("pulls a nearby stop above one across the city, on distance not on zone name", () => {
+    const near = { name: "A", area: "", zone: "z1", themes: [], blocks: [], id: "a", note: "", ...bukchon } as never;
+    const far = { name: "B", area: "", zone: "z1", themes: [], blocks: [], id: "b", lat: 37.51, lng: 127.1 } as never;
+    const anchor = { name: "C", area: "", zone: "z1", themes: [], blocks: [], id: "c", note: "", ...gyeongbokgung } as never;
+    expect(proximity(near, [anchor])).toBeGreaterThan(proximity(far, [anchor]));
+  });
+
+  it("gives the famous curated stops a location, so a hand-written day can be timed", () => {
+    const seoul = ALL_SPOTS.filter((s) => (s.city ?? "Seoul") === "Seoul");
+    const located = seoul.filter((s) => s.lat != null);
+    expect(located.length / seoul.length).toBeGreaterThan(0.8);
+  });
+});
+
+describe("stationFromAccess — the station a place names for itself", () => {
+  it("reads the shapes the city's own data actually uses", () => {
+    expect(stationFromAccess("Subway Line 5 Jongno 3-ga Station Exit 7, 383m")).toBe("Jongno 3-ga");
+    expect(stationFromAccess("Subway Lines 2/3 Euljiro 3-ga Station Exit 7, 133m")).toBe("Euljiro 3-ga");
+    expect(stationFromAccess("Subway Line 7, Soongsil University Station, Exit 3, 1.4km")).toBe("Soongsil University");
+    expect(stationFromAccess("Subway Lines 1/2/Ui-Sinseol Sinseoldong Station Exit 9, 350m")).toBe("Sinseoldong");
+  });
+
+  it("says nothing rather than guessing", () => {
+    expect(stationFromAccess(undefined)).toBeUndefined();
+    expect(stationFromAccess("Bus 273 to the main gate")).toBeUndefined();
+  });
+});
+
+describe("asking again never returns the day already given", () => {
+  it("strikes off the signature day that variant 0 actually served", () => {
+    for (const persona of ["family", "couple", "foodie"]) {
+      const seen = new Set<string>();
+      for (let v = 0; v < 5; v++) {
+        for (const stop of composeCourse(resolvePersonas(persona), "1-day", [], "Seoul", false, v).days[0].stops) {
+          expect(seen.has(stop.spot.id), `${persona} v${v} repeated ${stop.spot.name}`).toBe(false);
+          seen.add(stop.spot.id);
+        }
+      }
+    }
+  });
+
+  it("keeps later variants on the theme that was asked for", () => {
+    for (let v = 1; v < 4; v++) {
+      const stops = composeCourse(resolvePersonas("foodie"), "1-day", [], "Seoul", false, v).days[0].stops;
+      // Not every slot can be food, but the day must not become someone else's.
+      const onTheme = stops.filter((s) =>
+        s.spot.themes.some((t) => ["food", "market", "cafe", "nightlife"].includes(t)),
+      );
+      expect(onTheme.length, `variant ${v}`).toBeGreaterThan(0);
+    }
+  });
+
+  it("never offers a request-only entry to someone who did not request it", () => {
+    for (let v = 0; v < 5; v++) {
+      for (const persona of ["foodie", "family", "culture"]) {
+        const stops = composeCourse(resolvePersonas(persona), "1-day", [], "Seoul", false, v).days[0].stops;
+        for (const s of stops) {
+          expect(s.spot.onlyIf, `${persona} v${v}: ${s.spot.name}`).toBeUndefined();
+        }
+      }
+    }
   });
 });
