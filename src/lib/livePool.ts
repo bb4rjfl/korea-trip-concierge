@@ -183,7 +183,13 @@ function fromSeoul(c: SeoulContent, i: number): Spot | undefined {
  * reads like a broken page. Prefer the end of a sentence, then the end of a word.
  */
 function trimBlurb(raw: string, max = 160): string {
-  const text = raw.replace(/\s+/g, " ").trim();
+  const text = raw
+    .replace(/\s+/g, " ")
+    // "Dongmyo Flea Flea Market started life…" — the feed stutters, and a typo
+    // we pass through unchanged reads as our typo. Case-sensitive, so a real
+    // repetition like "had had" survives.
+    .replace(/\b(\p{Lu}\p{L}+) \1\b/gu, "$1")
+    .trim();
   if (text.length <= max) return text;
   const window = text.slice(0, max);
   const sentence = Math.max(window.lastIndexOf(". "), window.lastIndexOf("! "), window.lastIndexOf("? "));

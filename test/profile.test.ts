@@ -479,3 +479,13 @@ describe("a day that has to be walkable stays in one place", () => {
     }
   });
 });
+
+describe("we do not pass the feed's typos through as our own", () => {
+  it("collapses a stuttered proper noun", async () => {
+    const { livePool } = await import("../src/lib/livePool.js");
+    const pool = await livePool("Seoul").catch(() => []);
+    for (const spot of pool) {
+      expect(spot.note, spot.name).not.toMatch(/\b(\p{Lu}\p{L}+) \1\b/u);
+    }
+  }, 60_000);
+});
