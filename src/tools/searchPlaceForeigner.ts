@@ -296,8 +296,12 @@ async function rescueBySearch(query: string, areaLabel?: string): Promise<string
   const lines = hits.slice(0, 3).map((h, i) => {
     const where = h.doc.area && !/^(?:Seoul|Busan|Jeju|Gyeongju)$/i.test(h.doc.area) ? ` _(${h.doc.area})_` : "";
     // The document text is our own blurb; the part of it that reads like a
-    // sentence is the reason to go, which is the part worth printing.
-    const why = h.doc.text.split(" · ").find((part) => part.length > 30 && !part.includes("allergens"));
+    // sentence is the reason to go. The name is in there too and is long enough
+    // to pass for one, which printed "COEX Aquarium + Starfield Library — COEX
+    // Aquarium + Starfield Library".
+    const why = h.doc.text
+      .split(" · ")
+      .find((part) => part.length > 30 && part !== h.doc.title && !part.includes("allergens"));
     return `**${i + 1}. ${h.doc.title}**${where}${why ? `\n   ${why}` : ""}\n   ${mapLinks(h.doc.title)}`;
   });
   return [
