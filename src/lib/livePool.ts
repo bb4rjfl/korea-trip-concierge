@@ -17,7 +17,7 @@
  */
 
 import { TtlCache } from "./cache.js";
-import { searchSeoulContent, VS_CATEGORY, type SeoulContent } from "./sources/visitseoul.js";
+import { getSeoulDetail, searchSeoulContent, VS_CATEGORY, type SeoulContent } from "./sources/visitseoul.js";
 import { searchPlacesNearby, type Place } from "./sources/tourapi.js";
 import { hasKey } from "./env.js";
 import type { Spot } from "./courses.js";
@@ -206,6 +206,10 @@ function fromTour(p: Place, i: number): Spot | undefined {
     themes,
     blocks: blocksFor(themes),
     note: "",
+    // The feed already carries these; not using them was leaving the day to be
+    // planned on district-name string matching when we had the actual point.
+    lat: p.mapy,
+    lng: p.mapx,
   };
 }
 
@@ -256,12 +260,72 @@ export async function livePool(city: string): Promise<Spot[]> {
   const hit = pool.get(key);
   if (hit !== undefined) return hit;
   const { spots, degraded } = await buildPool(city);
+  // Place the ones the list endpoint could not. This runs behind the answer
+  // rather than in front of it: the first course after a cold start is built on
+  // zones as before, and by the next one the same cached array carries real
+  // coordinates, because the objects are enriched in place.
+  void locate(spots);
   // A source that was merely rate-limited when we happened to build the pool
   // should not narrow the whole afternoon. TourAPI's development quota runs out
   // on a busy day and answers 429 for a while; caching that half-pool for six
   // hours turns a passing outage into the rest of the day.
   pool.set(key, spots, degraded ? 20 * 60_000 : undefined);
   return spots;
+}
+
+/** Guards against two pool builds enriching the same entries at once. */
+let locating = false;
+
+/**
+ * Fill in coordinates for candidates the list endpoint gave us without one.
+ *
+ * VisitSeoul's list response carries no address, so more than half the pool had
+ * no location at all and the day had to be planned by comparing district names.
+ * The detail endpoint has the point — it is just one call per place, which is
+ * far too slow to do before answering (about a hundred seconds for a full pool)
+ * and perfectly fine to do behind the answer, once, for a pool that then lives
+ * for six hours.
+ *
+ * Entries are mutated in place, so the array already handed to the cache — and
+ * to any course built from it — picks the coordinates up as they arrive.
+ */
+async function locate(spots: Spot[]): Promise<void> {
+  if (locating || !hasKey("VISITSEOUL_API_KEY")) return;
+  locating = true;
+  try {
+    const todo = spots.filter((s) => s.id.startsWith("vs_") && s.lat == null);
+    // Strictly one at a time. Four lanes located 39 of 203: the endpoint answers
+    // concurrent detail calls with a 500, exactly as it answers concurrent list
+    // calls with an empty body. Nothing is waiting on this, so slow is free.
+    for (const spot of todo) {
+      const cid = spot.id.slice(3);
+      let detail = await getSeoulDetail(cid).catch(() => undefined);
+      if (!detail) {
+        await new Promise((r) => setTimeout(r, 300));
+        detail = await getSeoulDetail(cid).catch(() => undefined);
+      }
+      if (!detail) continue;
+      if (detail.lat != null && detail.lng != null) {
+        spot.lat = detail.lat;
+        spot.lng = detail.lng;
+      }
+      // The address names the district, which is what the zone reader wanted all
+      // along — the list endpoint simply never carried one.
+      if (spot.zone === "any" && detail.address) {
+        const { zone, area } = zoneFor(`${detail.address} ${spot.name}`);
+        if (zone !== "any") {
+          spot.zone = zone;
+          spot.area = area;
+        }
+      }
+      // The line and exit are the single most useful thing we can tell someone
+      // holding a place name, and the same call already carries them. Kept apart
+      // from the blurb so a card can show it without losing the reason to go.
+      if (detail.subway) spot.access = detail.subway.replace(/\s+/g, " ").trim();
+    }
+  } finally {
+    locating = false;
+  }
 }
 
 async function buildPool(city: string): Promise<{ spots: Spot[]; degraded: boolean }> {

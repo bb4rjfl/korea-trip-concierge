@@ -99,6 +99,17 @@ export const PLACES: GeoPlace[] = [
   { label: "Gangneung", lng: 128.8761, lat: 37.7519, aliases: ["gangneung", "강릉"] },
   { label: "Sokcho", lng: 128.5918, lat: 38.207, aliases: ["sokcho", "속초"] },
   { label: "Suwon (Hwaseong)", lng: 127.0152, lat: 37.282, aliases: ["suwon", "수원", "hwaseong fortress", "화성행궁"] },
+  // Seoul neighbourhoods and museums the course builder plans around. They were
+  // missing here, so a day made of them could not be timed or priced at all —
+  // the transit summary was absent from exactly the hand-written itineraries.
+  { label: "Ikseon-dong", lng: 126.9905, lat: 37.5735, aliases: ["ikseon", "ikseon-dong", "익선동"] },
+  { label: "Tongin Market", lng: 126.97, lat: 37.5806, aliases: ["tongin", "tongin market", "통인시장"] },
+  { label: "Yeonnam-dong", lng: 126.925, lat: 37.5605, aliases: ["yeonnam", "yeonnam-dong", "연남동", "연트럴파크"] },
+  { label: "National Museum of Korea", lng: 126.9803, lat: 37.524, aliases: ["national museum of korea", "국립중앙박물관"] },
+  { label: "Ihwa Mural Village", lng: 127.0055, lat: 37.5795, aliases: ["ihwa mural village", "이화벽화마을", "낙산공원"] },
+  { label: "Euljiro", lng: 126.9917, lat: 37.5661, aliases: ["euljiro", "을지로", "hipjiro", "힙지로"] },
+  { label: "Seochon", lng: 126.9709, lat: 37.5793, aliases: ["seochon", "서촌"] },
+  { label: "Gwangjang Market", lng: 126.9999, lat: 37.5701, aliases: ["gwangjang", "gwangjang market", "광장시장"] },
 ];
 
 const INDEX = new Map<string, GeoPlace>();

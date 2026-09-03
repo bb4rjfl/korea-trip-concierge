@@ -16,6 +16,7 @@ export type Duration = "half-day" | "1-day" | "2-day" | "3-day";
 export type City = "Seoul" | "Busan" | "Jeju" | "Gyeongju";
 
 import { isEmptyProfile, type TravelProfile } from "./profile.js";
+import { findPlaceInText, resolvePlaceCoord } from "./places.js";
 
 export interface Spot {
   id: string;
@@ -26,6 +27,44 @@ export interface Spot {
   blocks: Block[]; // best time-of-day
   note: string;
   city?: City; // defaults to Seoul (most spots); Busan/Jeju set explicitly
+  /** WGS84, when we know it. Zones are a coarse stand-in for this; where both
+   *  stops carry coordinates the day is built on actual distance instead. */
+  lat?: number;
+  lng?: number;
+  /** "Subway Line 5 Jongno 3-ga Station Exit 7, 383m" — the line that turns a
+   *  place name into somewhere a visitor can actually walk to. */
+  access?: string;
+  /**
+   * Only offer this when the traveller asked for the named theme.
+   *
+   * Some entries are answers to a question, not filler. The aesthetic-clinic
+   * primer is one: it exists so someone asking about K-beauty procedures gets
+   * an honest, booking-free explanation, and it was turning up as the morning
+   * stop of a foodie's second day because ties break alphabetically.
+   */
+  onlyIf?: string;
+}
+
+/**
+ * Straight-line kilometres between two points.
+ *
+ * Straight-line rather than routed: a routed distance for every candidate pair
+ * would be hundreds of API calls to decide an ordering that only needs to know
+ * "is this across the street or across the river". Seoul's grid makes the error
+ * roughly constant, so it ranks correctly even though it under-reads.
+ */
+export function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const la1 = toRad(a.lat);
+  const la2 = toRad(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+function coordOf(s: Spot): { lat: number; lng: number } | undefined {
+  return s.lat != null && s.lng != null ? { lat: s.lat, lng: s.lng } : undefined;
 }
 
 // ── Curated Seoul spots (Phase 1) ───────────────────────────────────────────
@@ -54,7 +93,7 @@ export const SEOUL_SPOTS: Spot[] = [
   { id: "bbq", name: "Korean BBQ + somaek", area: "Hongdae", zone: "west", themes: ["food", "nightlife"], blocks: ["evening"], note: "Grill samgyeopsal/galbi at the table with soju-beer." },
   // South (Gangnam / Sinsa / Jamsil)
   { id: "hairsalon", name: "Hair & makeup salon", area: "Gangnam", zone: "south", themes: ["beauty"], blocks: ["morning", "afternoon"], note: "English-friendly salons with tourist styling packages." },
-  { id: "dermainfo", name: "K-beauty derma/aesthetic (info only)", area: "Gangnam", zone: "south", themes: ["beauty", "experience"], blocks: ["any"], note: "Popular facials/lifting; English consultations at big clinics — info only, no booking (medical law)." },
+  { id: "dermainfo", name: "K-beauty derma/aesthetic (info only)", area: "Gangnam", zone: "south", themes: ["beauty", "experience"], blocks: ["any"], note: "Popular facials/lifting; English consultations at big clinics — info only, no booking (medical law).", onlyIf: "beauty" },
   { id: "garosugil", name: "Garosu-gil (Sinsa) boutiques & cafés", area: "Sinsa", zone: "south", themes: ["shopping", "cafe"], blocks: ["afternoon"], note: "Tree-lined designer street + dessert cafés." },
   { id: "bongeunsa", name: "Bongeunsa Temple", area: "Gangnam", zone: "south", themes: ["history", "experience"], blocks: ["morning", "afternoon"], note: "1,200-year-old temple facing COEX; English Temple Life Thu." },
   { id: "coexaqua", name: "COEX Aquarium + Starfield Library", area: "Gangnam", zone: "south", themes: ["family", "shopping"], blocks: ["afternoon"], note: "Aquarium + the huge open library — easy indoor combo." },
@@ -131,6 +170,20 @@ export const GYEONGJU_SPOTS: Spot[] = [
 ];
 
 export const ALL_SPOTS: Spot[] = [...SEOUL_SPOTS, ...BUSAN_SPOTS, ...JEJU_SPOTS, ...GYEONGJU_SPOTS];
+
+// The curated spots are the famous ones, which means the coordinate index we
+// already keep for routing knows most of them by name. Seeding from it costs
+// nothing and means a curated day can be priced and timed even before any live
+// data arrives — the transit summary used to be missing from exactly the days
+// made entirely of hand-written stops.
+for (const spot of ALL_SPOTS) {
+  if (spot.lat != null) continue;
+  const geo = resolvePlaceCoord(spot.name) ?? findPlaceInText(spot.name) ?? resolvePlaceCoord(spot.area);
+  if (geo) {
+    spot.lat = geo.lat;
+    spot.lng = geo.lng;
+  }
+}
 const cityOf = (s: Spot): City => s.city ?? "Seoul";
 
 // ── Personas → preferred themes (ordered = weight) ──────────────────────────
@@ -190,6 +243,11 @@ function score(spot: Spot, themes: string[]): number {
   // matches every part of the city and a day built around them zig-zags across
   // Seoul. Let them fill gaps, not lead the day.
   if (spot.zone === "any" && /^(?:vs_|ta_)/.test(spot.id)) s -= 1;
+  // A stop with no line about it is a name on a list. The TourAPI sweep returns
+  // titles without descriptions, and they were leading days: "Artee Riders Club"
+  // as a foodie's evening, "Hangang River" — a forty-kilometre river — as a
+  // morning. Anything we can say a sentence about is the better recommendation.
+  if (spot.note) s += 2;
   spot.themes.forEach((t) => {
     const idx = themes.indexOf(t);
     if (idx >= 0) s += Math.max(1, 6 - idx); // earlier wanted theme → higher
@@ -349,9 +407,23 @@ export function proximity(spot: Spot, sameDay: Spot[], profile?: TravelProfile):
   // was an unplaceable listing, measuring from it makes every candidate equally
   // "far" and the pull collapses — which is how a slow-walker's day still went
   // Seosomun → Seongsu → Nowon after the ranking was supposed to prevent it.
-  const anchor = [...sameDay].reverse().find((s) => s.zone !== "any");
+  const anchor = [...sameDay].reverse().find((s) => s.zone !== "any" || coordOf(s));
   if (!anchor) return 0;
   const pull = tight ? 9 : 4;
+
+  // Real distance where we have it. Zones are a stand-in for this and a coarse
+  // one — Jongno and Jung-gu are different zones and often a ten-minute walk
+  // apart, while two ends of "south" are half an hour on the subway.
+  const here = coordOf(spot);
+  const there = coordOf(anchor);
+  if (here && there) {
+    const km = haversineKm(here, there);
+    if (km <= 1.2) return pull + 3; // walkable, and pleasant
+    if (km <= 3) return pull; // one or two stops
+    if (km <= 6) return 0; // a normal city hop
+    return -pull * Math.min(2, km / 6); // across town, and worse the further out
+  }
+
   if (spot.area && spot.area !== "Seoul" && spot.area === anchor.area) return pull + 2;
   if (spot.zone !== "any" && spot.zone === anchor.zone) return pull;
   // We don't know where it is; it might be next door, it might be an hour away.
@@ -389,11 +461,14 @@ function buildDay(
   const ranked = rank(pool);
   const wider = rank(fallback.filter((s) => !pool.includes(s)));
   const stops: Stop[] = [];
+  /** Alternatives already offered today — shown once, but still pickable later. */
+  const shownAlts = new Set<string>();
   for (const [slotIndex, slot] of template.entries()) {
     const suits = (s: Spot): boolean =>
       !used.has(s.id) &&
       fits(s, slot.block) &&
       allowedBy(s, profile) &&
+      (!s.onlyIf || themes.includes(s.onlyIf)) &&
       (!slot.food || s.themes.includes("food") || s.themes.includes("market")) &&
       // An evening is dinner, a bar or a view — not a stationery shop that
       // happened to be the next candidate in the list.
@@ -401,8 +476,16 @@ function buildDay(
     const chosen = [...alreadyPlaced, ...stops.map((st) => st.spot)];
     const notATwin = (s: Spot) => !samePlaceAs(s, chosen);
     const ok = ranked.filter(suits).filter(notATwin);
-    const candidates = ok.length ? ok : wider.filter(suits).filter(notATwin);
+    let candidates = ok.length ? ok : wider.filter(suits).filter(notATwin);
     if (!candidates.length) continue;
+    // Keep the day about what they asked for. As the best matches get struck off
+    // across variants, the fallback used to hand a foodie asking for another day
+    // a dermatology consultation and a sauna — every stop technically unused and
+    // none of them food. Drop the theme only when nothing on-theme is left.
+    if (themes.length) {
+      const onTheme = candidates.filter((c) => c.themes.some((t) => themes.includes(t)));
+      if (onTheme.length) candidates = onTheme;
+    }
     // A day of three markets is a list, not an itinerary. Prefer a stop whose
     // lead theme hasn't been used yet, and fall back if that leaves nothing.
     const usedThemes = stops.map((st) => st.spot.themes[0]);
@@ -432,8 +515,12 @@ function buildDay(
     const step = offset * stride;
     const pick = shortlist[step % shortlist.length];
     used.add(pick.id);
-    const alt = shortlist.find((s) => !used.has(s.id) && s.id !== pick.id);
-    if (alt) used.add(alt.id);
+    // The alternative is a suggestion, not somewhere they went. Striking it off
+    // the same list as the picks burned the pool twice as fast, and a four-stop
+    // day across four variants was consuming most of a city — which is how
+    // "give me another" started circling back to a stop already shown.
+    const alt = shortlist.find((s) => !used.has(s.id) && !shownAlts.has(s.id) && s.id !== pick.id);
+    if (alt) shownAlts.add(alt.id);
     stops.push({ block: BLOCK_LABEL[slot.key] ?? slot.key, spot: pick, alt });
   }
   return { title, stops };
@@ -527,7 +614,7 @@ export interface Course {
 
 /** One entry per place, keeping the first (curated) of any duplicate name. */
 function dedupeByName(spots: Spot[]): Spot[] {
-  const seen = new Set<string>();
+  const seen = new Map<string, Spot>();
   const out: Spot[] = [];
   for (const s of spots) {
     // "Tongin Market" and "Tongin Market (coin lunchbox)" are one place.
@@ -535,8 +622,24 @@ function dedupeByName(spots: Spot[]): Spot[] {
       .toLowerCase()
       .replace(/\([^)]*\)/g, "")
       .replace(/[^a-z가-힣0-9]/g, "");
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
+    if (!key) continue;
+    const kept = seen.get(key);
+    if (kept) {
+      // The curated entry wins, because it carries the hand-written reason to
+      // go. But the live twin knows where the place actually is and which exit
+      // to use, and throwing that away was leaving the curated half of every day
+      // unroutable — the transit summary simply never appeared.
+      //
+      // The curated entries are module-level objects, so this fills them in once
+      // and they keep it — which is the point: it is the same place every time.
+      if (kept.lat == null && s.lat != null) {
+        kept.lat = s.lat;
+        kept.lng = s.lng;
+      }
+      if (!kept.access && s.access) kept.access = s.access;
+      continue;
+    }
+    seen.set(key, s);
     out.push(s);
   }
   return out;
@@ -632,21 +735,25 @@ export function composeCourse(
   // single best answer — so it is variant 0 only, and only when the traveller has
   // not told us anything a fixed sequence cannot honour (a bad knee, a budget,
   // shelter from the rain).
-  const sig =
+  const signature =
     duration === "1-day" &&
-    variant === 0 &&
     !indoor &&
     city === "Seoul" &&
     personas.length === 1 &&
     (!profile || isEmptyProfile(profile))
       ? SIGNATURES[`${personas[0].key}:1-day`]
       : undefined;
-  if (sig) {
-    const stops = sig.map((x) => ({ block: x.block, spot: SPOT_BY_ID.get(x.id)! })).filter((st) => st.spot);
+  if (signature && variant === 0) {
+    const stops = signature.map((x) => ({ block: x.block, spot: SPOT_BY_ID.get(x.id)! })).filter((st) => st.spot);
     return { days: [{ title: "1-day", stops }], themes };
   }
 
-  for (let k = 0; k < variant; k++) compose(k, used);
+  // What the traveller has already been shown is what must not come back. When
+  // variant 0 was answered with the signature, striking off the *engine's*
+  // variant 0 struck off a day nobody saw — and the hand-written day's stops
+  // came round again on the very next ask. Strike off what was actually served.
+  if (signature) for (const x of signature) used.add(x.id);
+  for (let k = signature ? 1 : 0; k < variant; k++) compose(k, used);
   let days = compose(variant, used);
   // Every candidate struck off eventually — a two-stop "course" is worse than
   // one that circles back, so start the rotation over rather than thinning out.

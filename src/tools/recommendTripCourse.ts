@@ -5,10 +5,12 @@ import { ok } from "../lib/responses.js";
 import {
   resolvePersonas,
   composeCourse,
+  haversineKm,
   type Duration,
   type DayPlan,
   type PersonaDef,
   type City,
+  type Spot,
 } from "../lib/courses.js";
 import { livePool } from "../lib/livePool.js";
 import { readProfile, profileNote, isEmptyProfile } from "../lib/profile.js";
@@ -97,6 +99,9 @@ function renderDay(d: DayPlan): string[] {
     lines.push(`${s.block}`);
     const note = s.spot.note ? ` — ${s.spot.note}` : "";
     lines.push(`- **${s.spot.name}**${areaTag(s.spot.area)}${note}`);
+    // The station and exit, where the city's own data gave us one. A place name
+    // a visitor cannot find is not an answer.
+    if (s.spot.access) lines.push(`  🚇 _${s.spot.access}_`);
     if (s.alt) lines.push(`  ↔ _or:_ **${s.alt.name}**${areaTag(s.alt.area)}`);
   }
   return lines;
@@ -111,16 +116,41 @@ function renderDay(d: DayPlan): string[] {
 /** A live listing with no address lands here — not a neighbourhood we can route. */
 const CITY_AS_AREA = /^(?:Seoul|Busan|Jeju|Gyeongju|Korea)$/i;
 
+/** Brisk city walking, allowing for crossings and stairs. */
+const WALK_KMH = 4.2;
+
 async function legsBetweenStops(
-  stops: { spot: { name: string; area: string } }[],
+  stops: { spot: Spot }[],
 ): Promise<{ label: string; minutes: number; fareWon: number }[]> {
   if (stops.length < 2) return [];
   try {
     const graph = await getGraph();
     const out: { label: string; minutes: number; fareWon: number }[] = [];
     for (let i = 1; i < stops.length; i++) {
-      const from = stops[i - 1].spot.area;
-      const to = stops[i].spot.area;
+      const a = stops[i - 1].spot;
+      const b = stops[i].spot;
+
+      // Two stops we have points for: answer from the points. Most of the pool
+      // carries coordinates now, and "1.1 km, about 16 min on foot" is both
+      // truer and more useful than a subway hop between two district names —
+      // especially when the honest answer is that you should just walk.
+      if (a.lat != null && a.lng != null && b.lat != null && b.lng != null) {
+        const km = haversineKm({ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng });
+        if (km < 0.15) continue; // effectively the same spot
+        if (km <= 1.5) {
+          out.push({
+            label: `${shortName(a.name)} → ${shortName(b.name)} ${Math.round((km / WALK_KMH) * 60)}min walk`,
+            minutes: Math.round((km / WALK_KMH) * 60),
+            fareWon: 0,
+          });
+          continue;
+        }
+      }
+
+      // Prefer the station each place names for itself; fall back to the
+      // neighbourhood, which only routes when it happens to also be a station.
+      const from = stationFromAccess(a.access) ?? a.area;
+      const to = stationFromAccess(b.access) ?? b.area;
       if (!from || !to || from === to) continue;
       // Live listings often carry no address, so their "area" is the city name.
       // "Seoul → Myeongdong 4min" is a routing artefact, not a leg of anyone's
@@ -129,7 +159,7 @@ async function legsBetweenStops(
       const route = planRoute(graph, from, to);
       if (!route) continue;
       out.push({
-        label: `${from} → ${to} ${route.minutes}min`,
+        label: `${shortName(a.name)} → ${shortName(b.name)} ${route.minutes}min`,
         minutes: route.minutes,
         fareWon: route.fareWon,
       });
@@ -138,6 +168,29 @@ async function legsBetweenStops(
   } catch {
     return [];
   }
+}
+
+/**
+ * The station a place tells you to get off at.
+ *
+ * Routing between neighbourhood labels only works when the neighbourhood happens
+ * to share a station's name — "Gwanghwamun" routes, "Bukchon" and "Jongno" do
+ * not, so most days had no transit line at all. VisitSeoul states the station
+ * outright ("Subway Line 5 Jongno 3-ga Station Exit 7, 383m"), which is both
+ * exact and the station a local would actually name.
+ */
+export function stationFromAccess(access?: string): string | undefined {
+  if (!access) return undefined;
+  const withoutLines = access.replace(/^\s*(?:subway\s*)?lines?\s*[\d/A-Za-z–—-]*\s*,?\s*/i, "");
+  const m = /^([^,()]+?)\s+station\b/i.exec(withoutLines) ?? /([^,()]+?)\s+station\b/i.exec(access);
+  const name = m?.[1]?.replace(/^(?:subway\s*)?lines?\s*[\d/A-Za-z]*\s*/i, "").trim();
+  return name && name.length > 1 ? name : undefined;
+}
+
+/** Enough of a name to recognise the stop, without a line of parentheses. */
+function shortName(name: string): string {
+  const trimmed = name.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  return trimmed.length > 34 ? `${trimmed.slice(0, 33).trimEnd()}…` : trimmed;
 }
 
 export const recommendTripCourse: ToolDef = {
@@ -260,11 +313,12 @@ export const recommendTripCourse: ToolDef = {
     if (hops.length) {
       const total = hops.reduce((sum, h) => sum + h.fareWon, 0);
       const minutes = hops.reduce((sum, h) => sum + h.minutes, 0);
-      lines.push(
-        "",
-        `🚇 **Getting between them:** ${hops.map((h) => h.label).join(" · ")}`,
-        `_About ${minutes} min and ₩${total.toLocaleString()} of transit across the day, before entry fees._`,
-      );
+      // A day whose hops are all walks costs nothing to move around, and saying
+      // "₩0 of transit" makes the reader check whether something is broken.
+      const summary = total
+        ? `_About ${minutes} min and ₩${total.toLocaleString()} of transit across the day, before entry fees._`
+        : `_About ${minutes} min of walking between stops — no transit fare needed for this day._`;
+      lines.push("", `🚇 **Getting between them:** ${hops.map((h) => h.label).join(" · ")}`, summary);
     }
 
     lines.push(
