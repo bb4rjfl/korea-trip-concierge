@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail } from "../lib/responses.js";
+import { search, confident } from "../lib/retrieval.js";
 import { searchForeignerPois, hasPoiProvider, type PoiPlace } from "../lib/sources/poi.js";
 import { resolvePlaceCoord } from "../lib/places.js";
 import type { Choice } from "../lib/footer.js";
@@ -306,6 +307,27 @@ export const findForeignerFriendlyStore: ToolDef = {
           ].join("\n"),
           EMERGENCY_CHOICES,
         );
+      }
+      // Before asking a traveller to fill in a field, check whether they already
+      // said enough. "I'm vegan and my friend eats only halal, where can we eat
+      // together" names no neighbourhood and has an obvious answer — Itaewon —
+      // and it was coming back as "Which area?".
+      const said = [args.need, args.area].filter(Boolean).join(" ");
+      if (said) {
+        const hits = await search(said, { kinds: ["area", "spot"], limit: 3 }).catch(() => []);
+        const guess = hits[0];
+        if (guess && confident(hits) && guess.doc.area) {
+          return ok(
+            [
+              `📍 **Best bet: ${guess.doc.area}**`,
+              "",
+              renderOverview(guess.doc.area.replace(/\s*\([^)]*\)\s*$/, "")),
+              "",
+              `_You didn't name a neighbourhood, so I picked the one that fits "${said}". Tell me another and I'll switch._`,
+            ].join("\n"),
+            OVERVIEW_CHOICES,
+          );
+        }
       }
       return fail(
         "Which area?",

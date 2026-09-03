@@ -23,7 +23,7 @@ export interface Mall {
   getThere: string;
 }
 
-const SEOUL: Mall[] = [
+export const SEOUL_MALLS: Mall[] = [
   {
     name: "Starfield COEX Mall",
     ko: "스타필드 코엑스몰",
@@ -105,7 +105,7 @@ const SEOUL: Mall[] = [
   },
 ];
 
-const BUSAN: Mall[] = [
+export const BUSAN_MALLS: Mall[] = [
   {
     name: "Shinsegae Centum City",
     ko: "신세계 센텀시티",
@@ -136,7 +136,7 @@ export function asksAboutMalls(text: string): boolean {
 /** The mall card for whichever city was named. */
 export function mallsCard(text: string): string {
   const busan = /busan|부산|釜山|プサン/i.test(text ?? "");
-  const list = busan ? BUSAN : SEOUL;
+  const list = busan ? BUSAN_MALLS : SEOUL_MALLS;
   const city = busan ? "Busan" : "Seoul";
   const lines = list.map(
     (m, i) =>

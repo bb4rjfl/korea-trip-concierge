@@ -12,7 +12,7 @@ import type { ToolDef } from "./types.js";
  * over plain LLM: concise, foreigner-oriented, links into the other tools.
  */
 
-interface Area {
+export interface Area {
   keys: RegExp;
   name: string;
   blurb: string;
@@ -21,7 +21,7 @@ interface Area {
   interests: Partial<Record<"food" | "shopping" | "history" | "nightlife", string>>;
 }
 
-const AREAS: Area[] = [
+export const AREAS: Area[] = [
   {
     keys: /(myeong-?dong|명동)/i,
     name: "Myeongdong (명동)",

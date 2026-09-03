@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok } from "../lib/responses.js";
+import { search, confident, tokenize } from "../lib/retrieval.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -10,7 +11,7 @@ import type { ToolDef } from "./types.js";
  * dishes, plus allergy flags tailored to the user's concerns.
  */
 
-interface Dish {
+export interface Dish {
   match: RegExp;
   en: string;
   desc: string;
@@ -18,7 +19,7 @@ interface Dish {
   allergens: string[]; // lowercase tokens: gluten, egg, soy, shellfish, fish, peanut, dairy, sesame, pork
 }
 
-const DISHES: Dish[] = [
+export const DISHES: Dish[] = [
   { match: /짬뽕|jjamppong|jjambbong|champong/i, en: "Jjamppong (spicy seafood noodle soup)", desc: "Fiery red seafood-and-vegetable noodle soup — squid, mussels, shrimp in a chili broth.", spice: 3, allergens: ["shellfish", "seafood", "gluten", "soy"] },
   { match: /(?<!\S)김치(?!찌개|전|볶)|(?<!\S)kimchi(?!\s*(?:jjigae|jeon|fried))/i, en: "Kimchi", desc: "Fermented napa cabbage with chili, garlic and jeotgal (salted seafood) — served free with almost every meal. Usually NOT vegetarian because of the fish sauce/shrimp, though vegan versions exist.", spice: 2, allergens: ["fish", "shellfish"] },
   { match: /김밥|gimbap|kimbap/i, en: "Gimbap (seaweed rice roll)", desc: "Seasoned rice, vegetables, egg and ham or tuna rolled in seaweed and sliced — the classic cheap, portable meal.", spice: 0, allergens: ["egg", "sesame", "fish", "soy"] },
@@ -198,6 +199,42 @@ function phraseCard(concerns: string[], veg: boolean, noPork: boolean): string[]
   return rows.length ? ["", "🪧 **Show this to the staff (Korean):**", ...rows] : [];
 }
 
+/** Marker on the no-match card, so the handler can recognise its own miss. */
+const NO_MATCH_MARKER = "I couldn't match a known dish";
+
+/**
+ * Answer from the dish knowledge when no dish name was given.
+ *
+ * "My kid has a peanut allergy, is Korean food going to be a problem" arrived
+ * here as the dish name "Korean food" and was answered with a parse error — a
+ * safety question met with a syntax complaint. The question behind it is which
+ * dishes carry the allergen, and every dish we know lists its allergens; it just
+ * took an exact name to reach them.
+ */
+async function rescueDishes(text: string): Promise<string | undefined> {
+  const hits = await search(text, { kinds: ["dish"], limit: 5 }).catch(() => []);
+  if (!hits.length || !confident(hits)) return undefined;
+  const names = new Set(hits.map((h) => h.doc.title));
+  let cards = DISHES.filter((d) => names.has(d.en));
+  // When they named an allergen, the dishes that contain it are the answer and
+  // the rest is noise — retrieval ranks on the whole sentence, so a dish with no
+  // peanut in it can still out-score one that has it.
+  const named = canonicalConcerns(tokenize(text)).filter((c) => SUPPORTED_ALLERGENS.has(c));
+  if (named.length) {
+    const hasOne = cards.filter((d) => named.some((c) => d.allergens.includes(c)));
+    if (hasOne.length) cards = hasOne;
+  }
+  cards = cards.slice(0, 4);
+  if (!cards.length) return undefined;
+  return [
+    `🍽️ **Closest dishes for** _"${text.slice(0, 90)}"_`,
+    "",
+    ...cards.map((d) => `**${d.en}** — ${d.desc}\n   ⚠️ Contains: ${d.allergens.join(", ") || "nothing we flag"}`),
+    "",
+    "_Matched from what you described rather than an exact dish name. Name a dish and I'll give you its full card — and tell the restaurant directly either way, because kitchens share pans._",
+  ].join("\n");
+}
+
 function render(menuText: string, rawConcerns: string[]): string {
   const concerns = canonicalConcerns(rawConcerns);
   // Preserve the order dishes appear in the user's text, not dictionary order.
@@ -209,7 +246,7 @@ function render(menuText: string, rawConcerns: string[]): string {
     return [
       head,
       "",
-      `I couldn't match a known dish in: _"${menuText.slice(0, 120)}"_.`,
+      `${NO_MATCH_MARKER} in: _"${menuText.slice(0, 120)}"_.`,
       "Try a single dish name (Korean or romanized), e.g. `tteokbokki`, `bibimbap`, `삼겹살`.",
     ].join("\n");
   }
@@ -347,11 +384,16 @@ export const translateMenuContext: ToolDef = {
     idempotentHint: true,
     openWorldHint: false,
   },
-  handler: (args) => {
+  handler: async (args) => {
     const menuText = normalizeDishText(String(args.menuText ?? ""));
     const concerns = Array.isArray(args.allergyConcerns)
       ? (args.allergyConcerns as unknown[]).map((c) => String(c).toLowerCase())
       : [];
-    return ok(render(menuText, concerns), CHOICES);
+    const card = render(menuText, concerns);
+    if (card.includes(NO_MATCH_MARKER)) {
+      const rescued = await rescueDishes(`${menuText} ${concerns.join(" ")}`.trim());
+      if (rescued) return ok(rescued, CHOICES);
+    }
+    return ok(card, CHOICES);
   },
 };

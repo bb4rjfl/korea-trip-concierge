@@ -11,7 +11,7 @@ import type { ToolDef } from "./types.js";
  * Korea-specific, up-to-date caveats curated for foreigners.
  */
 
-interface PaymentGuide {
+export interface PaymentGuide {
   match: RegExp;
   label: string;
   works: string[];
@@ -19,7 +19,7 @@ interface PaymentGuide {
   tip: string;
 }
 
-const GUIDES: PaymentGuide[] = [
+export const GUIDES: PaymentGuide[] = [
   {
     match: /(tip|tipping|gratuity|service charge|팁)/i,
     label: "Tipping",

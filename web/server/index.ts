@@ -3,7 +3,7 @@ import path from "node:path";
 import { existsSync } from "node:fs";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { ENV, hasKey } from "../../src/lib/env.js";
-import { warmUpSources, warmCoursePool } from "../../src/lib/warmup.js";
+import { warmUpSources, warmCoursePool, warmCorpus } from "../../src/lib/warmup.js";
 import { warmCityList } from "../../src/lib/sources/tago.js";
 import { CATALOG } from "./catalog.js";
 import { handleChat, type ChatRequest } from "./orchestrator.js";
@@ -181,6 +181,7 @@ app.listen(port, () => {
   try {
     warmCityList();
     warmUpSources();
+    warmCorpus();
     warmCoursePool();
   } catch {
     /* best-effort warmup */

@@ -21,7 +21,7 @@ export interface CityMobility {
   watch: string;
 }
 
-const CITIES: { match: RegExp; guide: CityMobility }[] = [
+export const CITIES: { match: RegExp; guide: CityMobility }[] = [
   {
     match: /seoul|서울|ソウル|首尔|首爾/i,
     guide: {

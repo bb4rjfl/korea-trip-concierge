@@ -29,7 +29,7 @@ import type { ToolDef } from "./types.js";
  * entry-document advice has a year-guard so it can't silently go stale.
  */
 
-interface ServiceGuide {
+export interface ServiceGuide {
   match: RegExp;
   label: string;
   emoji: string;
@@ -40,7 +40,7 @@ interface ServiceGuide {
   dated?: string; // volatile facts → "As of …; verify at …"
 }
 
-const SERVICES: ServiceGuide[] = [
+export const SERVICES: ServiceGuide[] = [
   {
     // Lost passport / wallet / phone / bag, theft and scams. QA found every one of
     // these routed to the medical-emergency card — no embassy, no 112, no lost112.

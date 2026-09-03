@@ -11,6 +11,10 @@ import { backfillArgs, contextHint, deriveContext } from "./context.js";
 import { localizeLabels, toTraditional } from "./labels.js";
 import { asksAboutExit, exitFor } from "../../src/lib/exits.js";
 import { searchPlaces } from "../../src/lib/sources/tourapi.js";
+import { search as retrieve, confident as confidentHit } from "../../src/lib/retrieval.js";
+
+/** Tools whose answer is anchored on a neighbourhood, and stall without one. */
+const AREA_TOOLS = new Set(["findForeignerFriendlyStore", "getAreaGuide"]);
 
 export interface ChatRequest {
   messages: ChatTurn[];
@@ -507,7 +511,23 @@ ${partial.reply ?? ""}`.trim(),
       }
     }
 
-    // 3) Nothing routed → welcome/help.
+    // 3) Still nothing — ask what we know rather than what we expected.
+    //
+    // Both routers recognise phrasings someone anticipated. A visitor who types
+    // "I'm vegan and my friend eats only halal, where can we eat together" has
+    // said something perfectly clear that matches no pattern, and used to get
+    // the welcome message back. Searching our own corpus finds Itaewon, and the
+    // document carries the tool that answers it, so the reply is a real card.
+    if (!toolCall) {
+      const hits = await retrieve(text, { limit: 3 }).catch(() => []);
+      const best = hits.find((h) => h.doc.route)?.doc;
+      if (best?.route && confidentHit(hits)) {
+        toolCall = { name: best.route.tool, args: best.route.args };
+        engine = "rules";
+      }
+    }
+
+    // 4) Nothing routed → welcome/help.
     if (!toolCall) {
       return done({ reply: WELCOME[lang], chips: DEFAULT_CHIPS_BY_LANG[lang] });
     }
@@ -556,7 +576,35 @@ ${partial.reply ?? ""}`.trim(),
       ).length;
       if (alreadyShown > 0) filled.variant = alreadyShown;
     }
-    const result = await executeTool(toolCall.name, filled);
+    // A tool only ever sees the arguments the model extracted, never the sentence
+    // they came from — so "I'm vegan and my friend eats only halal, where can we
+    // eat together" reached the essentials finder as a need with no place, and
+    // came back asking which neighbourhood. The sentence names one implicitly,
+    // and the corpus knows which: Itaewon. Fill it before the tool has to ask.
+    if (!String(filled.area ?? "").trim() && AREA_TOOLS.has(toolCall.name)) {
+      const hits = await retrieve(text, { kinds: ["area"], limit: 2 }).catch(() => []);
+      if (hits[0] && confidentHit(hits)) {
+        filled.area = hits[0].doc.title.replace(/\s*\([^)]*\)\s*$/, "");
+      }
+    }
+
+    let result = await executeTool(toolCall.name, filled);
+    if (!result.ok) {
+      // A missing argument is not always a missing answer. "I'm vegan and my
+      // friend eats only halal, where can we eat together" was routed to the
+      // essentials finder with no neighbourhood, so a question with an obvious
+      // answer — Itaewon — came back as "Which area?". Ask the corpus before
+      // asking the traveller to fill in a form.
+      const hits = await retrieve(text, { limit: 3 }).catch(() => []);
+      const rescue = hits.find((h) => h.doc.route && h.doc.route.tool !== toolCall!.name)?.doc;
+      if (rescue?.route && confidentHit(hits)) {
+        const retry = await executeTool(rescue.route.tool, backfillArgs(rescue.route.tool, rescue.route.args, ctx));
+        if (retry.ok) {
+          toolCall = { name: rescue.route.tool, args: rescue.route.args };
+          result = retry;
+        }
+      }
+    }
     if (!result.ok) {
       const asks = result.invalidArgs
         .map((f) => FIELD_QUESTIONS[`${toolCall!.name}.${f}`]?.[lang])

@@ -70,15 +70,15 @@ describe("tomorrow's outlook", () => {
 });
 
 describe("allergy wording people actually use", () => {
-  it("maps shrimp, エビ and 새우 onto the shellfish data we hold", () => {
+  it("maps shrimp, エビ and 새우 onto the shellfish data we hold", async () => {
     for (const word of ["shrimp", "エビ", "새우", "I'm allergic to prawns"]) {
-      const text = translateMenuContext.handler({ menuText: "짬뽕", allergyConcerns: [word] }).content[0].text;
+      const text = (await translateMenuContext.handler({ menuText: "짬뽕", allergyConcerns: [word] })).content[0].text;
       expect(text).toContain("Contains shellfish");
     }
   });
 
-  it("still reports a concern it cannot check rather than passing it silently", () => {
-    const text = translateMenuContext.handler({ menuText: "비빔밥", allergyConcerns: ["mushroom"] }).content[0].text;
+  it("still reports a concern it cannot check rather than passing it silently", async () => {
+    const text = (await translateMenuContext.handler({ menuText: "비빔밥", allergyConcerns: ["mushroom"] })).content[0].text;
     expect(text.toLowerCase()).toContain("mushroom");
   });
 });

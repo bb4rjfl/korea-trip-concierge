@@ -20,7 +20,7 @@ export interface Season {
   caveat?: string;
 }
 
-const BY_MONTH: Record<number, Season> = {
+export const BY_MONTH: Record<number, Season> = {
   1: {
     label: "Deep winter",
     feel: "Cold and dry, roughly −8 to 3°C in Seoul, with bright blue skies. The wind is what gets you, not the snow.",

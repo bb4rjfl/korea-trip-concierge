@@ -25,6 +25,7 @@ export const WARM_URLS = [
 
 /** Fire one throwaway request per external origin to warm the connection pool. */
 import { livePool } from "./livePool.js";
+import { buildCorpus, indexLivePool } from "./corpus.js";
 
 /**
  * Build the course candidate pool before anyone asks for a course. It takes
@@ -33,8 +34,27 @@ import { livePool } from "./livePool.js";
  */
 export function warmCoursePool(): void {
   for (const city of ["Seoul", "Busan", "Jeju"]) {
-    void livePool(city).catch(() => undefined);
+    void livePool(city)
+      .then((spots) => {
+        // Fold the pool into the search corpus twice: now, and again once the
+        // background pass has attached station exits and neighbourhoods, which
+        // is what makes those searchable rather than merely printable.
+        indexLivePool(spots);
+        setTimeout(() => indexLivePool(spots), 4 * 60_000).unref?.();
+      })
+      .catch(() => undefined);
   }
+}
+
+/**
+ * Build the search index over everything we know.
+ *
+ * Lexical search is ready the moment this returns; the vectors fill in behind
+ * it over the next few seconds, so a request arriving immediately still gets a
+ * keyword match rather than an error.
+ */
+export function warmCorpus(): void {
+  buildCorpus();
 }
 
 export function warmUpSources(): void {

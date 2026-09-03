@@ -12,6 +12,7 @@ import {
 } from "../lib/sources/tourapi.js";
 import { todayKST } from "../lib/holidays.js";
 import { asksAboutMalls, mallsCard } from "../lib/malls.js";
+import { search, confident } from "../lib/retrieval.js";
 import { searchForeignerPois, hasPoiProvider, type PoiPlace } from "../lib/sources/poi.js";
 import {
   searchSeoulContent,
@@ -276,6 +277,36 @@ function withinReach<T extends { mapx?: number; mapy?: number }>(
   // coordinate-radius fallback below produces genuinely local results, and a
   // Suncheon restaurant is not an answer to "in Seoul".
   return near;
+}
+
+/**
+ * When the tourism API has nothing, answer from what we know ourselves.
+ *
+ * This is the difference between a search box and a concierge: a person who
+ * says they are tired of shopping and wants somewhere quiet has told us plenty,
+ * and the only reason it produced *Nothing matched* is that no regular
+ * expression in the pipeline was looking for it.
+ *
+ * Only places are offered here, and only when retrieval is confident — a wrong
+ * place stated plainly is worse than admitting the search found nothing.
+ */
+async function rescueBySearch(query: string, areaLabel?: string): Promise<string | undefined> {
+  const hits = await search(query, { kinds: ["spot", "landmark", "area"], limit: 4 }).catch(() => []);
+  if (!hits.length || !confident(hits)) return undefined;
+  const lines = hits.slice(0, 3).map((h, i) => {
+    const where = h.doc.area && !/^(?:Seoul|Busan|Jeju|Gyeongju)$/i.test(h.doc.area) ? ` _(${h.doc.area})_` : "";
+    // The document text is our own blurb; the part of it that reads like a
+    // sentence is the reason to go, which is the part worth printing.
+    const why = h.doc.text.split(" · ").find((part) => part.length > 30 && !part.includes("allergens"));
+    return `**${i + 1}. ${h.doc.title}**${where}${why ? `\n   ${why}` : ""}\n   ${mapLinks(h.doc.title)}`;
+  });
+  return [
+    `🔎 **Closest matches for** _"${query}"_${areaLabel ? ` in ${areaLabel}` : ""}`,
+    "",
+    ...lines,
+    "",
+    "_Matched from this service's own place knowledge rather than a keyword search, so tell me if I read you wrong._",
+  ].join("\n");
 }
 
 function renderPlaces(query: string, places: Place[]): string {
@@ -821,6 +852,14 @@ export const searchPlaceForeigner: ToolDef = {
             }
           }
         }
+      }
+      // The tourism API answers a place *type* in an *area*. It has nothing to
+      // say to "somewhere quiet, I am exhausted from shopping" or "a traditional
+      // wedding ceremony", and it answered both with "Nothing matched" while a
+      // hanok village and a dozen teahouses sat in our own corpus. Search that.
+      if (!places.length) {
+        const rescued = await rescueBySearch(query, areaLabel);
+        if (rescued) return ok(mustSee + rescued, searchChoices(areaLabel, cat === "food"));
       }
       return ok(mustSee + renderPlaces(query, places), searchChoices(areaLabel, cat === "food"));
     } catch {

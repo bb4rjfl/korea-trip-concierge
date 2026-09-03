@@ -50,19 +50,19 @@ describe("landmarkVerdict mountain copy (polish G)", () => {
 
 // ── P7: vegan egg/dairy nuance + no contradictory allergen line ───────────────
 describe("translateMenuContext vegan nuance (P7)", () => {
-  it("flags egg as not-vegan for a vegetarian-OK dish", () => {
-    const r = translateMenuContext.handler({ menuText: "bibimbap", allergyConcerns: ["vegan"] });
+  it("flags egg as not-vegan for a vegetarian-OK dish", async () => {
+    const r = await translateMenuContext.handler({ menuText: "bibimbap", allergyConcerns: ["vegan"] });
     expect(text(r)).toMatch(/not vegan/i);
   });
-  it("does not false-flag a genuinely vegan dish (P-V1: 콩국수 'broth' regression)", () => {
-    const r = translateMenuContext.handler({ menuText: "콩국수", allergyConcerns: ["vegan"] });
+  it("does not false-flag a genuinely vegan dish (P-V1: 콩국수 'broth' regression)", async () => {
+    const r = await translateMenuContext.handler({ menuText: "콩국수", allergyConcerns: ["vegan"] });
     // The false flag was the full "not vegetarian/vegan" line — match either form.
     expect(text(r)).not.toMatch(/not veg(etarian|an)/i);
     // 설렁탕 (ox-bone) must STILL be flagged — the fix must stay narrow.
-    expect(text(translateMenuContext.handler({ menuText: "설렁탕", allergyConcerns: ["vegetarian"] }))).toMatch(/not veg/i);
+    expect(text(await translateMenuContext.handler({ menuText: "설렁탕", allergyConcerns: ["vegetarian"] }))).toMatch(/not veg/i);
   });
-  it("empty-allergen meat dish reads 'to flag', not a bare reassurance", () => {
-    const r = translateMenuContext.handler({ menuText: "설렁탕", allergyConcerns: ["vegetarian"] });
+  it("empty-allergen meat dish reads 'to flag', not a bare reassurance", async () => {
+    const r = await translateMenuContext.handler({ menuText: "설렁탕", allergyConcerns: ["vegetarian"] });
     expect(text(r)).toContain("No common allergens to flag");
     expect(text(r)).toMatch(/not vegetarian/i);
   });
@@ -100,11 +100,11 @@ describe("content coverage expansion", () => {
     expect(text(getAreaGuide.handler({ area: "Apgujeong" }))).toContain("Apgujeong");
     expect(text(getAreaGuide.handler({ area: "망원" }))).toContain("Mangwon");
   });
-  it("identifies newly added regional dishes", () => {
-    expect(text(translateMenuContext.handler({ menuText: "돼지국밥" }))).toContain("Pork soup rice");
-    expect(text(translateMenuContext.handler({ menuText: "간장게장" }))).toContain("Soy-marinated raw crab");
-    expect(text(translateMenuContext.handler({ menuText: "흑돼지" }))).toContain("black-pork");
-    expect(text(translateMenuContext.handler({ menuText: "전복죽" }))).toContain("Abalone porridge");
+  it("identifies newly added regional dishes", async () => {
+    expect(text(await translateMenuContext.handler({ menuText: "돼지국밥" }))).toContain("Pork soup rice");
+    expect(text(await translateMenuContext.handler({ menuText: "간장게장" }))).toContain("Soy-marinated raw crab");
+    expect(text(await translateMenuContext.handler({ menuText: "흑돼지" }))).toContain("black-pork");
+    expect(text(await translateMenuContext.handler({ menuText: "전복죽" }))).toContain("Abalone porridge");
   });
 });
 
@@ -115,10 +115,10 @@ describe("round-1 content additions", () => {
     expect(text(r)).toContain("Concert & event tickets");
     expect(text(r)).toMatch(/Interpark Global/i);
   });
-  it("flags insect/lamb dishes for vegetarians (MEAT_RE)", () => {
-    expect(text(translateMenuContext.handler({ menuText: "번데기", allergyConcerns: ["vegetarian"] }))).toMatch(/not vegetarian/i);
-    expect(text(translateMenuContext.handler({ menuText: "양꼬치", allergyConcerns: ["vegetarian"] }))).toMatch(/not vegetarian/i);
-    expect(text(translateMenuContext.handler({ menuText: "닭볶음탕" }))).toContain("Spicy braised chicken stew");
+  it("flags insect/lamb dishes for vegetarians (MEAT_RE)", async () => {
+    expect(text(await translateMenuContext.handler({ menuText: "번데기", allergyConcerns: ["vegetarian"] }))).toMatch(/not vegetarian/i);
+    expect(text(await translateMenuContext.handler({ menuText: "양꼬치", allergyConcerns: ["vegetarian"] }))).toMatch(/not vegetarian/i);
+    expect(text(await translateMenuContext.handler({ menuText: "닭볶음탕" }))).toContain("Spicy braised chicken stew");
   });
   it("resolves more landmarks", () => {
     expect(resolveLandmark("Banpo Bridge")?.name).toMatch(/Banpo|Rainbow/i);
@@ -160,11 +160,11 @@ describe("completeness round", () => {
   it("explainPayment covers jjimjilbang/sauna", () => {
     expect(text(explainPayment.handler({ situation: "jjimjilbang" }))).toMatch(/Jjimjilbang/i);
   });
-  it("identifies more dishes", () => {
-    expect(text(translateMenuContext.handler({ menuText: "닭강정" }))).toContain("Sweet crispy chicken bites");
-    expect(text(translateMenuContext.handler({ menuText: "양념게장" }))).toContain("Spicy marinated raw crab");
-    expect(text(translateMenuContext.handler({ menuText: "김치볶음밥" }))).toContain("Kimchi fried rice");
-    expect(text(translateMenuContext.handler({ menuText: "새우장" }))).toContain("Soy-marinated raw shrimp");
+  it("identifies more dishes", async () => {
+    expect(text(await translateMenuContext.handler({ menuText: "닭강정" }))).toContain("Sweet crispy chicken bites");
+    expect(text(await translateMenuContext.handler({ menuText: "양념게장" }))).toContain("Spicy marinated raw crab");
+    expect(text(await translateMenuContext.handler({ menuText: "김치볶음밥" }))).toContain("Kimchi fried rice");
+    expect(text(await translateMenuContext.handler({ menuText: "새우장" }))).toContain("Soy-marinated raw shrimp");
   });
   it("resolves more landmarks", () => {
     expect(resolveLandmark("Udo")?.name).toMatch(/Udo/);
@@ -192,9 +192,9 @@ describe("D-021 content additions", () => {
     expect(text(getAreaGuide.handler({ area: "Incheon" }))).toContain("Incheon");
     expect(text(getAreaGuide.handler({ area: "속초" }))).toContain("Sokcho");
   });
-  it("identifies hanjeongsik/baekban/suyuk", () => {
-    expect(text(translateMenuContext.handler({ menuText: "수육" }))).toContain("Boiled pork");
-    expect(text(translateMenuContext.handler({ menuText: "한정식" }))).toMatch(/hanjeongsik|table d'h/i);
+  it("identifies hanjeongsik/baekban/suyuk", async () => {
+    expect(text(await translateMenuContext.handler({ menuText: "수육" }))).toContain("Boiled pork");
+    expect(text(await translateMenuContext.handler({ menuText: "한정식" }))).toMatch(/hanjeongsik|table d'h/i);
   });
 });
 
@@ -328,10 +328,10 @@ describe("courses engine (D-025)", () => {
 
 // ── v6 final-gate findings (D-023) ────────────────────────────────────────────
 describe("v6 fixes (D-023)", () => {
-  it("V6-1: naengmyeon (beef broth) flagged for vegetarians", () => {
-    expect(text(translateMenuContext.handler({ menuText: "냉면", allergyConcerns: ["vegetarian"] }))).toMatch(/not veg/i);
+  it("V6-1: naengmyeon (beef broth) flagged for vegetarians", async () => {
+    expect(text(await translateMenuContext.handler({ menuText: "냉면", allergyConcerns: ["vegetarian"] }))).toMatch(/not veg/i);
     // kongguksu must STAY clean (the broth→bone fix isn't undone)
-    expect(text(translateMenuContext.handler({ menuText: "콩국수", allergyConcerns: ["vegan"] }))).not.toMatch(/not veg/i);
+    expect(text(await translateMenuContext.handler({ menuText: "콩국수", allergyConcerns: ["vegan"] }))).not.toMatch(/not veg/i);
   });
   it("V6-2: simplified 济州 + traditional 觀光 seed the Jeju must-see", () => {
     expect(cityMustSeeLead("济州 观光", "")).toMatch(/Jeju must-see/);
