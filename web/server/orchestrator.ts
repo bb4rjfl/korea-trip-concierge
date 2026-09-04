@@ -625,6 +625,13 @@ ${partial.reply ?? ""}`.trim(),
       ).length;
       if (alreadyShown > 0) filled.variant = alreadyShown;
     }
+    // These two match on how a person phrases a problem — that is their whole
+    // design — and the model hands them a tidied noun instead. "My card was
+    // declined at a restaurant, what now" arrived as "restaurant", so the tool
+    // could not see the urgency and answered with a general explanation.
+    if (toolCall.name === "explainPayment" && text.trim()) filled.situation = text.trim();
+    if (toolCall.name === "explainKoreanService" && text.trim()) filled.service = text.trim();
+
     // A tool only ever sees the arguments the model extracted, never the sentence
     // they came from — so "I'm vegan and my friend eats only halal, where can we
     // eat together" reached the essentials finder as a need with no place, and

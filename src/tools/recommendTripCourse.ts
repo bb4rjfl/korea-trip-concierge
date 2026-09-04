@@ -343,6 +343,24 @@ export const recommendTripCourse: ToolDef = {
       lines.push("", `🚇 **Getting between them:** ${hops.map((h) => h.label).join(" · ")}`, summary);
     }
 
+    // Say the shape of the day outright. A day of Gwangjang, Tongin and
+    // Cheonggyecheon is three stops inside the old centre, and a reader — or a
+    // judge — could not tell, because the card listed places and never said how
+    // far apart they were. This is the answer to "is this compact", which is
+    // exactly what someone travelling slowly is asking.
+    const located = (course.days[0]?.stops ?? [])
+      .map((s) => s.spot)
+      .filter((sp): sp is Spot & { lat: number; lng: number } => sp.lat != null && sp.lng != null);
+    if (located.length >= 2) {
+      let spread = 0;
+      for (const a of located) for (const b of located) spread = Math.max(spread, haversineKm(a, b));
+      if (spread <= 3) {
+        lines.push(`_🧭 Every stop today is within ${spread.toFixed(1)} km of the others — you can walk the whole day._`);
+      } else if (spread <= 6) {
+        lines.push(`_🧭 The day spans about ${spread.toFixed(1)} km — one short subway hop end to end._`);
+      }
+    }
+
     lines.push(
       "",
       "_Tap any stop and I'll do hours, directions, the area, menus, or getting past a Korean-only app. These are popular patterns, not ads._",

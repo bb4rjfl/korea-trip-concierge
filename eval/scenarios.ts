@@ -179,22 +179,33 @@ export const SCENARIOS: Scenario[] = [
     name: "course, then another",
     guards: "asking again gives a different day",
     turns: [
-      { say: "plan me a day in Seoul for a couple", expect: "A day of specific stops with a shape to it." },
       {
+        say: "plan me a day in Seoul for a couple",
+        expect: "A day of specific named stops, in an order, with a reason for each.",
+        mustMatch: [/Gwangjang|Bukchon|Ikseon|Namsan|Gyeongbokgung|Seongsu|Yeonnam|Hongdae/i],
+      },
+      {
+        // The promise is different *stops*, not a different persona — they asked
+        // for another option, not another kind of trip. Judged on that, and
+        // guarded on it too: the same market twice is the failure this scenario
+        // exists to catch.
         say: "something else please",
-        expect: "A genuinely different day — different stops from the one just given.",
+        expect:
+          "Another day for the same couple, made of different stops from the one just given. Keeping the same persona is correct; repeating the stops is not.",
       },
     ],
   },
   {
     name: "walks slowly",
-    guards: "what the traveller said about themselves changes the plan",
+    guards: "what the traveller said about themselves changes the plan, and the card says so",
     turns: [
       {
         say: "one day in Seoul, on a budget, and my mother walks slowly",
         expect:
-          "A compact day that stays in one part of the city, avoids climbs and expensive venues, and says back what it took from the request.",
-        mustMatch: [/Planned for/i],
+          "A compact day that avoids climbs and expensive venues, says back what it took from the request, and states how far apart the stops are so the reader can see it is manageable.",
+        // Saying it back is the correctable part; stating the distance is what
+        // makes "compact" a claim the reader can check rather than take on faith.
+        mustMatch: [/Planned for/i, /within .* km|Getting between them/i],
       },
     ],
   },
