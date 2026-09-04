@@ -544,7 +544,11 @@ ${partial.reply ?? ""}`.trim(),
     // request for restaurants, and the payment guide is not an answer to it.
     const reading = understand(text);
     if (toolCall && GENERIC_TOOLS.has(toolCall.name) && (reading.urgent || reading.permission)) {
-      const hits = await retrieve(text, { kinds: ["service", "payment", "card"], limit: 2 }).catch(() => []);
+      // Guides and cards only. Payment documents were included at first and
+      // hijacked "how do I get to my hotel with no phone and no cash" into a
+      // guide about paying hotels, on the strength of the word "hotel" — and
+      // payment questions are the one thing the model already routes well.
+      const hits = await retrieve(text, { kinds: ["service", "card"], limit: 2 }).catch(() => []);
       const better = hits[0]?.doc;
       if (better?.route && stronglyConfident(hits) && better.route.tool !== toolCall.name) {
         // The traveller's own words, not the document's title: these tools match

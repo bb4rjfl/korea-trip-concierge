@@ -30,6 +30,7 @@ const NEEDS = [
   "emergency",
   "luggage",
   "laundry",
+  "vegan",
   "prayer",
   "post",
 ] as const;
@@ -107,6 +108,17 @@ const ESSENTIALS: Record<Need, Essential> = {
     tip: "**Coin laundries (코인빨래방)** are open 24 hours, unstaffed, and everywhere in residential areas. A wash and dry runs about **₩4,000–7,000** total, machines take **cards and cash**, detergent is dispensed automatically, and the panels usually have an English mode. Guesthouses often have a free or cheap machine — ask before you pay hotel laundry rates, which are charged per item.",
     query: "코인빨래방",
   },
+  // Vegan travellers were reaching the halal card and getting an answer about
+  // half their table: "I'm vegan and my friend eats only halal" is a common
+  // pairing and Itaewon happens to be the honest answer to both, but only if
+  // the card says so.
+  vegan: {
+    label: "Vegan & vegetarian food",
+    emoji: "🌱",
+    short: "temple cuisine, Itaewon and Haebangchon; watch for fish sauce",
+    tip: "Korean food is harder than it looks for vegans: **kimchi, most stews and nearly every broth contain fish sauce, anchovy or shrimp**, and 'vegetarian' is often read as 'no big pieces of meat'. What works — **사찰음식 (temple cuisine)**, which is vegan by doctrine and served at temple-stay restaurants and around Insadong and Jogyesa; **Itaewon and Haebangchon**, which hold most of Seoul's dedicated vegan kitchens and sit next to the halal restaurants, so a mixed table can actually eat together; and **bibimbap without egg and gochujang on the side**, which most restaurants will do if you ask. Say **\"고기, 생선, 계란, 유제품 다 빼주세요\"** (no meat, fish, egg or dairy) — writing it down works better than saying it.",
+    query: "비건 채식 식당",
+  },
   prayer: {
     label: "Prayer room & halal",
     emoji: "🕌",
@@ -160,6 +172,14 @@ const NEED_BY_ALIAS: Record<string, Need> = {
   mosque: "prayer",
   muslim: "prayer",
   halal: "prayer",
+  vegan: "vegan",
+  vegetarian: "vegan",
+  plantbased: "vegan",
+  veggie: "vegan",
+  비건: "vegan",
+  채식: "vegan",
+  사찰음식: "vegan",
+  templefood: "vegan",
   post: "post",
   postoffice: "post",
   shipping: "post",
