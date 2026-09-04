@@ -623,7 +623,7 @@ ${partial.reply ?? ""}`.trim(),
     // course cards was not enough: the candidate pool refreshes in the
     // background, so recomputing "what the first course was" does not reproduce
     // it, and a stop could reappear on the very next ask.
-    if (toolCall.name === "recommendTripCourse" && filled.alreadyShown == null) {
+    if (toolCall.name === "recommendTripCourse" && !String(filled.alreadyShown ?? "").trim()) {
       const shown = history
         .filter((h) => h.role === "assistant")
         .flatMap((h) => [...(h.content ?? "").matchAll(/^- \*\*(.+?)\*\*/gm)].map((m) => m[1]))
@@ -632,7 +632,7 @@ ${partial.reply ?? ""}`.trim(),
       if (shown.length) filled.alreadyShown = [...new Set(shown)].slice(-24).join(" | ");
     }
 
-    if (toolCall.name === "recommendTripCourse" && filled.variant == null) {
+    if (toolCall.name === "recommendTripCourse" && !Number(filled.variant)) {
       const alreadyShown = history.filter(
         (h) => h.role === "assistant" && /course\s+—|코스\s*—|コース|课程|課程/.test(h.content ?? ""),
       ).length;

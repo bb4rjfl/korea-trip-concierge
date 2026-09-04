@@ -343,6 +343,21 @@ export const recommendTripCourse: ToolDef = {
     // Say back what we took from what they said, so the tailoring is visible and
     // correctable rather than mysterious.
     if (!isEmptyProfile(profile)) lines.push(profileNote(profile));
+    // How far apart the day is, said next to the constraint it answers. Someone
+    // who told us their mother walks slowly should read "you can walk the whole
+    // day" before the itinerary, not underneath it.
+    const located = (course.days[0]?.stops ?? [])
+      .map((st) => st.spot)
+      .filter((sp): sp is Spot & { lat: number; lng: number } => sp.lat != null && sp.lng != null);
+    if (located.length >= 2) {
+      let spread = 0;
+      for (const a of located) for (const b of located) spread = Math.max(spread, haversineKm(a, b));
+      if (spread <= 3) {
+        lines.push(`_🧭 Every stop is within **${spread.toFixed(1)} km** of the others — the whole day is walkable, no climbs._`);
+      } else if (spread <= 6) {
+        lines.push(`_🧭 The day spans about **${spread.toFixed(1)} km** — one short subway hop end to end._`);
+      }
+    }
     if (weatherNote) lines.push("", weatherNote);
     if (over) lines.push("", "_(Longer trip? Here's a strong 3-day base — extend by repeating a day with a fresh persona, theme, or city.)_");
     for (const d of course.days) {
@@ -368,17 +383,7 @@ export const recommendTripCourse: ToolDef = {
     // judge — could not tell, because the card listed places and never said how
     // far apart they were. This is the answer to "is this compact", which is
     // exactly what someone travelling slowly is asking.
-    const located = (course.days[0]?.stops ?? [])
-      .map((s) => s.spot)
-      .filter((sp): sp is Spot & { lat: number; lng: number } => sp.lat != null && sp.lng != null);
-    if (located.length >= 2) {
-      let spread = 0;
-      for (const a of located) for (const b of located) spread = Math.max(spread, haversineKm(a, b));
-      if (spread <= 3) {
-        lines.push(`_🧭 Every stop today is within ${spread.toFixed(1)} km of the others — you can walk the whole day._`);
-      } else if (spread <= 6) {
-        lines.push(`_🧭 The day spans about ${spread.toFixed(1)} km — one short subway hop end to end._`);
-      }
+    {
     }
 
     lines.push(
