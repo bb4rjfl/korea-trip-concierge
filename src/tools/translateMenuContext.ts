@@ -203,6 +203,31 @@ function phraseCard(concerns: string[], veg: boolean, noPork: boolean): string[]
 const NO_MATCH_MARKER = "I couldn't match a known dish";
 
 /**
+ * Whether to worry at all, before the list of dishes.
+ *
+ * A parent asking "is Korean food going to be a problem" is asking whether to
+ * relax or to be careful for two weeks. Four dish names are accurate and do not
+ * answer that. This does, and it is the part they will remember.
+ */
+const ALLERGEN_PICTURE: Record<string, string> = {
+  peanut:
+    "**Mostly fine, with two exceptions.** Peanuts are not a Korean staple — the everyday dishes (bibimbap, bulgogi, stews, grilled meat, gimbap) contain none. The risk sits in **street snacks and sweets** (hotteok, dakgangjeong, gangjeong, yakgwa, bingsu toppings) and in **Chinese-Korean and skewer places**, where peanut turns up in sauces and coatings. Shared fryers and sauce ladles are the real hazard, not the recipe.",
+  sesame:
+    "**Assume yes, everywhere.** Sesame oil and seeds are in almost every banchan, marinade and dressing, and are rarely written on a menu. This is the hardest common allergy to manage in Korea.",
+  shellfish:
+    "**Assume yes unless told otherwise.** Anchovy, shrimp and fish stock underlie most soups, stews and kimchi even when nothing seafood is visible.",
+  gluten:
+    "**Common but avoidable.** Soy sauce, gochujang and most noodles contain wheat. Rice, grilled meat and plain bibimbap are safe; even buckwheat naengmyeon is usually cut with wheat flour.",
+  dairy:
+    "**Rare in traditional food.** Korean cooking uses almost no dairy — the risk is in cafés, bakeries and fusion dishes like rose tteokbokki and cheese buldak.",
+  egg: "**Common as a garnish.** Egg appears sliced or fried on bibimbap, gimbap and noodle dishes, and can usually be left off if you ask before it is cooked.",
+};
+
+/** The sentence to show a restaurant, which is what actually keeps a child safe. */
+const ALLERGY_PHRASE =
+  '🪧 **Show this:** **"저희 아이는 ○○ 알레르기가 있어요. 조금이라도 들어가면 위험합니다. 들어갔나요?"** — _My child is allergic to ○○. Even a trace is dangerous. Does this contain any?_ Fill in the allergen: 땅콩 (peanut), 참깨 (sesame), 갑각류 (shellfish), 밀 (wheat), 유제품 (dairy), 계란 (egg).';
+
+/**
  * Answer from the dish knowledge when no dish name was given.
  *
  * "My kid has a peanut allergy, is Korean food going to be a problem" arrived
@@ -226,12 +251,17 @@ async function rescueDishes(text: string): Promise<string | undefined> {
   }
   cards = cards.slice(0, 4);
   if (!cards.length) return undefined;
+  // Lead with whether Korean food is a problem at all, then the dishes that
+  // carry it. The list alone answers a question nobody asked.
+  const picture = named.map((c) => ALLERGEN_PICTURE[c]).filter(Boolean);
   return [
-    `🍽️ **Closest dishes for** _"${text.slice(0, 90)}"_`,
+    picture.length ? `🍽️ **${named[0]} in Korean food**` : `🍽️ **Closest dishes for** _"${text.slice(0, 90)}"_`,
     "",
+    ...(picture.length ? [picture.join("\n\n"), "", "**The dishes that carry it:**", ""] : []),
     ...cards.map((d) => `**${d.en}** — ${d.desc}\n   ⚠️ Contains: ${d.allergens.join(", ") || "nothing we flag"}`),
     "",
-    "_Matched from what you described rather than an exact dish name. Name a dish and I'll give you its full card — and tell the restaurant directly either way, because kitchens share pans._",
+    ...(picture.length ? [ALLERGY_PHRASE, ""] : []),
+    "_Name a dish and I'll give you its full card. Tell the restaurant directly either way — kitchens share fryers and sauce ladles, and that is where the risk actually is._",
   ].join("\n");
 }
 
