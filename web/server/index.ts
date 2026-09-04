@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { ENV, hasKey } from "../../src/lib/env.js";
 import { warmUpSources, warmCoursePool, warmCorpus } from "../../src/lib/warmup.js";
+import { corpusSize, corpusEmbedded } from "../../src/lib/retrieval.js";
 import { warmCityList } from "../../src/lib/sources/tago.js";
 import { CATALOG } from "./catalog.js";
 import { handleChat, type ChatRequest } from "./orchestrator.js";
@@ -107,6 +108,10 @@ app.get("/healthz", (_req: Request, res: Response) => {
   res.json({
     name: "korea-trip-concierge-web",
     build: ENV.GIT_SHA.slice(0, 7),
+    // Semantic search is the difference between answering "somewhere quiet"
+    // and not, and it is unavailable for a moment after a cold start. Say so,
+    // so a deploy can be checked rather than assumed.
+    search: { docs: corpusSize(), semantic: corpusEmbedded() },
     status: "ok",
     tools: CATALOG.length,
     llm: llmEnabled(),

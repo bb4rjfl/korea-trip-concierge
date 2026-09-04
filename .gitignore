@@ -21,3 +21,4 @@ biz-local/
 # Eval transcripts are a working artefact of a run, not a record worth keeping;
 # the baseline scores are.
 eval/last-run.md
+eval/.embeddings.json

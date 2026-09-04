@@ -35,6 +35,9 @@
  * why that keeps us on the right side of D-009.
  */
 
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { embedDocuments, embedQuery, embeddingsAvailable, dot } from "./sources/embeddings.js";
 
 export type DocKind = "spot" | "landmark" | "area" | "dish" | "service" | "payment" | "card";
@@ -208,21 +211,75 @@ export function corpusEmbedded(): boolean {
 }
 
 /** Batches of 64: comfortably inside the request limit, few enough round trips. */
+/**
+ * Vectors kept on disk between restarts.
+ *
+ * Without this, every deploy opens a window — a minute or two — in which the
+ * service answers from lexical search only. The evaluation caught it as a
+ * seven-point drop with the semantic answers all reverting at once ("Which
+ * area?", "couldn't match a known dish"), which is exactly what a traveller
+ * would have hit had they arrived in that window.
+ *
+ * Keyed by a hash of the exact text embedded, so a changed document re-embeds
+ * itself and an unchanged one never does. The file is a cache: losing it costs
+ * one re-index, and a stale entry is impossible because the key is the content.
+ */
+const CACHE_PATH = process.env.EMBED_CACHE ?? "eval/.embeddings.json";
+
+function fingerprint(text: string): string {
+  return createHash("sha1").update(text).digest("base64url").slice(0, 22);
+}
+
+function loadCache(): Map<string, number[]> {
+  try {
+    const raw = JSON.parse(readFileSync(CACHE_PATH, "utf8")) as Record<string, number[]>;
+    return new Map(Object.entries(raw));
+  } catch {
+    return new Map();
+  }
+}
+
+function saveCache(cache: Map<string, number[]>): void {
+  try {
+    mkdirSync(dirname(CACHE_PATH), { recursive: true });
+    writeFileSync(CACHE_PATH, JSON.stringify(Object.fromEntries(cache)), "utf8");
+  } catch {
+    // A cache we cannot write is a slower start, not a failure.
+  }
+}
+
 async function fillVectors(): Promise<void> {
   if (embedding || !index || !embeddingsAvailable()) return;
   embedding = true;
   const target = index;
   try {
-    for (let i = 0; i < target.docs.length; i += 64) {
-      const slice = target.docs.slice(i, i + 64);
-      const vecs = await embedDocuments(slice.map(embedText));
-      if (vecs.length !== slice.length) continue; // a failed batch just stays lexical
+    const cache = loadCache();
+    const texts = target.docs.map(embedText);
+    const keys = texts.map(fingerprint);
+
+    // Anything we have seen before is available immediately, so a restart with a
+    // warm cache is fully semantic from the first request.
+    let fresh = false;
+    keys.forEach((k, i) => {
+      const hit = cache.get(k);
+      if (hit) target.vectors[i] = hit;
+    });
+    target.embedded = target.vectors.some(Boolean);
+
+    const missing = keys.map((_, i) => i).filter((i) => !target.vectors[i]);
+    for (let i = 0; i < missing.length; i += 64) {
+      const batch = missing.slice(i, i + 64);
+      const vecs = await embedDocuments(batch.map((j) => texts[j]));
+      if (vecs.length !== batch.length) continue; // a failed batch just stays lexical
       vecs.forEach((v, j) => {
-        target.vectors[i + j] = v;
+        target.vectors[batch[j]] = v;
+        cache.set(keys[batch[j]], v);
+        fresh = true;
       });
       if (index !== target) return; // corpus was replaced under us
     }
     target.embedded = target.vectors.some(Boolean);
+    if (fresh) saveCache(cache);
   } finally {
     embedding = false;
   }
