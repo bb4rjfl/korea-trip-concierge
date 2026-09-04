@@ -10,6 +10,7 @@ import { criticalRoute, detectLang, isTraditionalChinese, routeText, type Lang }
 import { backfillArgs, contextHint, deriveContext } from "./context.js";
 import { localizeLabels, toTraditional } from "./labels.js";
 import { asksAboutExit, exitFor } from "../../src/lib/exits.js";
+import { understand } from "../../src/lib/understand.js";
 import { searchPlaces } from "../../src/lib/sources/tourapi.js";
 import {
   search as retrieve,
@@ -536,11 +537,21 @@ ${partial.reply ?? ""}`.trim(),
     // much more sure than usual and the model reached for a catch-all, follow
     // the corpus instead. This is the step that connects new knowledge to the
     // questions that need it without another regular expression in the router.
-    if (toolCall && GENERIC_TOOLS.has(toolCall.name)) {
+    //
+    // Only for "what do I do" and "am I allowed to" — the two shapes a catch-all
+    // tool reliably mishandles. Arbitrating on topic alone was worse than not
+    // arbitrating: "명동에서 카드 되는 식당 알려줘" is about cards *and* is a
+    // request for restaurants, and the payment guide is not an answer to it.
+    const reading = understand(text);
+    if (toolCall && GENERIC_TOOLS.has(toolCall.name) && (reading.urgent || reading.permission)) {
       const hits = await retrieve(text, { kinds: ["service", "payment", "card"], limit: 2 }).catch(() => []);
       const better = hits[0]?.doc;
       if (better?.route && stronglyConfident(hits) && better.route.tool !== toolCall.name) {
-        toolCall = { name: better.route.tool, args: better.route.args };
+        // The traveller's own words, not the document's title: these tools match
+        // on how a person phrases the problem, and a label like "Travelling with
+        // a pet" does not match the matcher that selected it.
+        const argKey = Object.keys(better.route.args)[0];
+        toolCall = { name: better.route.tool, args: argKey ? { [argKey]: text } : better.route.args };
         engine = "rules";
       }
     }

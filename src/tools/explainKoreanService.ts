@@ -67,7 +67,11 @@ export const SERVICES: ServiceGuide[] = [
     // "Can I bring my dog into a cafe" returned an art museum. We had nothing to
     // say about being allowed to do something, only about where things are.
     match:
-      /(bring (?:my )?(?:dog|pet|cat|puppy)|pet.?friendly|with (?:my )?dog|dogs? allowed|pets? allowed|애견|반려(?:견|동물)|강아지.*(?:데리|같이|가능)|ペット(?:同伴|可)|犬(?:と|を連れ)|[宠寵]物|可以[带帶].*狗)/i,
+      // "travelling with a pet" is here because it is this guide's own label, and
+      // the corpus routes by document title — a label that does not match the
+      // matcher that selected it lands on the tool and falls through to a
+      // generic card, which is exactly what happened.
+      /(bring (?:my )?(?:dog|pet|cat|puppy)|pet.?friendly|travell?ing with a pet|with (?:my )?(?:dog|pet)|dogs? allowed|pets? allowed|애견|반려(?:견|동물)|강아지.*(?:데리|같이|가능)|ペット(?:同伴|可)|犬(?:と|を連れ)|[宠寵]物|可以[带帶].*狗)/i,
     label: "Travelling with a pet",
     emoji: "🐾",
     blocker:

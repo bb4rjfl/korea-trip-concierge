@@ -37,7 +37,12 @@ export interface Reading {
 
 /** Adjectives that decide whether an answer fits, in four languages. */
 const QUALITIES: [RegExp, string][] = [
-  [/quiet|calm|peaceful|relax|unwind|rest|tired|exhausted|sit down|조용|한적|쉴|쉬고|편하게|지쳤|静か|落ち着|休め|疲れ|安[静靜]|休息|累/i, "quiet"],
+  // `\brest\b`, because "restaurant" was reading as a request for somewhere
+  // restful and quietly bending every food answer towards teahouses.
+  [
+    /quiet|calm|peaceful|relax|unwind|\brest\b|\btired\b|exhausted|sit down|조용|한적|쉴|쉬고|편하게|지쳤|静か|落ち着|休め|疲れ|安[静靜]|休息|累/i,
+    "quiet",
+  ],
   [/indoor|inside|out of the (?:rain|cold|heat)|sheltered|실내|안에서|비 ?피|屋内|室内|中で|室[内內]|避雨/i, "indoor"],
   [/outdoor|outside|fresh air|야외|바깥|屋外|外で|户外|戶外/i, "outdoor"],
   [/cheap|budget|free|affordable|저렴|무료|공짜|가성비|安い|無料|便宜|免[费費]/i, "cheap"],
@@ -49,7 +54,8 @@ const QUALITIES: [RegExp, string][] = [
 
 /** Requirements that rule a place in or out, rather than merely ranking it. */
 const DIETS: [RegExp, string][] = [
-  [/\bvegan\b|비건|ヴィーガン|完全菜食|[纯純]素/i, "vegan"],
+  // Japanese writes it both ways; only ヴィーガン was here, so ビーガン read as nothing.
+  [/\bvegan\b|비건|ヴィーガン|ビーガン|完全菜食|[纯純]素/i, "vegan"],
   [/vegetarian|채식|ベジタリアン|素食/i, "vegetarian"],
   [/halal|무슬림|할랄|ハラル|清真|穆斯林/i, "halal"],
   [/kosher|코셔|コーシャ|洁食|潔食/i, "kosher"],
