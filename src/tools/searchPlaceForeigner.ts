@@ -291,11 +291,12 @@ function withinReach<T extends { mapx?: number; mapy?: number }>(
  * Only places are offered here, and only when retrieval is confident — a wrong
  * place stated plainly is worse than admitting the search found nothing.
  */
-async function rescueBySearch(query: string, areaLabel?: string): Promise<string | undefined> {
+async function rescueBySearch(query: string, areaLabel?: string, said = ""): Promise<string | undefined> {
   // Search what they asked for, including the adjectives. "Something indoors and
   // quiet" used to return a mall, an aquarium and a department store: topically
   // correct, and the word doing all the work was *quiet*.
-  const reading = understand(query);
+  // Read their sentence, not the search phrase it was reduced to.
+  const reading = understand(`${said} ${query}`.trim());
   const found = await search(expandQuery(query, reading), { kinds: ["spot", "landmark", "area"], limit: 8 }).catch(
     () => [],
   );
@@ -768,6 +769,14 @@ export const searchPlaceForeigner: ToolDef = {
       .string()
       .optional()
       .describe("Natural-language intent, e.g. 'quiet cafe near Hongdae with English menu'. If omitted, give an area."),
+    said: z
+      .string()
+      .optional()
+      .describe(
+        "The traveler's sentence, verbatim. The query is a tidied search phrase and loses what they said " +
+          "about themselves — 'exhausted from shopping' becomes 'quiet indoor place', and the thing they " +
+          "wanted avoided disappears. Pass their words and the search reads them.",
+      ),
     area: z.string().optional().describe("Optional area/neighborhood to focus on."),
     category: z.string().optional().describe("Optional category: food, cafe, attraction, shopping, culture."),
     language: z
@@ -938,7 +947,7 @@ export const searchPlaceForeigner: ToolDef = {
       // wedding ceremony", and it answered both with "Nothing matched" while a
       // hanok village and a dozen teahouses sat in our own corpus. Search that.
       if (!places.length) {
-        const rescued = await rescueBySearch(query, areaLabel);
+        const rescued = await rescueBySearch(query, areaLabel, String(args.said ?? ""));
         if (rescued) return ok(mustSee + rescued, searchChoices(areaLabel, cat === "food"));
       }
       return ok(mustSee + renderPlaces(query, places), searchChoices(areaLabel, cat === "food"));

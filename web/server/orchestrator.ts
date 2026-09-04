@@ -650,6 +650,10 @@ ${partial.reply ?? ""}`.trim(),
       if (diets.length > 1) filled.need = diets.join(", ");
     }
 
+    // Place search keeps its tidied query for the API and gets the sentence too,
+    // because the tidying is where "exhausted from shopping" goes missing.
+    if (toolCall.name === "searchPlaceForeigner" && text.trim()) filled.said = text.trim();
+
     if (toolCall.name === "explainPayment" && text.trim()) filled.situation = text.trim();
     if (toolCall.name === "explainKoreanService" && text.trim()) filled.service = text.trim();
 

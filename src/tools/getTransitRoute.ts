@@ -364,9 +364,7 @@ export const getTransitRoute: ToolDef = {
     if (!from && (!to || BARE_CITY.test(to))) {
       return fail(
         "Where do you want to go?",
-        to
-          ? `Somewhere in **${to}** — tell me the place, station or address and I'll route you there.`
-          : "Tell me the place, station or address you're heading to and I'll route you there.",
+        "Tell me the place, station or address you're heading to and I'll route you there.",
         [
           { emoji: "🏛️", cmdEn: "Route to Gyeongbokgung Palace", descEn: "to the main palace" },
           { emoji: "🛍️", cmdEn: "Route to Myeongdong", descEn: "to Myeongdong" },
