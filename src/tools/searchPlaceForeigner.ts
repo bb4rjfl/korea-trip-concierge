@@ -13,6 +13,7 @@ import {
 import { todayKST } from "../lib/holidays.js";
 import { asksAboutMalls, mallsCard } from "../lib/malls.js";
 import { search, confident } from "../lib/retrieval.js";
+import { understand, expandQuery, readingNote } from "../lib/understand.js";
 import { searchForeignerPois, hasPoiProvider, type PoiPlace } from "../lib/sources/poi.js";
 import {
   searchSeoulContent,
@@ -291,7 +292,13 @@ function withinReach<T extends { mapx?: number; mapy?: number }>(
  * place stated plainly is worse than admitting the search found nothing.
  */
 async function rescueBySearch(query: string, areaLabel?: string): Promise<string | undefined> {
-  const hits = await search(query, { kinds: ["spot", "landmark", "area"], limit: 4 }).catch(() => []);
+  // Search what they asked for, including the adjectives. "Something indoors and
+  // quiet" used to return a mall, an aquarium and a department store: topically
+  // correct, and the word doing all the work was *quiet*.
+  const reading = understand(query);
+  const hits = await search(expandQuery(query, reading), { kinds: ["spot", "landmark", "area"], limit: 4 }).catch(
+    () => [],
+  );
   if (!hits.length || !confident(hits)) return undefined;
   const lines = hits.slice(0, 3).map((h, i) => {
     const where = h.doc.area && !/^(?:Seoul|Busan|Jeju|Gyeongju)$/i.test(h.doc.area) ? ` _(${h.doc.area})_` : "";
@@ -304,8 +311,10 @@ async function rescueBySearch(query: string, areaLabel?: string): Promise<string
       .find((part) => part.length > 30 && part !== h.doc.title && !part.includes("allergens"));
     return `**${i + 1}. ${h.doc.title}**${where}${why ? `\n   ${why}` : ""}\n   ${mapLinks(h.doc.title)}`;
   });
+  const note = readingNote(reading);
   return [
     `🔎 **Closest matches for** _"${query}"_${areaLabel ? ` in ${areaLabel}` : ""}`,
+    ...(note ? [note] : []),
     "",
     ...lines,
     "",
@@ -582,6 +591,18 @@ const DATED_TITLE_RE = /\b(?:19|20)\d{2}\b|《|》|개인전|기획전|특별전
 const NOT_A_SIGHT_RE =
   /luggage|locker|storage|baggage|짐\s*보관|물품보관|rental office|대여소|parking|주차/i;
 
+/**
+ * A run with dates is not a place you can be sent to.
+ *
+ * "Art galleries in Gangnam" came back with "Gangnam Fine Craft Art Club
+ * Exhibition", which then became the conversation's anchor, and the chip we
+ * offered next — "Guide me around Gangnam Fine Craft Art Club Exhibition" —
+ * could not be geocoded. Three dead ends, from one listing that was never a
+ * venue. The course pool has excluded these for a while; place search had not.
+ */
+const IS_AN_EVENT =
+  /exhibition|exhibits?\b|fan ?meet|fanfest|concert|festival|fashion week|biennale|showcase|screening|open call|pop-?up store|기획전|특별전|전시회|콘서트|페스티벌|팝업|[0-9]{4}\s*(?:s\/s|f\/w)/i;
+
 /** Rank Seoul results for the query: float a specific noun (museum/palace/gallery)
  *  up (Y3), and demote ephemeral events/exhibitions for general sightseeing intent
  *  (P-V2) — unless the user explicitly asked for events. */
@@ -666,7 +687,14 @@ async function trySeoul(
     // Drop stale past-dated events (Y1) and float intent-matching picks (Y3).
     const year = currentYearKST();
     vs = rankByIntent(
-      vs.filter((c) => !isStalePastEvent(c.title, year) && !NOT_A_SIGHT_RE.test(`${c.title} ${c.categoryPath ?? ""}`)),
+      // Events are excluded unless they were asked for: `asksAboutEvents` has
+      // its own festival card, and everything reaching here wanted a venue.
+      vs.filter(
+        (c) =>
+          !isStalePastEvent(c.title, year) &&
+          !NOT_A_SIGHT_RE.test(`${c.title} ${c.categoryPath ?? ""}`) &&
+          !IS_AN_EVENT.test(c.title),
+      ),
       query,
     );
     if (indoor) {
@@ -827,7 +855,9 @@ export const searchPlaceForeigner: ToolDef = {
       // A named neighbourhood means "walkable-ish"; a bare city means the metro area.
       const reachKm = area.trim() && !isSeoulText(area) ? 12 : 35;
       const places = withinReach(
-        await searchPlacesAny(candidates, { category: cat, limit: 5, language }),
+        (await searchPlacesAny(candidates, { category: cat, limit: 5, language })).filter(
+          (p) => !IS_AN_EVENT.test(p.title),
+        ),
         anchorCoord,
         reachKm,
         city?.addr,

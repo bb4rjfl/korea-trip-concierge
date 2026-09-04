@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { asksAboutSeason, seasonCard } from "../lib/seasons.js";
+import { asksAboutSeason, seasonCard, seasonalVerdict } from "../lib/seasons.js";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail, notConnected } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
@@ -105,8 +105,15 @@ export const getWeatherAndAir: ToolDef = {
 
     // "Is now a good time to come?" is a question about the season, not about this
     // afternoon — so the season leads and today's numbers follow it.
+    const monthKST = new Date(Date.now() + 9 * 3600_000).getUTCMonth() + 1;
+    // If they named something that is only there for a few weeks, say whether it
+    // is there — first. Asking about cherry blossoms in September and being told
+    // about autumn weather is every word true and not an answer.
+    const verdict = seasonalVerdict(when, monthKST);
     const season = asksAboutSeason(when)
-      ? `${seasonCard(new Date(Date.now() + 9 * 3600_000).getUTCMonth() + 1)}
+      ? `${verdict ? `${verdict}
+
+` : ""}${seasonCard(monthKST)}
 
 ---
 `

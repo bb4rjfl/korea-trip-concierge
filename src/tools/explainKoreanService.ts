@@ -42,6 +42,46 @@ export interface ServiceGuide {
 
 export const SERVICES: ServiceGuide[] = [
   {
+    // "My phone died and I have no cash, how do I get to my hotel" was answered
+    // with "Where are you starting from?" — a form field put to someone who has
+    // just told us they cannot use a form. The answer is what to do in the next
+    // five minutes, and none of it needs a phone.
+    match:
+      /(phone (?:died|is dead|has no battery)|no (?:battery|charge|phone|signal|data|cash|money)|out of (?:battery|cash|money)|lost my (?:wallet|money)|can'?t pay|stranded|stuck (?:with|without)|missed the last (?:train|bus|subway)|배터리\s*(?:없|나가|방전)|폰\s*꺼|현금\s*없|돈\s*없|막차\s*놓|고립|충전\s*(?:못|없)|電池(?:が)?(?:切れ|ない)|充電(?:が)?(?:ない|切れ)|現金(?:が)?ない|終電(?:を)?逃|没[电電]了|没[现現]金|手机没[电電]|末班[车車](?:错错|[错錯][过過]))/i,
+    label: "Stranded — no phone, no cash, or no last train",
+    emoji: "🔌",
+    blocker:
+      "Nearly every fallback a visitor is told about — call a taxi, tap a card, look up a route — assumes a working phone and a payment method. With neither, the advice runs out, and the systems that could help are Korean-only.",
+    workaround: [
+      "**Charging first, if you can** — every subway station, most convenience stores (GS25/CU/7-Eleven), and every café have outlets, and station customer-service desks lend cables. Fifteen minutes of charge is enough to call.",
+      "**No cash for the subway** → buy a **single-journey ticket** at the machine; it takes cards *and* coins, and it refunds ₩500 of your deposit at the exit machine. Machines have an English button.",
+      "**No cash and no card** → go to the station office (역무실) at the gate. Staff can let you through for a genuine emergency and will point you to help; Seoul stations see this often.",
+      "**Nothing works** → any **파출소 (police box)** — they are on main streets, staffed 24h, and helping a stranded visitor is squarely their job. They will call your hotel, call **1330** to interpret, and in a real bind arrange transport.",
+      "**Your hotel is the other lever** — staff will pay a taxi on arrival and add it to your bill. Show the driver the hotel name in Korean; a printed hotel card is worth carrying for exactly this.",
+      "**Missed the last train** → night buses (**N-numbered**, ~₩2,500, run 23:30–05:30) cover most of Seoul, and they take T-money or cash.",
+    ],
+    twin: "**1330** works from any phone, including a stranger's, and is free — they interpret and can call your hotel or a taxi for you.",
+    fallback: "Police box 파출소 · **112** · Travel hotline **1330** · Seoul city **120**.",
+  },
+  {
+    // "Can I bring my dog into a cafe" returned an art museum. We had nothing to
+    // say about being allowed to do something, only about where things are.
+    match:
+      /(bring (?:my )?(?:dog|pet|cat|puppy)|pet.?friendly|with (?:my )?dog|dogs? allowed|pets? allowed|애견|반려(?:견|동물)|강아지.*(?:데리|같이|가능)|ペット(?:同伴|可)|犬(?:と|を連れ)|[宠寵]物|可以[带帶].*狗)/i,
+    label: "Travelling with a pet",
+    emoji: "🐾",
+    blocker:
+      "Korea separates 'pet-friendly' from 'ordinary' sharply, and the rule is not posted in English. Assuming a café will take a dog because cafés elsewhere do is how people get turned away at the door.",
+    workaround: [
+      "**Ordinary cafés and restaurants: assume no.** Food-hygiene rules keep animals out of most, and staff will refuse politely at the door. This is not negotiable by asking nicely.",
+      "**애견동반 (pet-friendly) is a category of its own** — search Naver Map for **애견동반 카페** plus the neighbourhood. Seongsu, Yeonnam, Hannam and the Han River parks have clusters, and many have off-lead gardens.",
+      "**Public transport**: subway and buses allow pets **in a closed carrier only**. A dog on a lead will be refused. Taxis are the driver's decision — Kakao T has a pet option.",
+      "**Parks are the easy yes** — Han River parks, Seoul Forest and Olympic Park all welcome leashed dogs, and are where people actually take them.",
+      "**Guide dogs are different**: legally admitted everywhere, including restaurants and transport, and refusing one is an offence.",
+    ],
+    fallback: "Search 애견동반 on Naver Map · Han River parks and Seoul Forest are reliably fine.",
+  },
+  {
     // Lost passport / wallet / phone / bag, theft and scams. QA found every one of
     // these routed to the medical-emergency card — no embassy, no 112, no lost112.
     match: /(lost|stole|stolen|theft|pickpocket|missing|left (?:my|it|the)|scam|overcharg|rip(?:ped)? me off|분실|잃어버|도난|소매치기|바가지|사기|置き忘|なくし|盗まれ|丢了|丢失|被偷|被骗)/i,

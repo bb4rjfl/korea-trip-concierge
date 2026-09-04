@@ -124,6 +124,74 @@ export function asksAboutSeason(text: string): boolean {
 }
 
 /** The season card for a given month (1–12), with any big holiday coming up. */
+/**
+ * The things people ask to see that are only there for a few weeks.
+ *
+ * "Is there anywhere I can see cherry blossoms right now" was answered in
+ * September with a card about autumn weather — every word true, and it never
+ * said the one thing that mattered, which is *no, not for another seven months*.
+ * A seasonal answer that does not state the season is a non-answer.
+ */
+const SEASONAL_SIGHTS: { match: RegExp; what: string; months: number[]; where: string }[] = [
+  {
+    match: /cherry blossom|벚꽃|[樱櫻]花|桜/i,
+    what: "Cherry blossoms",
+    months: [3, 4],
+    where: "Yeouido, Seokchon Lake and Namsan in Seoul; earlier in Jeju and Busan (late March).",
+  },
+  {
+    match: /autumn (?:leaves|foliage|colours|colors)|fall (?:leaves|foliage)|단풍|[红紅][叶葉]|紅葉/i,
+    what: "Autumn leaves",
+    months: [10, 11],
+    where: "Naejangsan and Seoraksan peak first; Seoul's palaces and Bukhansan follow in early November.",
+  },
+  {
+    match: /lotus|연꽃|蓮|荷花/i,
+    what: "Lotus blooms",
+    months: [7, 8],
+    where: "Semiwon in Yangpyeong and Gwanbangjerim in Damyang.",
+  },
+  {
+    match: /canola|rapeseed|유채|油菜/i,
+    what: "Canola fields",
+    months: [3, 4],
+    where: "Jeju, especially around Seongsan Ilchulbong.",
+  },
+  {
+    match: /pink muhly|핑크뮬리|粉黛/i,
+    what: "Pink muhly grass",
+    months: [9, 10],
+    where: "Haneul Park in Seoul and Songdo Central Park.",
+  },
+  {
+    match: /snow|눈 ?구경|雪/i,
+    what: "Snow",
+    months: [12, 1, 2],
+    where: "Gangwon-do — Pyeongchang, Taebaek, and the ski resorts.",
+  },
+];
+
+/**
+ * A straight answer about whether the thing they asked for is out right now.
+ *
+ * Returned as its own line to lead the card with, so the honest "not now" comes
+ * before anything else rather than being buried under this month's weather.
+ */
+export function seasonalVerdict(text: string, month: number): string | undefined {
+  const sight = SEASONAL_SIGHTS.find((s) => s.match.test(text ?? ""));
+  if (!sight) return undefined;
+  if (sight.months.includes(month)) {
+    return `🌸 **Yes — ${sight.what.toLowerCase()} are in season right now.** ${sight.where}`;
+  }
+  const names = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const window = sight.months.map((m) => names[m]).join(" and ");
+  // Count forward to the next window, so "seven months away" is a fact rather
+  // than something the reader has to work out from two month names.
+  const next = sight.months.map((m) => (m - month + 12) % 12).sort((a, b) => a - b)[0];
+  const away = next === 0 ? "" : next === 1 ? " — about a month away" : ` — about ${next} months away`;
+  return `🚫 **Not now.** ${sight.what} are a ${window} thing in Korea${away}. ${sight.where}`;
+}
+
 export function seasonCard(month: number, today = new Date()): string {
   const s = BY_MONTH[month] ?? BY_MONTH[1];
   const holiday = upcomingMajorHoliday(today);
