@@ -644,7 +644,12 @@ function dedupeByName(spots: Spot[]): Spot[] {
       .replace(/\([^)]*\)/g, "")
       .replace(/[^a-z가-힣0-9]/g, "");
     if (!key) continue;
-    const kept = seen.get(key);
+    // An exact key is not enough: "Gwangjang Market" and "Gwangjang Market
+    // street food" are the same market under two keys, and both were surviving
+    // — so a day could hold one of each, and the copy that won the slot was
+    // whichever had the longer blurb rather than the one carrying coordinates.
+    const twin = out.find((o) => samePlaceAs(s, [o]));
+    const kept = seen.get(key) ?? twin;
     if (kept) {
       // The curated entry wins, because it carries the hand-written reason to
       // go. But the live twin knows where the place actually is and which exit

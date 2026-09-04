@@ -629,6 +629,14 @@ ${partial.reply ?? ""}`.trim(),
     // design — and the model hands them a tidied noun instead. "My card was
     // declined at a restaurant, what now" arrived as "restaurant", so the tool
     // could not see the urgency and answered with a general explanation.
+    // Two requirements at one table stay two. The model picks one need and the
+    // tool renders one card, so "I'm vegan and my friend eats only halal" came
+    // back about halal only — an answer about half the table.
+    if (toolCall.name === "findForeignerFriendlyStore") {
+      const diets = understand(text).diets.filter((d) => d === "vegan" || d === "vegetarian" || d === "halal");
+      if (diets.length > 1) filled.need = diets.join(", ");
+    }
+
     if (toolCall.name === "explainPayment" && text.trim()) filled.situation = text.trim();
     if (toolCall.name === "explainKoreanService" && text.trim()) filled.service = text.trim();
 

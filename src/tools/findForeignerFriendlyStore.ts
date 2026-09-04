@@ -310,6 +310,12 @@ export const findForeignerFriendlyStore: ToolDef = {
   handler: async (args) => {
     const area = String(args.area ?? "").trim();
     const need = resolveNeed(args.need as string | undefined);
+    // A comma-separated need means the traveller stated more than one, and
+    // answering only the first one is answering half the table.
+    const extraNeeds = String(args.need ?? "")
+      .split(",")
+      .map((n) => resolveNeed(n.trim()))
+      .filter((n): n is Need => Boolean(n) && n !== need);
 
     if (!area) {
       // Someone describing chest pain or a collapse must never be handed a menu of
@@ -363,6 +369,16 @@ export const findForeignerFriendlyStore: ToolDef = {
 
     const e = ESSENTIALS[need];
     const head = [`${e.emoji} **${e.label} in ${area}**`, "", e.tip];
+    // A second stated need gets its own section rather than being dropped. Two
+    // people at one table with different requirements is the common case, and
+    // answering one of them reads as not having listened to the other.
+    for (const other of extraNeeds) {
+      const o = ESSENTIALS[other];
+      head.push("", `${o.emoji} **${o.label}**`, "", o.tip);
+    }
+    if (extraNeeds.length) {
+      head.push("", "_You named more than one requirement, so both are above — Itaewon and Haebangchon sit next to each other, which is why a mixed table usually ends up there._");
+    }
 
     // Curated guidance always renders; add live nearby spots when a POI key exists.
     let nearby: string[] = [];
