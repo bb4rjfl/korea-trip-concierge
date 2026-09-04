@@ -119,6 +119,9 @@ const CITY_AS_AREA = /^(?:Seoul|Busan|Jeju|Gyeongju|Korea)$/i;
 /** Brisk city walking, allowing for crossings and stairs. */
 const WALK_KMH = 4.2;
 
+/** Seoul's base fare — a short hop is one fare whichever mode you take. */
+const SHORT_HOP_FARE = 1550;
+
 async function legsBetweenStops(
   stops: { spot: Spot }[],
 ): Promise<{ label: string; minutes: number; fareWon: number }[]> {
@@ -151,18 +154,37 @@ async function legsBetweenStops(
       // neighbourhood, which only routes when it happens to also be a station.
       const from = stationFromAccess(a.access) ?? a.area;
       const to = stationFromAccess(b.access) ?? b.area;
-      if (!from || !to || from === to) continue;
       // Live listings often carry no address, so their "area" is the city name.
       // "Seoul → Myeongdong 4min" is a routing artefact, not a leg of anyone's
-      // day — better to show one honest hop than two and a fiction.
-      if (CITY_AS_AREA.test(from) || CITY_AS_AREA.test(to)) continue;
-      const route = planRoute(graph, from, to);
-      if (!route) continue;
-      out.push({
-        label: `${shortName(a.name)} → ${shortName(b.name)} ${route.minutes}min`,
-        minutes: route.minutes,
-        fareWon: route.fareWon,
-      });
+      // day. That used to end the leg here, which threw away a distance we knew
+      // perfectly well — so it now falls through to the coordinates below.
+      const routable = Boolean(from && to && from !== to && !CITY_AS_AREA.test(from) && !CITY_AS_AREA.test(to));
+      const route = routable ? planRoute(graph, from as string, to as string) : undefined;
+      if (route) {
+        out.push({
+          label: `${shortName(a.name)} → ${shortName(b.name)} ${route.minutes}min`,
+          minutes: route.minutes,
+          fareWon: route.fareWon,
+        });
+        continue;
+      }
+
+      // Neither name is a station, and we still know exactly how far apart they
+      // are. Dropping the leg made a genuinely compact day — Gwangjang, Tongin
+      // and Cheonggyecheon, all inside the old centre — read as three unrelated
+      // places, because nothing on the card said they were close. Say the
+      // distance and mark the time as an estimate rather than say nothing.
+      if (a.lat != null && a.lng != null && b.lat != null && b.lng != null) {
+        const km = haversineKm({ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng });
+        // ~18 km/h door to door across Seoul, which is what a short hop averages
+        // once waiting, walking to the platform and transferring are counted.
+        const minutes = Math.max(5, Math.round((km / 18) * 60));
+        out.push({
+          label: `${shortName(a.name)} → ${shortName(b.name)} ${km.toFixed(1)}km, about ${minutes}min`,
+          minutes,
+          fareWon: SHORT_HOP_FARE,
+        });
+      }
     }
     return out;
   } catch {
