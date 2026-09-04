@@ -343,3 +343,23 @@ export function confident(hits: Hit[]): boolean {
   if (top.cosine != null) return top.cosine >= COSINE_FLOOR;
   return (top.lexical ?? 0) >= LEXICAL_ONLY_FLOOR;
 }
+
+/**
+ * Confident enough to overrule a tool the model already chose.
+ *
+ * A higher bar than `confident`, and it exists because of a specific failure
+ * class the evaluation exposed: the model routes anything place-shaped to place
+ * search and anything with a destination in it to the route planner, so
+ * "my phone died and I have no cash, how do I get to my hotel" became a routing
+ * request and "can I bring my dog into a cafe" became a café list — while the
+ * guides that actually answer both sat in the corpus, unreachable.
+ *
+ * Overruling a model is only defensible when the corpus is much more sure than
+ * the ordinary threshold, which is why this is 0.68 against 0.60: the answerable
+ * questions measured between 0.61 and 0.71, so this keeps only the top of that
+ * band.
+ */
+export function stronglyConfident(hits: Hit[]): boolean {
+  const top = hits[0];
+  return Boolean(top?.cosine != null && top.cosine >= 0.68);
+}

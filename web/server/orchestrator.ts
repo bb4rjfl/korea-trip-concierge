@@ -11,7 +11,27 @@ import { backfillArgs, contextHint, deriveContext } from "./context.js";
 import { localizeLabels, toTraditional } from "./labels.js";
 import { asksAboutExit, exitFor } from "../../src/lib/exits.js";
 import { searchPlaces } from "../../src/lib/sources/tourapi.js";
-import { search as retrieve, confident as confidentHit } from "../../src/lib/retrieval.js";
+import {
+  search as retrieve,
+  confident as confidentHit,
+  stronglyConfident,
+} from "../../src/lib/retrieval.js";
+
+/**
+ * Tools broad enough to swallow a question meant for a narrower one.
+ *
+ * The model routes anything place-shaped to place search and anything with a
+ * destination to the route planner. That is reasonable of it and wrong often
+ * enough to matter: "my phone died and I have no cash, how do I get to my
+ * hotel" is not a routing request, and "can I bring my dog into a cafe" is not
+ * a search for cafés. When the corpus is much more sure than usual, it wins.
+ */
+const GENERIC_TOOLS = new Set([
+  "searchPlaceForeigner",
+  "getTransitRoute",
+  "findForeignerFriendlyStore",
+  "getNowInfo",
+]);
 
 /** Tools whose answer is anchored on a neighbourhood, and stall without one. */
 const AREA_TOOLS = new Set(["findForeignerFriendlyStore", "getAreaGuide"]);
@@ -507,6 +527,20 @@ ${partial.reply ?? ""}`.trim(),
       const hit = routeText(text, lang);
       if (hit) {
         toolCall = { name: hit.tool, args: hit.args };
+        engine = "rules";
+      }
+    }
+
+    // 2b) Arbitrate. The corpus knows which of our own answers a sentence is
+    // about, and each document carries the tool that gives it — so when it is
+    // much more sure than usual and the model reached for a catch-all, follow
+    // the corpus instead. This is the step that connects new knowledge to the
+    // questions that need it without another regular expression in the router.
+    if (toolCall && GENERIC_TOOLS.has(toolCall.name)) {
+      const hits = await retrieve(text, { kinds: ["service", "payment", "card"], limit: 2 }).catch(() => []);
+      const better = hits[0]?.doc;
+      if (better?.route && stronglyConfident(hits) && better.route.tool !== toolCall.name) {
+        toolCall = { name: better.route.tool, args: better.route.args };
         engine = "rules";
       }
     }
