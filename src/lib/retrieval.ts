@@ -53,6 +53,16 @@ export interface Doc {
   route?: { tool: string; args: Record<string, unknown> };
   /** Set for spots: the neighbourhood, for a one-line label. */
   area?: string;
+  /**
+   * The one sentence worth printing about this — the reason to go.
+   *
+   * Kept apart from `text` because `text` is everything a query might match,
+   * aliases included, and a renderer guessing which part of it reads like a
+   * sentence printed a list of aliases under a gallery's name.
+   */
+  blurb?: string;
+  /** "10:00–18:00, closed Mondays" — the thing a generic assistant cannot say. */
+  hours?: string;
 }
 
 export interface Hit {

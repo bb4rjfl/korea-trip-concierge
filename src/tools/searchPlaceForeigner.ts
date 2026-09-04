@@ -13,7 +13,7 @@ import {
 import { todayKST } from "../lib/holidays.js";
 import { asksAboutMalls, mallsCard } from "../lib/malls.js";
 import { search, confident } from "../lib/retrieval.js";
-import { understand, expandQuery, readingNote } from "../lib/understand.js";
+import { understand, expandQuery, readingNote, shouldAvoid } from "../lib/understand.js";
 import { searchForeignerPois, hasPoiProvider, type PoiPlace } from "../lib/sources/poi.js";
 import {
   searchSeoulContent,
@@ -296,20 +296,27 @@ async function rescueBySearch(query: string, areaLabel?: string): Promise<string
   // quiet" used to return a mall, an aquarium and a department store: topically
   // correct, and the word doing all the work was *quiet*.
   const reading = understand(query);
-  const hits = await search(expandQuery(query, reading), { kinds: ["spot", "landmark", "area"], limit: 4 }).catch(
+  const found = await search(expandQuery(query, reading), { kinds: ["spot", "landmark", "area"], limit: 8 }).catch(
     () => [],
   );
-  if (!hits.length || !confident(hits)) return undefined;
+  if (!found.length || !confident(found)) return undefined;
+  // Drop what they just said they were done with. "Exhausted from shopping" was
+  // being answered with a mall — quiet, indoors, and the one thing they had had
+  // enough of.
+  const kept = found.filter((h) => !shouldAvoid(reading, `${h.doc.title} ${h.doc.text}`));
+  const hits = kept.length ? kept : found;
   const lines = hits.slice(0, 3).map((h, i) => {
     const where = h.doc.area && !/^(?:Seoul|Busan|Jeju|Gyeongju)$/i.test(h.doc.area) ? ` _(${h.doc.area})_` : "";
-    // The document text is our own blurb; the part of it that reads like a
-    // sentence is the reason to go. The name is in there too and is long enough
-    // to pass for one, which printed "COEX Aquarium + Starfield Library — COEX
-    // Aquarium + Starfield Library".
-    const why = h.doc.text
-      .split(" · ")
-      .find((part) => part.length > 30 && part !== h.doc.title && !part.includes("allergens"));
-    return `**${i + 1}. ${h.doc.title}**${where}${why ? `\n   ${why}` : ""}\n   ${mapLinks(h.doc.title)}`;
+    // The reason to go, from the field that holds it. Guessing which part of the
+    // searchable text reads like a sentence printed a gallery's alias list under
+    // its name, and the place name twice before that.
+    const why =
+      h.doc.blurb ??
+      h.doc.text.split(" · ").find((part) => part.length > 30 && part !== h.doc.title && !part.includes("allergens"));
+    // Hours are what makes holding this ourselves worth anything: a general
+    // assistant can name the gallery and cannot tell you whether to go today.
+    const when = h.doc.hours ? `\n   🕒 ${h.doc.hours}` : "";
+    return `**${i + 1}. ${h.doc.title}**${where}${why ? `\n   ${why}` : ""}${when}\n   ${mapLinks(h.doc.title)}`;
   });
   const note = readingNote(reading);
   return [
@@ -600,6 +607,42 @@ const NOT_A_SIGHT_RE =
  * could not be geocoded. Three dead ends, from one listing that was never a
  * venue. The course pool has excluded these for a while; place search had not.
  */
+/**
+ * The kind of venue the traveller actually named.
+ *
+ * The Korean-language broadening search is a blunt radius query: ask it for
+ * galleries near Gangnam and it returns whatever tourism content sits there,
+ * which is how "art galleries in Gangnam" came back as two libraries, a
+ * taekwondo headquarters and a concert hall — with their names romanised, so
+ * unreadable as well as wrong. A generic assistant would have named Songeun and
+ * Horim; being beaten on our own subject is the failure that matters.
+ */
+const VENUE_KINDS: [RegExp, RegExp][] = [
+  [/\bgaller(?:y|ies)\b|미술관|갤러리/i, /gallery|galleries|미술관|갤러리|art (?:space|museum|centre|center)|아트/i],
+  [/\bmuseum\b|박물관/i, /museum|박물관|미술관|기념관/i],
+  [/\bpalace\b|고궁|궁궐/i, /palace|궁|고궁/i],
+  [/\btemple\b|사찰/i, /temple|사찰|암자|\uC808/i],
+  [/\bmarket\b|시장/i, /market|시장/i],
+  [/\bpark\b|공원/i, /park|공원|숲|정원/i],
+  [/\blibrar(?:y|ies)\b|도서관/i, /library|도서관/i],
+  [/\bcaf[eé]s?\b|카페/i, /cafe|café|카페|커피|coffee/i],
+];
+
+/**
+ * Drop results that are not the kind of place that was asked for.
+ *
+ * Applied only when the query names a kind — a vague "things to do" is not
+ * narrowed, and a query we cannot classify is left alone.
+ */
+function ofRequestedKind<T extends { title: string; address?: string }>(query: string, items: T[]): T[] {
+  const rule = VENUE_KINDS.find(([asked]) => asked.test(query));
+  if (!rule) return items;
+  const kept = items.filter((p) => rule[1].test(`${p.title} ${p.address ?? ""}`));
+  // If nothing survives, the honest outcome is an empty list — which sends the
+  // caller to the corpus rescue, where the real galleries are.
+  return kept;
+}
+
 const IS_AN_EVENT =
   /exhibition|exhibits?\b|fan ?meet|fanfest|concert|festival|fashion week|biennale|showcase|screening|open call|pop-?up store|기획전|특별전|전시회|콘서트|페스티벌|팝업|[0-9]{4}\s*(?:s\/s|f\/w)/i;
 
@@ -855,8 +898,11 @@ export const searchPlaceForeigner: ToolDef = {
       // A named neighbourhood means "walkable-ish"; a bare city means the metro area.
       const reachKm = area.trim() && !isSeoulText(area) ? 12 : 35;
       const places = withinReach(
-        (await searchPlacesAny(candidates, { category: cat, limit: 5, language })).filter(
-          (p) => !IS_AN_EVENT.test(p.title),
+        ofRequestedKind(
+          query,
+          (await searchPlacesAny(candidates, { category: cat, limit: 5, language })).filter(
+            (p) => !IS_AN_EVENT.test(p.title),
+          ),
         ),
         anchorCoord,
         reachKm,
@@ -877,7 +923,7 @@ export const searchPlaceForeigner: ToolDef = {
             language: "ko",
           });
           const seen = new Set(places.map((p) => p.title.toLowerCase()));
-          for (const p of ko) {
+          for (const p of ofRequestedKind(query, ko)) {
             if (places.length >= 6) break;
             const k = p.title.toLowerCase();
             if (!seen.has(k)) {

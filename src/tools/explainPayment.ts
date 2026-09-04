@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok } from "../lib/responses.js";
+import { understand } from "../lib/understand.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -315,6 +316,25 @@ function paymentChips(label: string, matched: boolean): Choice[] {
   return [P.transit, P.taxi, P.refund];
 }
 
+/**
+ * What to do in the next thirty seconds, before any explanation.
+ *
+ * The evaluation kept marking down "my card was declined at a restaurant, what
+ * now": the card explained what works in Korea and never told the person at the
+ * counter what to actually do.
+ */
+const DECLINED_NOW = [
+  "🚨 **Right now, at the counter — in this order:**",
+  "",
+  "1. **Ask them to run it as credit, not debit** — say **\"해외카드요\"** (hae-oe-card-yo, 'it's a foreign card'). Many terminals default to a domestic debit network that your card is not on.",
+  "2. **Try tap instead of insert**, or insert instead of tap. Korean terminals often accept one and not the other for foreign cards.",
+  "3. **Try a different card** — Visa and Mastercard are accepted far more widely than Amex, Discover or JCB.",
+  "4. **Pay in KRW if it offers your home currency** — that offer is DCC and costs you 3–8%.",
+  "5. **Still no?** Nearly every convenience store within a block has a **Global ATM** (CU, GS25, 7-Eleven) that takes foreign cards — withdraw cash and pay that way. Small restaurants are often cash-first anyway.",
+  "",
+  "_If the card is being refused everywhere, call your bank: Korean transactions frequently trigger a fraud block on the first attempt, and one call clears it._",
+].join("\n");
+
 export const explainPayment: ToolDef = {
   name: "explainPayment",
   description:
@@ -339,6 +359,10 @@ export const explainPayment: ToolDef = {
     const cardType = args.cardType ? String(args.cardType) : undefined;
     const matched = GUIDES.find((x) => x.match.test(situation));
     const g = matched ?? GENERIC;
-    return ok(render(g, Boolean(matched), cardType), paymentChips(g.label, Boolean(matched)));
+    // Someone standing at a till with a rejected card does not want an essay on
+    // Korean card acceptance; they want the next thing to try. Same knowledge,
+    // different shape — and the shape is what they asked for.
+    const lead = understand(situation).urgent ? `${DECLINED_NOW}\n\n---\n\n` : "";
+    return ok(lead + render(g, Boolean(matched), cardType), paymentChips(g.label, Boolean(matched)));
   },
 };

@@ -356,6 +356,25 @@ export const getTransitRoute: ToolDef = {
 
     // U3: a transit route needs a starting point. If the user only gave a
     // destination (common from chips), ask for the origin instead of failing.
+    // A bare city is not a destination when the traveller is standing in it.
+    // "Plan a route" with nothing named came back as "I can route you to Seoul",
+    // and then offered "From Seoul Station to Seoul" — three suggestions, none
+    // of which could go anywhere. Ask what they want to reach.
+    const BARE_CITY = /^(?:seoul|busan|jeju|incheon|daegu|daejeon|gwangju|ulsan|gyeongju|korea|서울|부산|제주|인천|대구|대전|광주|울산|경주|한국)$/i;
+    if (!from && (!to || BARE_CITY.test(to))) {
+      return fail(
+        "Where do you want to go?",
+        to
+          ? `Somewhere in **${to}** — tell me the place, station or address and I'll route you there.`
+          : "Tell me the place, station or address you're heading to and I'll route you there.",
+        [
+          { emoji: "🏛️", cmdEn: "Route to Gyeongbokgung Palace", descEn: "to the main palace" },
+          { emoji: "🛍️", cmdEn: "Route to Myeongdong", descEn: "to Myeongdong" },
+          { emoji: "🗼", cmdEn: "Route to N Seoul Tower", descEn: "to the tower" },
+        ],
+      );
+    }
+
     if (!from) {
       const dest = to || "your destination";
       // Offer common origins so the user can tap instead of re-typing (C9).

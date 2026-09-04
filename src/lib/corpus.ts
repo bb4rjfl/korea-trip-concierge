@@ -54,6 +54,7 @@ function spotDoc(spot: Spot, live = false): Doc {
     text: [spot.name, spot.area, city, spot.themes.join(" "), spot.note, spot.access, spot.blocks.join(" ")]
       .filter(Boolean)
       .join(" · "),
+    blurb: spot.note || undefined,
     route: { tool: "getNowInfo", args: { place: spot.name } },
   };
 }
@@ -68,7 +69,11 @@ function staticDocs(): Doc[] {
       id: `landmark:${l.name}`,
       kind: "landmark",
       title: l.name,
-      text: [l.name, l.aliases.join(" "), l.hoursLabel, (l as { note?: string }).note].filter(Boolean).join(" · "),
+      text: [l.name, l.aliases.join(" "), l.hoursLabel, l.note].filter(Boolean).join(" · "),
+      blurb: l.note,
+      // Hours are the whole point of holding these ourselves: a general-purpose
+      // assistant can name a gallery and cannot tell you whether to go today.
+      hours: [l.hoursLabel, l.closedLabel ? `closed ${l.closedLabel}` : ""].filter(Boolean).join(", "),
       route: { tool: "getNowInfo", args: { place: l.name } },
     });
   }
@@ -82,6 +87,7 @@ function staticDocs(): Doc[] {
       text: [a.name, wordsFromPattern(a.keys), a.blurb, a.spots.join(" · "), a.getThere, Object.values(a.interests).join(" · ")]
         .filter(Boolean)
         .join(" · "),
+      blurb: a.blurb,
       route: { tool: "getAreaGuide", args: { area: a.name.replace(/\s*\([^)]*\)\s*$/, "") } },
     });
   }
@@ -158,6 +164,7 @@ function staticDocs(): Doc[] {
       title: mall.name,
       area: mall.area,
       text: [mall.name, mall.ko, mall.area, mall.draw, mall.getThere, "mall shopping centre department store indoors"].join(" · "),
+      blurb: mall.draw,
       route: { tool: "getNowInfo", args: { place: mall.name } },
     });
   }

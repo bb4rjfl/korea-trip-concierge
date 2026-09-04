@@ -33,7 +33,23 @@ export interface Reading {
   rightNow: boolean;
   /** They asked whether something is allowed, not where it is. */
   permission: boolean;
+  /**
+   * What they have had enough of.
+   *
+   * "I'm exhausted from shopping" names the thing to avoid as clearly as it
+   * names what they want, and answering it with a mall — even a quiet one —
+   * reads as not having listened.
+   */
+  avoid: string[];
 }
+
+/** "tired of X", "sick of X", "X에 지쳤" — the thing they have had enough of. */
+const HAD_ENOUGH: [RegExp, string][] = [
+  [/(?:tired|exhausted|sick|done|enough)[^.]{0,24}\b(?:shopping|shops|malls?)\b|쇼핑[^.]{0,10}(?:지쳤|질렸|그만)/i, "shopping"],
+  [/(?:tired|exhausted|sick|done|enough)[^.]{0,24}\b(?:walking|walk)\b|걷[^.]{0,8}(?:지쳤|힘들)/i, "walking"],
+  [/(?:tired|exhausted|sick|done|enough)[^.]{0,24}\b(?:museums?|palaces?|temples?)\b/i, "history"],
+  [/(?:tired|exhausted|sick|done|enough)[^.]{0,24}\b(?:crowds?|people|queues?|lines)\b|사람[^.]{0,8}많[^.]{0,8}지쳤/i, "crowded"],
+];
 
 /** Adjectives that decide whether an answer fits, in four languages. */
 const QUALITIES: [RegExp, string][] = [
@@ -89,11 +105,27 @@ export function understand(text: string): Reading {
     urgent: URGENT.test(t),
     rightNow: RIGHT_NOW.test(t),
     permission: PERMISSION.test(t),
+    avoid: HAD_ENOUGH.filter(([re]) => re.test(t)).map(([, a]) => a),
   };
 }
 
 export function isEmptyReading(r: Reading): boolean {
-  return !r.qualities.length && !r.diets.length && !r.urgent && !r.rightNow && !r.permission;
+  return (
+    !r.qualities.length && !r.diets.length && !r.avoid.length && !r.urgent && !r.rightNow && !r.permission
+  );
+}
+
+/** Words that mark a document as the thing they said they had had enough of. */
+const AVOID_MARKERS: Record<string, RegExp> = {
+  shopping: /shopping|mall|department store|백화점|쇼핑|outlet|retail/i,
+  walking: /trail|hike|uphill|\bwalk\b|stairs|둘레길|등산/i,
+  history: /palace|museum|temple|shrine|heritage|궁|박물관|사찰/i,
+  crowded: /busiest|packed|crowded|most.?visited|번화|붐비/i,
+};
+
+/** Would this document be the thing they just said they were done with? */
+export function shouldAvoid(reading: Reading, text: string): boolean {
+  return reading.avoid.some((a) => AVOID_MARKERS[a]?.test(text));
 }
 
 /**
@@ -147,5 +179,8 @@ export function expandQuery(text: string, reading: Reading = understand(text)): 
  */
 export function readingNote(reading: Reading): string {
   const bits = [...reading.diets, ...reading.qualities];
-  return bits.length ? `_Looking for: ${bits.join(" · ")}._` : "";
+  const note = bits.length ? `Looking for: ${bits.join(" · ")}` : "";
+  const skip = reading.avoid.length ? `no more ${reading.avoid.join(", ")}` : "";
+  const both = [note, skip].filter(Boolean).join(" · ");
+  return both ? `_${both}._` : "";
 }
