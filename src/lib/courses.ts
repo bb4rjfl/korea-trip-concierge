@@ -686,6 +686,15 @@ export function composeCourse(
   profile?: TravelProfile,
   /** They asked about an evening specifically — anchor the plan there. */
   eveningOnly = false,
+  /**
+   * Lower-cased names of stops the traveller has already been shown.
+   *
+   * The variant counter recomposes earlier variants to know what to strike off,
+   * which only works if the candidate pool is identical between calls — and it
+   * is not, because the live pool fills in behind the answer. Naming what was
+   * actually served makes "another one" reliable rather than usually right.
+   */
+  alreadyShown: string[] = [],
 ): Course {
   const themes = wantedThemes(personas, explicitThemes);
   // Someone who asked to take it easy gets a day with room in it, not the same
@@ -786,6 +795,14 @@ export function composeCourse(
   // variant 0 was answered with the signature, striking off the *engine's*
   // variant 0 struck off a day nobody saw — and the hand-written day's stops
   // came round again on the very next ask. Strike off what was actually served.
+  // Anything already served is struck off by name before a single slot is
+  // filled, so it cannot come back however the pool has changed underneath us.
+  if (alreadyShown.length) {
+    for (const spot of catalogue) {
+      const n = spot.name.toLowerCase();
+      if (alreadyShown.some((shown) => n.includes(shown) || shown.includes(n))) used.add(spot.id);
+    }
+  }
   if (signature) for (const x of signature) used.add(x.id);
   for (let k = signature ? 1 : 0; k < variant; k++) compose(k, used);
   let days = compose(variant, used);

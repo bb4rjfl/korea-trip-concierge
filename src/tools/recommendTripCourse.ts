@@ -245,6 +245,15 @@ export const recommendTripCourse: ToolDef = {
         "Which alternative to return. 0 (default) is the strongest course; pass 1, 2, 3… when the traveler " +
           "asks for another one, and each returns a different day in a different part of the city.",
       ),
+    alreadyShown: z
+      .string()
+      .optional()
+      .describe(
+        "Stops the traveler has already been shown in this conversation, separated by ' | '. They will not " +
+          "appear again. Pass this whenever they ask for another course — it is what makes 'another one' " +
+          "reliable, because the candidate pool refreshes in the background and recomputing what was shown " +
+          "does not reproduce it.",
+      ),
     location: z.string().optional().describe("City: Seoul, Busan, Jeju, or Gyeongju (default Seoul). Other cities steer to getAreaGuide."),
   },
   annotations: {
@@ -315,7 +324,18 @@ export const recommendTripCourse: ToolDef = {
       /\b(?:this |first |tomorrow )?evening\b|\btonight\b|after dark|for dinner|첫날 ?저녁|오늘 ?저녁|저녁에|밤에|今夜|夜だけ|今晩|今晚|晚上/i.test(
         `${blob} ${String(args.notes ?? "")}`,
       );
-    const course = composeCourse(personas, dur, explicitThemes, city, indoor, variant, extra, profile, eveningOnly);
+    // What they have already seen, excluded by name. The variant counter alone
+    // was not enough: the live pool refreshes in the background, so recomputing
+    // "what variant 1 would have been" does not reproduce what variant 1 was,
+    // and a stop could come back on the very next ask.
+    const shown = String(args.alreadyShown ?? "")
+      .split("|")
+      .map((n) => n.trim().toLowerCase())
+      .filter((n) => n.length > 2);
+    const withoutShown = shown.length
+      ? extra.filter((sp) => !shown.some((n) => sp.name.toLowerCase().includes(n) || n.includes(sp.name.toLowerCase())))
+      : extra;
+    const course = composeCourse(personas, dur, explicitThemes, city, indoor, variant, withoutShown, profile, eveningOnly, shown);
     const durLabel = dur === "half-day" ? (eveningOnly ? "Evening" : "Half-day") : dur === "2-day" ? "2-day" : dur === "3-day" ? "3-day" : "1-day";
     const head = `🗺️ **${durLabel} ${city} course — for a ${personaTitle(personas)}**`;
     const lines = [head];
