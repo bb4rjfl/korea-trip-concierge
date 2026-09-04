@@ -19,7 +19,8 @@
     "inspect": "npx -y @modelcontextprotocol/inspector",
     "test": "vitest run",
     "test:watch": "vitest",
-    "audit:facts": "tsx scripts/audit-facts.ts"
+    "audit:facts": "tsx scripts/audit-facts.ts",
+    "eval": "tsx scripts/eval.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

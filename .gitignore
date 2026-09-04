@@ -17,3 +17,7 @@ docs/27_tourism_contest_r1_requirements.md
 docs/28_webapp_architecture.md
 # Business strategy docs (local only, not for the public repo)
 biz-local/
+
+# Eval transcripts are a working artefact of a run, not a record worth keeping;
+# the baseline scores are.
+eval/last-run.md
