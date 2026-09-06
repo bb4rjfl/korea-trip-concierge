@@ -667,7 +667,10 @@ ${partial.reply ?? ""}`.trim(),
     if (toolCall.name === "recommendTripCourse" && !String(filled.alreadyShown ?? "").trim()) {
       const shown = history
         .filter((h) => h.role === "assistant")
-        .flatMap((h) => [...(h.content ?? "").matchAll(/^- \*\*(.+?)\*\*/gm)].map((m) => m[1]))
+        // Bold names anywhere, not list items at the start of a line: the answer
+        // is composed now, and a stop can appear mid-sentence. Parsing our own
+        // rendering was a coupling waiting to break, and it broke.
+        .flatMap((h) => [...(h.content ?? "").matchAll(/\*\*([^*\n]{3,60}?)\*\*/g)].map((m) => m[1]))
         .map((n) => n.replace(/\s*\([^)]*\)\s*$/, "").trim())
         .filter(Boolean);
       if (shown.length) filled.alreadyShown = [...new Set(shown)].slice(-24).join(" | ");
@@ -769,7 +772,14 @@ ${partial.reply ?? ""}`.trim(),
     //
     // This is the half we were missing. A general assistant writes well and does
     // not know whether the gallery is open; we knew and did not write.
-    const composed = await composeAnswer(text, body, lang, reading);
+    let composed = await composeAnswer(text, body, lang, reading);
+    // What we understood has to survive the rewrite. The "Planned for" line is
+    // how a traveller sees — and corrects — what we took from their words, and
+    // the composer dropped it.
+    const readBack = /^_(?:Planned for|Looking for)[^\n]*$/m.exec(body)?.[0];
+    if (composed && readBack && !composed.includes(readBack)) {
+      composed = `${readBack}\n\n${composed}`;
+    }
 
     const [localizedRaw, images] = await Promise.all([
       // A composed answer is already written in the reader's language, so only
