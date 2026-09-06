@@ -10,7 +10,9 @@ import { criticalRoute, detectLang, isTraditionalChinese, routeText, type Lang }
 import { backfillArgs, contextHint, deriveContext } from "./context.js";
 import { localizeLabels, toTraditional } from "./labels.js";
 import { asksAboutExit, exitFor } from "../../src/lib/exits.js";
-import { understand } from "../../src/lib/understand.js";
+import { understand, readingNote, isEmptyReading } from "../../src/lib/understand.js";
+import { synthesize } from "./synthesize.js";
+import { getWeather, resolveCity as resolveCityGeo } from "../../src/lib/sources/weatherair.js";
 import { searchPlaces } from "../../src/lib/sources/tourapi.js";
 import {
   search as retrieve,
@@ -215,6 +217,45 @@ const CHIP_MARKER = "<<<CHIPS>>>";
  * buttons under a Japanese answer are unusable, and tapping one used to throw
  * the whole session back into English.
  */
+/**
+ * Compose the answer over the facts, with the situation the traveller is in.
+ *
+ * The situation is the part a general assistant cannot have: what time it is
+ * where they are standing, what the sky is doing, and what they have told us
+ * about themselves. It is passed as fact, so quoting it is grounded.
+ */
+async function composeAnswer(
+  said: string,
+  card: string,
+  lang: Lang,
+  reading: ReturnType<typeof understand>,
+): Promise<string | undefined> {
+  if (!card.trim()) return undefined;
+  const now = new Date(Date.now() + 9 * 3600_000);
+  const nowKST = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-${String(
+    now.getUTCDate(),
+  ).padStart(2, "0")} ${String(now.getUTCHours()).padStart(2, "0")}:${String(now.getUTCMinutes()).padStart(2, "0")} KST`;
+  // Weather only when it could change the answer — an indoor/outdoor question,
+  // a plan for today. Fetching it for "how do I pay" is latency for nothing.
+  const wantsWeather =
+    reading.rightNow || reading.qualities.includes("indoor") || reading.qualities.includes("outdoor");
+  let weather: string | undefined;
+  if (wantsWeather) {
+    const wx = await getWeather(resolveCityGeo("Seoul")).catch(() => undefined);
+    if (wx) {
+      weather = [wx.tempC != null ? `${wx.tempC}°C` : "", wx.sky, wx.precip, wx.rainProb != null ? `rain ${wx.rainProb}%` : ""]
+        .filter(Boolean)
+        .join(", ");
+    }
+  }
+  return synthesize({
+    said,
+    card,
+    lang,
+    situation: { nowKST, weather, profile: isEmptyReading(reading) ? undefined : readingNote(reading) },
+  });
+}
+
 async function localizeAnswer(
   body: string,
   chips: Chip[],
@@ -697,6 +738,14 @@ ${partial.reply ?? ""}`.trim(),
     }
 
     const { body, chips } = parseToolMarkdown(result.markdown);
+    // The card is correct and ready now; composing over it takes another second
+    // or two. Send the card first and replace it when the composed answer lands,
+    // which is the same two-stage path that took non-English answers from 9.1s
+    // to a readable 2.5s. English had no draft stage because it needed no
+    // translation — it needs one now.
+    if (lang === "en" && llmEnabled()) {
+      onDraft?.({ toolMarkdown: body, chips });
+    }
     if (lang !== "en" && llmEnabled()) {
       onStatus?.({ stage: "localizing" });
       // Translating a full card of restaurants costs about four seconds, on top of
@@ -713,9 +762,22 @@ ${partial.reply ?? ""}`.trim(),
     // translation window instead of adding latency. Chips travel with the body so
     // localizing them costs no extra round-trip: they are the primary interaction
     // surface, and English buttons under a Japanese answer are unusable.
+    // Compose the answer over the facts the card carries, rather than serving
+    // the card. The card is the fact base and stays the fallback: if the model
+    // is slow, or states anything that is not in the facts, we discard its
+    // answer and the traveller gets the card, which was always correct.
+    //
+    // This is the half we were missing. A general assistant writes well and does
+    // not know whether the gallery is open; we knew and did not write.
+    const composed = await composeAnswer(text, body, lang, reading);
+
     const [localizedRaw, images] = await Promise.all([
-      localizeAnswer(body, chips, lang, hant),
-      enrichImages(body, toolCall.name, lang),
+      // A composed answer is already written in the reader's language, so only
+      // its buttons still need localizing.
+      composed
+        ? localizeAnswer("", chips, lang, hant).then((r) => ({ body: composed, chips: r.chips }))
+        : localizeAnswer(body, chips, lang, hant),
+      enrichImages(composed ?? body, toolCall.name, lang),
     ]);
     // The client sends its own transcript back, so the previous card is right here.
     const lastAssistant = [...history].reverse().find((h) => h.role === "assistant")?.content?.trim();

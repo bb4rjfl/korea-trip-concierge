@@ -303,7 +303,13 @@ export const recommendTripCourse: ToolDef = {
     let indoor = isIndoorIntent(blob);
     let weatherNote = "";
     if (!indoor) {
-      const wx = await getWeather(geoForCity(city)).catch(() => undefined);
+      // Whether it is raining shapes the day; waiting on the forecast should not
+      // delay it. The feed answered in five seconds during one run and a course
+      // is not worth that, so it plans without the sky rather than late.
+      const wx = await Promise.race([
+        getWeather(geoForCity(city)).catch(() => undefined),
+        new Promise<undefined>((r) => setTimeout(() => r(undefined), 1200)),
+      ]);
       const wet = /rain|shower|snow|drizzle/i.test(`${wx?.precip ?? ""}`) || (wx?.rainProb ?? 0) >= 60;
       if (wet) {
         indoor = true;

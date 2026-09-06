@@ -636,6 +636,8 @@ export interface Course {
 /** One entry per place, keeping the first (curated) of any duplicate name. */
 function dedupeByName(spots: Spot[]): Spot[] {
   const seen = new Map<string, Spot>();
+  /** distinctive word → the kept spots carrying it, so a twin is a lookup. */
+  const byWord = new Map<string, Spot[]>();
   const out: Spot[] = [];
   for (const s of spots) {
     // "Tongin Market" and "Tongin Market (coin lunchbox)" are one place.
@@ -648,7 +650,14 @@ function dedupeByName(spots: Spot[]): Spot[] {
     // street food" are the same market under two keys, and both were surviving
     // — so a day could hold one of each, and the copy that won the slot was
     // whichever had the longer blurb rather than the one carrying coordinates.
-    const twin = out.find((o) => samePlaceAs(s, [o]));
+    //
+    // Looked up through a word index rather than by scanning what we have kept:
+    // the scan was O(n²) over five hundred candidates and pushed the course tool
+    // past its own five-second budget.
+    const words = distinctiveWords(s.name);
+    const nearby = new Set<Spot>();
+    for (const w of words) for (const o of byWord.get(w) ?? []) nearby.add(o);
+    const twin = [...nearby].find((o) => samePlaceAs(s, [o]));
     const kept = seen.get(key) ?? twin;
     if (kept) {
       // The curated entry wins, because it carries the hand-written reason to
@@ -666,6 +675,11 @@ function dedupeByName(spots: Spot[]): Spot[] {
       continue;
     }
     seen.set(key, s);
+    for (const w of words) {
+      const list = byWord.get(w);
+      if (list) list.push(s);
+      else byWord.set(w, [s]);
+    }
     out.push(s);
   }
   return out;
