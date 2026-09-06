@@ -5,6 +5,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { ENV, hasKey } from "../../src/lib/env.js";
 import { warmUpSources, warmCoursePool, warmCorpus } from "../../src/lib/warmup.js";
 import { corpusSize, corpusEmbedded } from "../../src/lib/retrieval.js";
+import { trippedHosts } from "../../src/lib/http.js";
 import { warmCityList } from "../../src/lib/sources/tago.js";
 import { CATALOG } from "./catalog.js";
 import { handleChat, type ChatRequest } from "./orchestrator.js";
@@ -112,6 +113,9 @@ app.get("/healthz", (_req: Request, res: Response) => {
     // and not, and it is unavailable for a moment after a cold start. Say so,
     // so a deploy can be checked rather than assumed.
     search: { docs: corpusSize(), semantic: corpusEmbedded() },
+    // Which upstreams we are currently skipping, so an outage is visible
+    // here instead of being inferred from slow answers.
+    ...(trippedHosts().length ? { degraded: trippedHosts() } : {}),
     status: "ok",
     tools: CATALOG.length,
     llm: llmEnabled(),
