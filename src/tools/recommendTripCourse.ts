@@ -122,6 +122,14 @@ const WALK_KMH = 4.2;
 /** Seoul's base fare — a short hop is one fare whichever mode you take. */
 const SHORT_HOP_FARE = 1550;
 
+/**
+ * When the forecast feed last failed us.
+ *
+ * A course does not need the sky, and asking a dead upstream on every request
+ * costs a second a time. One failure buys a minute of not asking.
+ */
+let weatherDownUntil = 0;
+
 async function legsBetweenStops(
   stops: { spot: Spot }[],
 ): Promise<{ label: string; minutes: number; fareWon: number }[]> {
@@ -305,11 +313,16 @@ export const recommendTripCourse: ToolDef = {
     if (!indoor) {
       // Whether it is raining shapes the day; waiting on the forecast should not
       // delay it. The feed answered in five seconds during one run and a course
-      // is not worth that, so it plans without the sky rather than late.
-      const wx = await Promise.race([
-        getWeather(geoForCity(city)).catch(() => undefined),
-        new Promise<undefined>((r) => setTimeout(() => r(undefined), 1200)),
-      ]);
+      // is not worth that, so it plans without the sky rather than late — and
+      // once it has failed, it is not asked again for a minute, because paying
+      // the same wait on every request while an upstream is down is not caution.
+      const wx = weatherDownUntil > Date.now()
+        ? undefined
+        : await Promise.race([
+            getWeather(geoForCity(city)).catch(() => undefined),
+            new Promise<undefined>((r) => setTimeout(() => r(undefined), 1200)),
+          ]);
+      if (!wx) weatherDownUntil = Date.now() + 60_000;
       const wet = /rain|shower|snow|drizzle/i.test(`${wx?.precip ?? ""}`) || (wx?.rainProb ?? 0) >= 60;
       if (wet) {
         indoor = true;
@@ -319,7 +332,15 @@ export const recommendTripCourse: ToolDef = {
     const variant = Math.max(0, Math.floor(Number(args.variant ?? 0)) || 0);
     // The city's own tourism data behind the curated spots — a few hundred more
     // candidates, which is what makes "give me another one" mean anything.
-    const extra = await livePool(city).catch(() => []);
+    // The live pool widens the field; the curated spots are what guarantee a
+    // course exists at all. When the national portal is unreachable — it was,
+    // for a whole evaluation run — waiting on it turns a two-second answer into
+    // a timeout, so the day is planned from what we hold and the pool joins in
+    // whenever it lands.
+    const extra = await Promise.race([
+      livePool(city).catch(() => [] as Spot[]),
+      new Promise<Spot[]>((r) => setTimeout(() => r([]), 2000)),
+    ]);
     // What they told us about how they want to travel — budget, pace, walking,
     // children, and anything they have already said no to.
     const profile = readProfile([String(args.notes ?? ""), personaRaw, themesRaw].filter(Boolean));

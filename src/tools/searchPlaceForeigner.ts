@@ -960,6 +960,19 @@ export const searchPlaceForeigner: ToolDef = {
           searchChoices(areaLabel, cat === "food"),
         );
       }
+      // The national data portal goes down — it was unreachable from this server
+      // for the whole of one evaluation run — and when it does we still hold
+      // hundreds of places, with hours. Answering from our own knowledge is a
+      // far better outage than eleven seconds and an apology.
+      const offline = await rescueBySearch(query, areaLabel, String(args.said ?? ""));
+      if (offline) {
+        return ok(
+          `${offline}
+
+_The national tourism feed is not responding right now, so these come from this service's own place knowledge. Live listings will be back shortly._`,
+          searchChoices(areaLabel, cat === "food"),
+        );
+      }
       return fail(
         "Couldn't reach the places service",
         "The Korea Tourism data source didn't respond in time. Please try again in a moment.",

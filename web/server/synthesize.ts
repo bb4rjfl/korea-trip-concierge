@@ -81,7 +81,16 @@ function numbersIn(text: string): Set<string> {
   const out = new Set<string>();
   for (const raw of text.match(NUMBER_RE) ?? []) {
     const n = raw.replace(/[.,:]+$/, "");
-    if (n.length > 1) out.add(n);
+    if (n.length <= 1) continue;
+    out.add(n);
+    // Clock times get rewritten between 24h and 12h — production discarded a
+    // perfectly good answer for saying "7:12" when the facts said "19:12".
+    const clock = /^(\d{1,2}):(\d{2})$/.exec(n);
+    if (clock) {
+      const h = Number(clock[1]);
+      out.add(`${h > 12 ? h - 12 : h === 0 ? 12 : h}:${clock[2]}`);
+      out.add(`${h < 12 ? h + 12 : h}:${clock[2]}`);
+    }
   }
   return out;
 }
@@ -109,6 +118,13 @@ const NOT_A_CLAIM = new Set([
   "Bring", "Look", "Walk", "Head", "Try", "Get", "Use", "Pay", "Say", "Call", "Free", "Open",
   "Closed", "Note", "One", "Two", "Three", "Four", "Five", "About", "Around", "Near", "Just", "Then",
   "After", "Before", "Once", "Still", "Also", "Because", "Since", "While", "Best", "Good", "More",
+  // Travel vocabulary that starts a sentence or a label. These are how an answer
+  // is phrased, not claims about Korea — production threw away a good answer for
+  // the word "Subway".
+  "Subway", "Line", "Station", "Exit", "Bus", "Train", "Metro", "Card", "Cash", "Free", "Entry",
+  "Ticket", "Map", "Walk", "Minutes", "Hours", "Days", "Weekdays", "Weekends", "Holidays", "Please",
+  "Remember", "Keep", "Avoid", "Consider", "Expect", "Plan", "Start", "Finish", "Nearby", "Inside",
+  "Outside", "Indoors", "Outdoors", "Morning", "Lunch", "Dinner", "Late", "Early", "Rain", "Snow",
 ]);
 
 /**

@@ -94,8 +94,26 @@ export const getWeatherAndAir: ToolDef = {
     const air = aRes.status === "fulfilled" ? aRes.value : undefined;
     const alerts = alertRes.status === "fulfilled" ? alertRes.value : [];
 
-    // Both sources down → honest failure with retry.
+    // Both sources down: say what we still know rather than nothing. The
+    // national data portal was unreachable from this server for an entire
+    // evaluation run, and "the service is down" is the least useful thing we
+    // could have said — the month's weather is knowledge we hold ourselves.
     if (!weather && !air) {
+      const monthNow = new Date(Date.now() + 9 * 3600_000).getUTCMonth() + 1;
+      const verdict = seasonalVerdict(when, monthNow);
+      return ok(
+        [
+          `⚠️ **Live weather for ${city.label} is not available right now** — the national forecast feed is not responding.`,
+          "",
+          ...(verdict ? [verdict, ""] : []),
+          seasonCard(monthNow),
+          "",
+          "_That is the typical picture for this month, not today's reading. Ask again shortly for live numbers._",
+        ].join("\n"),
+        RETRY,
+      );
+    }
+    if (false) {
       return fail(
         "Couldn't reach the weather/air service",
         "Both the forecast and air-quality sources didn't respond in time. Please try again in a moment.",
