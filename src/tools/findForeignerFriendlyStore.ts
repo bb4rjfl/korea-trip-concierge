@@ -340,7 +340,7 @@ export const findForeignerFriendlyStore: ToolDef = {
       // and it was coming back as "Which area?".
       const said = [args.need, args.area].filter(Boolean).join(" ");
       if (said) {
-        const hits = await search(said, { kinds: ["area", "spot"], limit: 3 }).catch(() => []);
+        const hits = await search(said, { kinds: ["area", "spot"], limit: 3, rerank: true }).catch(() => []);
         const guess = hits[0];
         if (guess && confident(hits) && guess.doc.area) {
           return ok(

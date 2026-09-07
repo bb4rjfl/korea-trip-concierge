@@ -609,7 +609,7 @@ ${partial.reply ?? ""}`.trim(),
     // the welcome message back. Searching our own corpus finds Itaewon, and the
     // document carries the tool that answers it, so the reply is a real card.
     if (!toolCall) {
-      const hits = await retrieve(text, { limit: 3 }).catch(() => []);
+      const hits = await retrieve(text, { limit: 3, rerank: true }).catch(() => []);
       const best = hits.find((h) => h.doc.route)?.doc;
       if (best?.route && confidentHit(hits)) {
         toolCall = { name: best.route.tool, args: best.route.args };
@@ -720,7 +720,7 @@ ${partial.reply ?? ""}`.trim(),
       // essentials finder with no neighbourhood, so a question with an obvious
       // answer — Itaewon — came back as "Which area?". Ask the corpus before
       // asking the traveller to fill in a form.
-      const hits = await retrieve(text, { limit: 3 }).catch(() => []);
+      const hits = await retrieve(text, { limit: 3, rerank: true }).catch(() => []);
       const rescue = hits.find((h) => h.doc.route && h.doc.route.tool !== toolCall!.name)?.doc;
       if (rescue?.route && confidentHit(hits)) {
         const retry = await executeTool(rescue.route.tool, backfillArgs(rescue.route.tool, rescue.route.args, ctx));

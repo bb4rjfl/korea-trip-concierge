@@ -39,6 +39,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { embedDocuments, embedQuery, embeddingsAvailable, dot } from "./sources/embeddings.js";
+import { rerank } from "./sources/reranker.js";
 
 export type DocKind = "spot" | "landmark" | "area" | "dish" | "service" | "payment" | "card";
 
@@ -79,6 +80,15 @@ export interface Hit {
   cosine?: number;
   /** Raw BM25. Scale depends on the corpus, so only useful comparatively. */
   lexical?: number;
+  /**
+   * Where fusion put this before any reranking — 0 is the retrieval winner.
+   *
+   * Kept because reranking changes the *order* of the shortlist, not what each
+   * document is about, and the confidence floors below were calibrated against
+   * the retrieval winner's cosine. Gating on whatever ended up first after a
+   * rerank would be reading a measured threshold against an unmeasured number.
+   */
+  retrievalRank: number;
 }
 
 /* ------------------------------- tokenizing -------------------------------- */
@@ -177,6 +187,17 @@ const KIND_CONTEXT: Record<DocKind, string> = {
   service: "How a foreign visitor gets past a Korean app, system or requirement.",
   payment: "How paying works in this situation in Korea, for a foreign card.",
   card: "Practical guidance for travelling in Korea.",
+};
+
+/** How each kind reads to a reranker being asked what a candidate is. */
+const KIND_LABEL: Record<DocKind, string> = {
+  spot: "place to visit",
+  landmark: "attraction",
+  area: "neighbourhood",
+  dish: "Korean dish",
+  service: "guide to a Korean system",
+  payment: "guide to paying",
+  card: "practical guidance",
 };
 
 interface Index {
@@ -312,6 +333,16 @@ export interface SearchOptions {
   /** Restrict to these kinds. Omit for everything. */
   kinds?: DocKind[];
   limit?: number;
+  /**
+   * Take a second, more careful look at the shortlist before returning it.
+   *
+   * Off by default and switched on per call site, because it costs a network
+   * round trip and only earns it where the *order* of the shortlist decides
+   * something: which document the answer comes from, which tool runs, which
+   * places a traveller is shown first. Where the caller only asks "is there
+   * anything here at all", reordering changes nothing and the call is waste.
+   */
+  rerank?: boolean;
 }
 
 export async function search(query: string, opts: SearchOptions = {}): Promise<Hit[]> {
@@ -359,16 +390,30 @@ export async function search(query: string, opts: SearchOptions = {}): Promise<H
   );
   add(semanticRanks, "semantic");
 
-  return [...fused.entries()]
+  const hits: Hit[] = [...fused.entries()]
     .sort((a, b) => b[1].score - a[1].score)
     .slice(0, limit)
-    .map(([docIndex, { score, from }]) => ({
+    .map(([docIndex, { score, from }], rank) => ({
       doc: index!.docs[docIndex],
       score,
       from: [...from],
       cosine: cosine.get(docIndex),
       lexical: lexicalScore.get(docIndex),
+      retrievalRank: rank,
     }));
+
+  if (!opts.rerank || hits.length < 3) return hits;
+
+  // Retrieval scored the query against each document separately — the query
+  // never met the text. That is what makes it fast enough to run over the whole
+  // corpus, and it is why the top few are often the right neighbourhood in the
+  // wrong order. Reranking reads the two together and answers the narrower
+  // question: of these, which one actually answers what was asked.
+  const order = await rerank(
+    query,
+    hits.map((h) => ({ title: h.doc.title, snippet: h.doc.blurb ?? h.doc.text, kind: KIND_LABEL[h.doc.kind] })),
+  ).catch(() => undefined);
+  return order ? order.map((i) => hits[i]) : hits;
 }
 
 /**
@@ -405,10 +450,22 @@ const LEXICAL_ONLY_FLOOR = 14;
  * is not evidence to the contrary.
  */
 export function confident(hits: Hit[]): boolean {
-  const top = hits[0];
+  const top = retrievalWinner(hits);
   if (!top) return false;
   if (top.cosine != null) return top.cosine >= COSINE_FLOOR;
   return (top.lexical ?? 0) >= LEXICAL_ONLY_FLOOR;
+}
+
+/**
+ * The document retrieval ranked first, wherever a reranker later moved it.
+ *
+ * "Is anything here about this question" and "which of these is the best answer"
+ * are separate questions, and only the first has a measured threshold. Reranking
+ * answers the second; it must not be allowed to quietly move the first one's
+ * goalposts by putting a differently-scored document at the front.
+ */
+function retrievalWinner(hits: Hit[]): Hit | undefined {
+  return hits.find((h) => h.retrievalRank === 0) ?? hits[0];
 }
 
 /**
@@ -427,6 +484,6 @@ export function confident(hits: Hit[]): boolean {
  * band.
  */
 export function stronglyConfident(hits: Hit[]): boolean {
-  const top = hits[0];
+  const top = retrievalWinner(hits);
   return Boolean(top?.cosine != null && top.cosine >= 0.68);
 }

@@ -297,7 +297,12 @@ async function rescueBySearch(query: string, areaLabel?: string, said = ""): Pro
   // correct, and the word doing all the work was *quiet*.
   // Read their sentence, not the search phrase it was reduced to.
   const reading = understand(`${said} ${query}`.trim());
-  const found = await search(expandQuery(query, reading), { kinds: ["spot", "landmark", "area"], limit: 8 }).catch(
+  const found = await search(expandQuery(query, reading), {
+    kinds: ["spot", "landmark", "area"],
+    limit: 8,
+    // This list is shown, in this order, to someone deciding where to go.
+    rerank: true,
+  }).catch(
     () => [],
   );
   if (!found.length || !confident(found)) return undefined;
