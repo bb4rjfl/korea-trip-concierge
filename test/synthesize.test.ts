@@ -81,8 +81,7 @@ describe("grounded but unfaithful — the other half of the failure", () => {
   // Everything in these answers is in the facts. What was lost is what mattered,
   // and looking for added claims cannot see it. Both cases are ones production
   // produced within a single evaluation run.
-  const threeOptions = ["**Horim Museum Sinsa**", "**Leeum Museum of Art**", "**Songeun Art Space**"].join("
-");
+  const threeOptions = ["**Horim Museum Sinsa**", "**Leeum Museum of Art**", "**Songeun Art Space**"].join("\n");
 
   it("rejects a list reduced to a single option", () => {
     expect(droppedEssential("Horim Museum Sinsa is closed today.", threeOptions)).toMatch(/1 of 3/);
