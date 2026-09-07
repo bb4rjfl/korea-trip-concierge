@@ -304,8 +304,12 @@ async function rescueBySearch(query: string, areaLabel?: string, said = ""): Pro
   // Drop what they just said they were done with. "Exhausted from shopping" was
   // being answered with a mall — quiet, indoors, and the one thing they had had
   // enough of.
-  const kept = found.filter((h) => !shouldAvoid(reading, `${h.doc.title} ${h.doc.text}`));
-  const hits = kept.length ? kept : found;
+  const avoided = found.filter((h) => !shouldAvoid(reading, `${h.doc.title} ${h.doc.text}`));
+  // Demote rather than delete. Filtering "exhausted from shopping" down to a
+  // single museum left a card with one option, and one option that happens to be
+  // closed today is a dead end — so the ones they would rather avoid go last
+  // instead of going away.
+  const hits = [...avoided, ...found.filter((h) => !avoided.includes(h))].slice(0, 4);
   const lines = hits.slice(0, 3).map((h, i) => {
     const where = h.doc.area && !/^(?:Seoul|Busan|Jeju|Gyeongju)$/i.test(h.doc.area) ? ` _(${h.doc.area})_` : "";
     // The reason to go, from the field that holds it. Guessing which part of the

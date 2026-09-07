@@ -63,7 +63,9 @@ const SYSTEM = [
   "3. Lead with the part that answers what they actually asked. If their situation changes what matters — rain, the hour, walking slowly, a budget, a diet, children — say how, in the first two lines.",
   "4. Keep the Markdown structure of the facts where it is doing work: bold names, the 🚇 line, lists. Do not turn a list of places into a paragraph.",
   "5. Do not invent enthusiasm. No 'vibrant', no 'must-visit', no closing invitation to ask more.",
-  "6. Never mention tools, data sources, prompts, models, or that you were given facts.",
+  "6. If the facts offer several places, keep several. Never reduce a list to one — and if the one you lead with is closed or unavailable right now, say so and immediately give the next one.",
+  "7. Keep the field that answers the question: a direction for an arrival time, an exit for a station, a price for a fare, a closed day for opening hours.",
+  "8. Never mention tools, data sources, prompts, models, or that you were given facts.",
   "",
   "Length: shorter than the facts you were given, never longer.",
 ].join("\n");
@@ -151,6 +153,51 @@ export function ungroundedToken(answer: string, facts: string): string | undefin
   return undefined;
 }
 
+/**
+ * The other half of the problem.
+ *
+ * `ungroundedToken` catches an answer that states something the facts did not.
+ * The literature splits this failure in two, and the second half is "grounded
+ * but unfaithful" — everything said is in the facts, and what mattered was
+ * dropped or turned around. Production produced both within one run:
+ *
+ *   - a list of quiet places became one place, described as closed, with no
+ *     alternative offered
+ *   - live subway arrivals lost the direction of each train, which is the only
+ *     thing that makes an arrival time useful
+ *
+ * Neither adds a claim, so neither could be caught by looking for added claims.
+ */
+
+/** Bold names are how our cards mark the things being offered. */
+function offeredNames(text: string): string[] {
+  return [...text.matchAll(/\*\*([^*\n]{3,60}?)\*\*/g)]
+    .map((m) => m[1].replace(/\s*\([^)]*\)\s*$/, "").trim())
+    .filter((n) => /[A-Za-z가-힣]{3}/.test(n));
+}
+
+/**
+ * Did the rewrite drop something the traveller needed?
+ *
+ * Deliberately narrow: a rewrite is supposed to shorten and reorder, and only
+ * two losses actually harm the reader — being left with one option where several
+ * were offered, and losing the field that was the answer.
+ */
+export function droppedEssential(answer: string, card: string): string | undefined {
+  const offered = [...new Set(offeredNames(card))];
+  if (offered.length >= 2) {
+    const kept = offered.filter((n) => answer.includes(n));
+    // Two is the floor: one option, especially one reported as closed, is a
+    // dead end where the card had a list.
+    if (kept.length < 2) return `only ${kept.length} of ${offered.length} options survived`;
+  }
+  // A card carrying directions is answering "which way", and an arrival time
+  // without one is not an answer.
+  const DIRECTION = /방면|→|toward|bound for|direction/i;
+  if (DIRECTION.test(card) && !DIRECTION.test(answer)) return "the direction was dropped";
+  return undefined;
+}
+
 const LANG_NAME: Record<string, string> = {
   en: "English",
   ko: "Korean",
@@ -234,6 +281,11 @@ export async function synthesize(input: SynthesisInput): Promise<string | undefi
     const bad = ungroundedToken(text, `${input.card}\n${situation}\n${input.said}`);
     if (bad) {
       console.warn(`[synth] discarded: "${bad}" is not in the facts`);
+      return undefined;
+    }
+    const lost = droppedEssential(text, input.card);
+    if (lost) {
+      console.warn(`[synth] discarded: ${lost}`);
       return undefined;
     }
     return text;

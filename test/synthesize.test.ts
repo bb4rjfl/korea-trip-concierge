@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { ungroundedToken } from "../web/server/synthesize.js";
+import { ungroundedToken, droppedEssential } from "../web/server/synthesize.js";
 
 const FACTS = [
   "Gyeongbokgung Palace 09:00-18:00, closed Tuesdays.",
@@ -74,5 +74,34 @@ describe("the situation counts as fact", () => {
     expect(
       ungroundedToken("It is 24°C and clear, and the palace is open until 18:00 — you have time.", facts),
     ).toBeUndefined();
+  });
+});
+
+describe("grounded but unfaithful — the other half of the failure", () => {
+  // Everything in these answers is in the facts. What was lost is what mattered,
+  // and looking for added claims cannot see it. Both cases are ones production
+  // produced within a single evaluation run.
+  const threeOptions = ["**Horim Museum Sinsa**", "**Leeum Museum of Art**", "**Songeun Art Space**"].join("
+");
+
+  it("rejects a list reduced to a single option", () => {
+    expect(droppedEssential("Horim Museum Sinsa is closed today.", threeOptions)).toMatch(/1 of 3/);
+  });
+
+  it("accepts a rewrite that keeps an alternative when the first is closed", () => {
+    expect(
+      droppedEssential("Horim Museum Sinsa is closed today — Leeum Museum of Art is open until 18:00.", threeOptions),
+    ).toBeUndefined();
+  });
+
+  it("rejects an arrival time that lost its direction", () => {
+    const card = "Line 2 · 신도림 방면 · 3 min";
+    expect(droppedEssential("The next train arrives in 3 min.", card)).toMatch(/direction/);
+    expect(droppedEssential("Next train toward 신도림 in 3 min.", card)).toBeUndefined();
+  });
+
+  it("leaves a single-option card alone", () => {
+    // Nothing was dropped if there was only ever one thing to say.
+    expect(droppedEssential("Jogyesa Temple is open.", "**Jogyesa Temple**")).toBeUndefined();
   });
 });
