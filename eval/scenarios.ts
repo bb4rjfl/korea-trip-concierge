@@ -32,6 +32,17 @@ export interface Turn {
   /** Cheap deterministic guards, checked before the judge is asked. */
   mustMatch?: RegExp[];
   mustNotMatch?: RegExp[];
+  /**
+   * Every bolded name here must be one the previous answer did not give.
+   *
+   * "Another one" has to mean another one, and whether it did is a set
+   * comparison rather than a judgement — so it should not be left to a judge.
+   * Left to one, it went wrong in the expensive direction: three runs running,
+   * a second course sharing no stop at all with the first was failed for
+   * "repeating several stops from the previous itinerary", which sent me
+   * looking for a bug that was not there.
+   */
+  freshNames?: true;
 }
 
 export interface Scenario {
@@ -192,6 +203,7 @@ export const SCENARIOS: Scenario[] = [
         say: "something else please",
         expect:
           "Another day for the same couple, made of different stops from the one just given. Keeping the same persona is correct; repeating the stops is not.",
+        freshNames: true,
       },
     ],
   },

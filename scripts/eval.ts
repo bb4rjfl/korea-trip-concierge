@@ -110,14 +110,22 @@ Score:
 1 — related to the question but does not answer it: a list where a judgement was needed, or a clarifying question when the traveller already gave enough.
 0 — does not answer, contradicts the question, or is about something else entirely.
 
+When a previous answer is supplied, any claim about what changed between them must be read off those two texts. Do not assert an overlap you cannot point to.
+
 A clarifying question scores 0 when the traveller's words already contained what was needed.
 Saying "I don't know" or "I don't cover that" honestly scores 3 when the expectation says so, and 0 when it does not.
 
 Reply as JSON only: {"score": 0-3, "why": "<one sentence, concrete>"}`;
 
-async function judge(said: string, expect: string, answer: string): Promise<Verdict> {
+async function judge(said: string, expect: string, answer: string, previous?: string): Promise<Verdict> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return { pass: true, score: 2, why: "no judge key — deterministic checks only" };
+  // An expectation like "asking again gives a different day" is a comparison,
+  // and the judge was being asked to make it without being shown the thing to
+  // compare against. It filled the gap: three runs in a row it scored a course
+  // sharing no stop with the previous one as "repeated several stops". A judge
+  // that cannot see cannot be careful, so give it the previous answer.
+  const before = previous ? `\n\nTHE PREVIOUS ANSWER, FOR COMPARISON:\n${previous.slice(0, 3000)}` : "";
   const body = {
     systemInstruction: { parts: [{ text: JUDGE_INSTRUCTIONS }] },
     contents: [
@@ -125,7 +133,7 @@ async function judge(said: string, expect: string, answer: string): Promise<Verd
         role: "user",
         parts: [
           {
-            text: `TRAVELLER SAID:\n${said}\n\nA GOOD ANSWER HERE:\n${expect}\n\nTHE ANSWER GIVEN:\n${answer.slice(0, 6000)}`,
+            text: `TRAVELLER SAID:\n${said}\n\nA GOOD ANSWER HERE:\n${expect}${before}\n\nTHE ANSWER GIVEN:\n${answer.slice(0, 6000)}`,
           },
         ],
       },
@@ -170,12 +178,29 @@ interface TurnResult {
   hardFail?: string;
 }
 
-function checkGuards(turn: Turn, answer: string): string | undefined {
+/** The bolded names an answer offers — its stops, places or dishes. */
+function namesIn(markdown: string): Set<string> {
+  const out = new Set<string>();
+  for (const m of markdown.matchAll(/\*\*([^*]{3,60})\*\*/g)) {
+    const name = m[1].replace(/\s*_\([^)]*\)_\s*$/, "").trim();
+    // Headings and labels are bold too, and they are not stops.
+    if (/^(Getting between|Best bet|Planned for|\d)/i.test(name)) continue;
+    out.add(name.toLowerCase());
+  }
+  return out;
+}
+
+function checkGuards(turn: Turn, answer: string, previous?: string): string | undefined {
   for (const re of turn.mustMatch ?? []) {
     if (!re.test(answer)) return `missing required ${re}`;
   }
   for (const re of turn.mustNotMatch ?? []) {
     if (re.test(answer)) return `contains forbidden ${re}`;
+  }
+  if (turn.freshNames && previous) {
+    const before = namesIn(previous);
+    const repeated = [...namesIn(answer)].filter((n) => before.has(n));
+    if (repeated.length) return `repeats ${repeated.length}: ${repeated.slice(0, 3).join(", ")}`;
   }
   return undefined;
 }
@@ -214,8 +239,9 @@ async function runScenario(scenario: Scenario): Promise<TurnResult[]> {
     history.push({ role: "assistant", content: answer.body });
     lastChips = answer.chips;
 
-    const hardFail = checkGuards(turn, answer.body);
-    const verdict = hardFail ? { score: 0, why: hardFail } : await judge(said, turn.expect, answer.body);
+    const previous = results[results.length - 1]?.answer;
+    const hardFail = checkGuards(turn, answer.body, previous);
+    const verdict = hardFail ? { score: 0, why: hardFail } : await judge(said, turn.expect, answer.body, previous);
 
     results.push({
       scenario: scenario.name,
