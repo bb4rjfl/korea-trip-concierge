@@ -3,7 +3,7 @@ import { buildChoiceFooter } from "../src/lib/footer.js";
 import { parseToolMarkdown } from "../web/server/chips.js";
 import { CATALOG, CATALOG_BY_NAME, executeTool } from "../web/server/catalog.js";
 import { criticalRoute, detectLang, extractFromTo, findCity, routeText } from "../web/server/router.js";
-import { extractPlaceNames, isIllegalRequest, isSafetyThreat } from "../web/server/orchestrator.js";
+import { extractPlaceNames, isIllegalRequest, isSafetyThreat, looksLikeACourse } from "../web/server/orchestrator.js";
 import { backfillArgs, deriveContext } from "../web/server/context.js";
 import { resolvePlaceCoord } from "../src/lib/places.js";
 import { matchAreaName } from "../src/tools/getAreaGuide.js";
@@ -459,5 +459,47 @@ describe("Seoul subway graph", () => {
     const r = planRoute(graph, "明洞", "東大門")!;
     expect(r.legs[0].from).toBe("명동");
     expect(r.legs[r.legs.length - 1].to).toBe("동대문");
+  });
+});
+
+describe("another course means another course, whoever wrote the last one", () => {
+  // The count of courses already given was read off our own heading — "1-day
+  // Seoul course — for a Couple". The composing layer rewrites headings, so a
+  // composed first answer opened "Here is a plan for a couple in Seoul", the
+  // count stayed at zero, and "something else please" returned the same five
+  // stops word for word.
+  const CARD = [
+    "🗺️ **1-day Seoul course — for a 💑 Couple**",
+    "🌅 Morning",
+    "- **Bukchon Hanok Village**",
+    "🍜 Lunch / market",
+    "- **Gwangjang Market street food**",
+    "🌃 Evening",
+    "- **N Seoul Tower (Namsan)**",
+  ].join("\n");
+
+  const COMPOSED = [
+    "Here is a plan for a couple in Seoul, focusing on views, cafes and food.",
+    "🌅 Morning",
+    "*   **Bukchon Hanok Village** (Bukchon) — Postcard hanok alleys.",
+    "🍜 Lunch / market",
+    "*   **Gwangjang Market street food** (Jongno) — Bindaetteok and mayak gimbap.",
+    "🌃 Evening",
+    "*   **N Seoul Tower (Namsan)** (Namsan) — Cable car up for the night skyline.",
+  ].join("\n");
+
+  it("recognises the card it wrote itself", () => {
+    expect(looksLikeACourse(CARD)).toBe(true);
+  });
+
+  it("recognises the same course after the composer has rewritten it", () => {
+    // The heading is gone. The day is still a day.
+    expect(COMPOSED).not.toMatch(/course\s+—/);
+    expect(looksLikeACourse(COMPOSED)).toBe(true);
+  });
+
+  it("does not mistake an ordinary answer for a course", () => {
+    expect(looksLikeACourse("🕒 **Songeun Art Space — right now**\n🔴 Closed now.")).toBe(false);
+    expect(looksLikeACourse("🍜 One block emoji on its own is a card about food.")).toBe(false);
   });
 });

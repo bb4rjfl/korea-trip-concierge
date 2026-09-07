@@ -64,6 +64,16 @@ export interface Doc {
   blurb?: string;
   /** "10:00–18:00, closed Mondays" — the thing a generic assistant cannot say. */
   hours?: string;
+  /**
+   * Where it is, when we know.
+   *
+   * Carried so a caller can hold a result to the area that was asked about.
+   * Without it, "art galleries in Gangnam" was answered with a museum in
+   * Itaewon under a heading saying "in Gangnam": the corpus had the right kind
+   * of thing and no way to tell it was in the wrong place.
+   */
+  lat?: number;
+  lng?: number;
 }
 
 export interface Hit {

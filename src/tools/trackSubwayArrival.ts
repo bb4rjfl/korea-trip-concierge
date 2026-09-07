@@ -46,6 +46,43 @@ const RETRY: Choice[] = [
   { emoji: "🗺️", cmdEn: "Plan a transit route instead", descEn: "subway/bus directions" },
 ];
 
+/** After the last train, the question is not "which station" — it is "how now". */
+const AFTER_HOURS: Choice[] = [
+  { emoji: "🚌", cmdEn: "How do I get home after the last train?", cmdKo: "막차 끊겼어요", descEn: "night buses and taxis" },
+  { emoji: "🚕", cmdEn: "How do I call a taxi without Korean?", descEn: "taxi apps for visitors" },
+  { emoji: "🗺️", cmdEn: "Plan a transit route instead", descEn: "subway/bus directions" },
+];
+
+/**
+ * Seoul's subway runs roughly 05:30 to 01:00.
+ *
+ * Empty arrivals at twenty to two in the morning is not a lookup that failed,
+ * and answering it with "double-check the station name" tells someone standing
+ * at a closed gate that they typed it wrong. They did not — the trains have
+ * stopped, and what they need is the night bus.
+ */
+function outsideServiceHours(): boolean {
+  const kst = new Date(Date.now() + 9 * 3600_000);
+  const minutes = kst.getUTCHours() * 60 + kst.getUTCMinutes();
+  return minutes >= 60 && minutes < 5 * 60 + 30;
+}
+
+/** What an empty arrival board means, given the time. */
+function nothingRunning(what: string): { title: string; detail: string; choices: Choice[] } {
+  return outsideServiceHours()
+    ? {
+        title: "The subway has stopped for the night",
+        detail:
+          "Seoul's trains run about 05:30–01:00, so nothing is arriving until roughly 05:30. Night buses (the blue **N** routes) run all night, and taxis are the other option.",
+        choices: AFTER_HOURS,
+      }
+    : {
+        title: `No live trains ${what} right now`,
+        detail: "That is unusual inside service hours — tap Refresh, or check the name.",
+        choices: RETRY,
+      };
+}
+
 function render(station: string, arrivals: SubwayArrival[]): string {
   // Group by direction (towards), keep the soonest 1–2 per direction.
   const byDir = new Map<string, SubwayArrival[]>();
@@ -70,7 +107,13 @@ function render(station: string, arrivals: SubwayArrival[]): string {
     lines.push(`**→ ${dir}**`);
     for (const a of arr) {
       const eta = a.etaMinutes != null ? `**${a.etaMinutes} min**` : `_${a.status}_`;
-      const loc = a.currentLocation ? ` · near ${romanizeText(a.currentLocation)}` : "";
+      // Where the train is now, said as such. "· near Euljiro 1-ga" under a
+      // heading reading "to Euljiro 1-ga" reads as a claim about the
+      // destination being close by, which is the opposite of what it means —
+      // and when the two are the same station it is pure noise, so drop it.
+      const at = a.currentLocation ? romanizeText(a.currentLocation) : "";
+      const dest = romanizeText(a.destination ?? "");
+      const loc = at && at !== dest ? ` · train now at ${at}` : "";
       lines.push(`- ${a.line}: ${eta}${loc}`);
     }
     lines.push("");
@@ -286,11 +329,8 @@ export const trackSubwayArrival: ToolDef = {
       try {
         const trains = await getLinePositions(lineKo);
         if (trains.length === 0) {
-          return fail(
-            `No live trains on ${line} right now`,
-            "Seoul subway runs about 05:30–01:00. If it's within service hours, double-check the line.",
-            RETRY,
-          );
+          const n = nothingRunning(`on ${line}`);
+          return fail(n.title, n.detail, n.choices);
         }
         return ok(renderPositions(trains[0].line, trains), LINE_CHOICES);
       } catch {
@@ -330,11 +370,8 @@ export const trackSubwayArrival: ToolDef = {
     try {
       const arrivals = await getStationArrivals(stationKo);
       if (arrivals.length === 0) {
-        return fail(
-          `No live trains at ${station} right now`,
-          "Seoul subway runs about 05:30–01:00. If it's within service hours, double-check the station name.",
-          RETRY,
-        );
+        const n = nothingRunning(`at ${station}`);
+        return fail(n.title, n.detail, n.choices);
       }
       return ok(render(station, arrivals), CHOICES);
     } catch {

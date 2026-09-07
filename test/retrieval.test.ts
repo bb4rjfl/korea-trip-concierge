@@ -115,3 +115,21 @@ describe("kind filters", () => {
     expect(withPeanut.length, hits.map((h) => h.doc.title).join(" | ")).toBeGreaterThan(0);
   }, TIMEOUT);
 });
+
+describe("a place in the wrong neighbourhood is not an answer", () => {
+  // "Art galleries in Gangnam" led with the Leeum, which is in Itaewon, under a
+  // heading that said "in Gangnam". The corpus had the right kind of thing and
+  // no way to tell it was in the wrong place, because documents were built
+  // without the coordinates the landmarks already carried.
+  it("carries coordinates onto the documents that have them", async () => {
+    const hits = await search("Songeun Art Space", { kinds: ["landmark"], limit: 3 });
+    const songeun = hits.find((h) => h.doc.title.includes("Songeun"));
+    expect(songeun?.doc.lat).toBeCloseTo(37.52, 1);
+    expect(songeun?.doc.lng).toBeCloseTo(127.03, 1);
+  }, TIMEOUT);
+
+  it("keeps the hours, which are the reason to hold any of this ourselves", async () => {
+    const hits = await search("Songeun Art Space", { kinds: ["landmark"], limit: 3 });
+    expect(hits.find((h) => h.doc.title.includes("Songeun"))?.doc.hours).toMatch(/closed Sundays/);
+  }, TIMEOUT);
+});

@@ -1,8 +1,8 @@
 {
-  "pct": 85,
+  "pct": 92,
   "perTurn": {
-    "gallery → its chips :: art galleries in Gangnam": 2,
-    "gallery → its chips :: Is one of these open right now?": 1,
+    "gallery → its chips :: art galleries in Gangnam": 3,
+    "gallery → its chips :: Is one of these open right now?": 0,
     "route with nothing given :: what's the weather in Seoul today": 3,
     "route with nothing given :: plan a route": 1,
     "tired of shopping :: something indoors and quiet, I'm exhausted from shopping": 3,
@@ -14,8 +14,8 @@
     "live transit :: when is the next subway at Hongik University station": 3,
     "card declined :: my card was declined at a restaurant, what now": 3,
     "course, then another :: plan me a day in Seoul for a couple": 3,
-    "course, then another :: something else please": 0,
-    "walks slowly :: one day in Seoul, on a budget, and my mother walks slowly": 2,
+    "course, then another :: something else please": 3,
+    "walks slowly :: one day in Seoul, on a budget, and my mother walks slowly": 3,
     "Korean speaker :: 명동에서 카드 되는 식당 알려줘": 3,
     "Japanese speaker :: ソウルで韓国料理のおすすめは？": 3,
     "medical emergency :: my friend collapsed on the subway platform and isn't responding": 3,

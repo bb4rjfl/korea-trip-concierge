@@ -5,7 +5,13 @@ import { getNowInfo } from "../src/tools/getNowInfo.js";
 import { getTransitRoute } from "../src/tools/getTransitRoute.js";
 import { getAreaGuide } from "../src/tools/getAreaGuide.js";
 import { getJejuInfo } from "../src/tools/getJejuInfo.js";
-import { searchPlaceForeigner, templeStayLead, guidedTourLead, searchChoices } from "../src/tools/searchPlaceForeigner.js";
+import {
+  searchPlaceForeigner,
+  templeStayLead,
+  guidedTourLead,
+  searchChoices,
+  ofRequestedKind,
+} from "../src/tools/searchPlaceForeigner.js";
 
 const res = (body: unknown) => ({ ok: true, json: async () => body }) as unknown as Response;
 const text = (r: { content: { text: string }[] }) => r.content[0].text;
@@ -235,5 +241,29 @@ describe("searchPlaceForeigner dish routing (R3)", () => {
     const r = await searchPlaceForeigner.handler({ query: "tteokbokki", area: "Myeongdong" });
     expect(text(r)).not.toContain("official Seoul Tourism");
     expect(fetchMock).not.toHaveBeenCalled(); // no POI/TourAPI keys in test → no external call at all
+  });
+});
+
+describe("a name with 'art' in it is not necessarily a gallery", () => {
+  // "Art galleries in Gangnam" came back with the KEPCO Art Centre performance
+  // hall and the Yearimdang Art Hall — both have 아트 in the name, neither is
+  // somewhere you go to look at paintings.
+  const asked = "art galleries in Gangnam";
+  const rows = [
+    { title: "Hanjeonateusenteo Gongyeonjang (한전아트센터 공연장)", address: "Seocho-gu" },
+    { title: "Yerimdangateuhol (예림당아트홀)", address: "Gangnam-gu" },
+    { title: "Songeun Art Space", address: "Gangnam-gu" },
+    { title: "Kukje Gallery", address: "Jongno-gu" },
+  ];
+
+  it("keeps the galleries and drops the halls", () => {
+    const kept = ofRequestedKind(asked, rows).map((r) => r.title);
+    expect(kept).toContain("Songeun Art Space");
+    expect(kept).toContain("Kukje Gallery");
+    expect(kept.join(" ")).not.toMatch(/Gongyeonjang|ateuhol/i);
+  });
+
+  it("leaves a query that names no kind of place alone", () => {
+    expect(ofRequestedKind("things to do", rows)).toHaveLength(rows.length);
   });
 });

@@ -170,7 +170,14 @@ export const SCENARIOS: Scenario[] = [
     turns: [
       {
         say: "when is the next subway at Hongik University station",
-        expect: "Live arrival times for that station, with direction.",
+        // Between 05:30 and 01:00 there are trains and the answer is the times.
+        // Outside those hours there are none, and the right answer says the
+        // service has ended and what to do instead — which is the more useful
+        // answer of the two, since the person asking at half past one is the
+        // one who is stuck. Requiring live times around the clock made this
+        // scenario fail every night for being correct.
+        expect:
+          "Live arrival times for that station, with direction — or, if the subway has stopped for the night, a clear statement that service has ended, when it resumes, and how to get home meanwhile.",
         mustNotMatch: DEAD_END,
       },
     ],

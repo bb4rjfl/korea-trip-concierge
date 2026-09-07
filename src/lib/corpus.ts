@@ -74,6 +74,8 @@ function staticDocs(): Doc[] {
       // Hours are the whole point of holding these ourselves: a general-purpose
       // assistant can name a gallery and cannot tell you whether to go today.
       hours: [l.hoursLabel, l.closedLabel ? `closed ${l.closedLabel}` : ""].filter(Boolean).join(", "),
+      lat: l.lat,
+      lng: l.lng,
       route: { tool: "getNowInfo", args: { place: l.name } },
     });
   }

@@ -13,6 +13,8 @@ import {
 import { todayKST } from "../lib/holidays.js";
 import { asksAboutMalls, mallsCard } from "../lib/malls.js";
 import { search, confident } from "../lib/retrieval.js";
+import { haversineKm } from "../lib/courses.js";
+import { resolveLandmark, landmarkVerdict } from "../lib/landmarks.js";
 import { understand, expandQuery, readingNote, shouldAvoid } from "../lib/understand.js";
 import { searchForeignerPois, hasPoiProvider, type PoiPlace } from "../lib/sources/poi.js";
 import {
@@ -57,7 +59,7 @@ const SEARCH_CITY_RE = /^(seoul|busan|jeju|incheon|daegu|daejeon|gwangju|ulsan|g
 /** Contextual follow-up chips for a result list — name the area when we know it
  *  (like getAreaGuide), and refer to "one of these" for the list. `areaLabel` is the
  *  resolved neighbourhood/city; isFood swaps the food chip for a transit one. (D-035) */
-export function searchChoices(areaLabel?: string, isFood?: boolean): Choice[] {
+export function searchChoices(areaLabel?: string, isFood?: boolean, hoursShown?: boolean): Choice[] {
   const a = areaLabel?.trim();
   const named = a && !SEARCH_CITY_RE.test(a) ? a : undefined; // neighbourhood → name it; bare city → generic
   const now: Choice = { emoji: "🕒", cmdEn: "Is one of these open right now?", cmdKo: "지금 열려 있어?", descEn: "live hours + weather" };
@@ -72,7 +74,14 @@ export function searchChoices(areaLabel?: string, isFood?: boolean): Choice[] {
     : { emoji: "💳", cmdEn: "Where do foreign cards work to eat here?", descEn: "foreign-card-friendly food" };
   // Always offer "how do I get there?" (the user's key follow-up); non-food results
   // also cross-sell a dining chip (max 4 per footer).
-  return isFood ? [now, route, guide] : [now, route, guide, food];
+  //
+  // The exception is a card that has already said which of these are open and
+  // when. Offering "Is one of these open right now?" underneath that is a
+  // button that re-asks a question the reader has just read the answer to, and
+  // it can only do worse than the card: it resolves one venue where the card
+  // covered them all.
+  const opening = hoursShown ? [] : [now];
+  return isFood ? [...opening, route, guide] : [...opening, route, guide, food];
 }
 
 // Food sub-keywords → the concrete term we hand to the POI search, so "vegan
@@ -291,6 +300,114 @@ function withinReach<T extends { mapx?: number; mapy?: number }>(
  * Only places are offered here, and only when retrieval is confident — a wrong
  * place stated plainly is worse than admitting the search found nothing.
  */
+/** City names, in the languages a visitor types them in. */
+const A_WHOLE_CITY = /\b(seoul|busan|jeju|incheon|daegu|daejeon|gwangju|gyeongju|ulsan)\b|서울|부산|제주|인천|대구|경주/i;
+
+/**
+ * A point to hold results near, when the traveller named somewhere small.
+ *
+ * "In Gangnam" is a promise about a few square kilometres; "in Seoul" is not a
+ * promise about anything, and filtering a city query to four kilometres of the
+ * city centre would throw away most of the city. So this returns a coordinate
+ * only for a named neighbourhood, and nothing for a bare city, which the
+ * callers read as "do not filter".
+ */
+function neighbourhoodAnchor(area: string, query: string): { lat: number; lng: number } | undefined {
+  if (!area.trim() || A_WHOLE_CITY.test(area)) return undefined;
+  const c = resolvePlaceCoord(area) ?? findPlaceInText(area) ?? findPlaceInText(query);
+  return c ? { lat: c.lat, lng: c.lng } : undefined;
+}
+
+/** How far from a named neighbourhood still counts as being in it. */
+const NEIGHBOURHOOD_KM = 4;
+
+/**
+ * Is this document somewhere the traveller asked about?
+ *
+ * Documents carry coordinates where we recorded them; for the rest — the
+ * neighbourhood documents especially — the gazetteer already knows where the
+ * name is, so ask it rather than waving the document through. Only a place we
+ * genuinely cannot locate gets the benefit of the doubt, because dropping
+ * those would quietly shrink the answer to whatever we happen to have mapped.
+ */
+function inNeighbourhood(doc: { title: string; lat?: number; lng?: number }, anchor?: { lat: number; lng: number }): boolean {
+  if (!anchor) return true;
+  const at = doc.lat != null && doc.lng != null ? { lat: doc.lat, lng: doc.lng } : resolvePlaceCoord(doc.title);
+  return !at || haversineKm(anchor, { lat: at.lat, lng: at.lng }) <= NEIGHBOURHOOD_KM;
+}
+
+/**
+ * Venues we hold opening hours for, when the corpus is sure they answer this.
+ *
+ * The corpus was only ever consulted when the tourism API returned nothing,
+ * which assumes anything it returns is better than anything we hold. For "art
+ * galleries in Gangnam" it returned Hanjeonateusenteo Gongyeonjang, a
+ * romanised electricity-company *performance hall*, while Songeun Art Space,
+ * the K Museum and Horim sat here with their opening hours and closed days.
+ * The traveller then tapped the chip we offered — "Is one of these open right
+ * now?" — and got told we have no hours for the venue we had just chosen for
+ * them.
+ *
+ * So when we are confident and we know the hours, we say so first, and the
+ * live listings follow underneath. Hours are the whole reason holding this
+ * ourselves is worth anything: any assistant can name a gallery, and only one
+ * that knows Mondays are closed can tell you whether to go today.
+ *
+ * Deliberately narrow. It needs the corpus to clear the same confidence floor
+ * as anywhere else, and it needs at least two venues with real hours — one
+ * stray landmark that happens to have opening times is not knowing better.
+ */
+async function venuesWithHours(
+  query: string,
+  areaLabel?: string,
+  said = "",
+  anchor?: { lat: number; lng: number },
+): Promise<string | undefined> {
+  const reading = understand(`${said} ${query}`.trim());
+  // Deep, because the corpus also indexes the live tourism results, and those
+  // carry no hours. A shortlist of six for "art galleries" came back as the
+  // KEPCO Art Center, Yearimdang Art Hall and Woori Art Hall — live rows, all
+  // hourless — with Songeun and the K Museum pushed off the end. Filtering a
+  // shortlist cannot recover what never made the shortlist.
+  const found = await search(expandQuery(query, reading), { kinds: ["spot", "landmark"], limit: 24 }).catch(() => []);
+  if (!found.length || !confident(found)) return undefined;
+  const known = found
+    .filter((h) => h.doc.hours && !shouldAvoid(reading, `${h.doc.title} ${h.doc.text}`))
+    // Somewhere else is not an answer to a question about here. Where an area
+    // was named and we know where the venue is, hold it to that area; a venue
+    // whose coordinates we do not have is let through, because dropping it
+    // would silently narrow the answer to whatever we happen to have mapped.
+    .filter((h) => inNeighbourhood(h.doc, anchor))
+    .slice(0, 3);
+  if (known.length < 2) return undefined;
+  // Open or closed, said here rather than left for the chip.
+  //
+  // We offer "Is one of these open right now?" underneath every list, and it is
+  // the question a traveller standing on a street at ten to seven actually has.
+  // We already hold the hours and the verdict is a pure function of the clock,
+  // so answering it in the list costs nothing and turns a tap into a glance.
+  const now = new Date(Date.now() + 9 * 3600_000);
+  const dow = now.getUTCDay();
+  const minutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  let openNow = 0;
+  const lines = known.map((h, i) => {
+    const why = h.doc.blurb ? `\n   ${h.doc.blurb}` : "";
+    const l = resolveLandmark(h.doc.title);
+    const verdict = l ? landmarkVerdict(l, dow, minutes) : undefined;
+    if (verdict?.status === "open") openNow++;
+    const when = verdict ? `\n   ${verdict.headline} _(${h.doc.hours})_` : `\n   🕒 ${h.doc.hours}`;
+    return `**${i + 1}. ${h.doc.title}**${why}${when}\n   ${mapLinks(h.doc.title)}`;
+  });
+  // The heading has to survive being read at half past ten at night. Calling a
+  // list "Open right now" above two closed galleries is the sort of small lie
+  // that costs a reader their trust in everything else on the card.
+  const where = areaLabel ? ` in ${areaLabel}` : "";
+  const heading = openNow
+    ? `🟢 **Open right now** — ${openNow} of ${known.length}, _${query}_${where}`
+    : `🕒 **All closed right now** — when they open, _${query}_${where}`;
+  return [heading, "", ...lines, ""].join("\n");
+}
+
 async function rescueBySearch(query: string, areaLabel?: string, said = ""): Promise<string | undefined> {
   // Search what they asked for, including the adjectives. "Something indoors and
   // quiet" used to return a mall, an aquarium and a department store: topically
@@ -309,12 +426,18 @@ async function rescueBySearch(query: string, areaLabel?: string, said = ""): Pro
   // Drop what they just said they were done with. "Exhausted from shopping" was
   // being answered with a mall — quiet, indoors, and the one thing they had had
   // enough of.
-  const avoided = found.filter((h) => !shouldAvoid(reading, `${h.doc.title} ${h.doc.text}`));
+  // Held to the neighbourhood, when one was named and we know where the place
+  // is. This list is printed under a heading that says "in Gangnam", and it was
+  // leading with a museum in Itaewon.
+  const anchor = neighbourhoodAnchor(areaLabel ?? "", query);
+  const near = found.filter((h) => inNeighbourhood(h.doc, anchor));
+  const inArea = near.length >= 2 ? near : found;
+  const avoided = inArea.filter((h) => !shouldAvoid(reading, `${h.doc.title} ${h.doc.text}`));
   // Demote rather than delete. Filtering "exhausted from shopping" down to a
   // single museum left a card with one option, and one option that happens to be
   // closed today is a dead end — so the ones they would rather avoid go last
   // instead of going away.
-  const hits = [...avoided, ...found.filter((h) => !avoided.includes(h))].slice(0, 4);
+  const hits = [...avoided, ...inArea.filter((h) => !avoided.includes(h))].slice(0, 4);
   const lines = hits.slice(0, 3).map((h, i) => {
     const where = h.doc.area && !/^(?:Seoul|Busan|Jeju|Gyeongju)$/i.test(h.doc.area) ? ` _(${h.doc.area})_` : "";
     // The reason to go, from the field that holds it. Guessing which part of the
@@ -627,8 +750,21 @@ const NOT_A_SIGHT_RE =
  * unreadable as well as wrong. A generic assistant would have named Songeun and
  * Horim; being beaten on our own subject is the failure that matters.
  */
-const VENUE_KINDS: [RegExp, RegExp][] = [
-  [/\bgaller(?:y|ies)\b|미술관|갤러리/i, /gallery|galleries|미술관|갤러리|art (?:space|museum|centre|center)|아트/i],
+/**
+ * What was asked for, what counts as that, and what is not it despite the name.
+ *
+ * The third pattern exists because "아트" is doing too much work in Korean
+ * venue names. Asked for art galleries in Gangnam, the tourism API returned the
+ * KEPCO Art Centre *performance hall* and the Yearimdang Art *Hall* — both
+ * genuinely have "아트" in the name, and neither is a place to go and look at
+ * paintings.
+ */
+const VENUE_KINDS: [RegExp, RegExp, RegExp?][] = [
+  [
+    /\bgaller(?:y|ies)\b|미술관|갤러리/i,
+    /gallery|galleries|미술관|갤러리|art (?:space|museum|centre|center)|아트/i,
+    /공연장|아트\s*홀|콘서트|극장|gongyeonjang|ateuhol|art hall|concert|theat(?:re|er)/i,
+  ],
   [/\bmuseum\b|박물관/i, /museum|박물관|미술관|기념관/i],
   [/\bpalace\b|고궁|궁궐/i, /palace|궁|고궁/i],
   [/\btemple\b|사찰/i, /temple|사찰|암자|\uC808/i],
@@ -644,10 +780,13 @@ const VENUE_KINDS: [RegExp, RegExp][] = [
  * Applied only when the query names a kind — a vague "things to do" is not
  * narrowed, and a query we cannot classify is left alone.
  */
-function ofRequestedKind<T extends { title: string; address?: string }>(query: string, items: T[]): T[] {
+export function ofRequestedKind<T extends { title: string; address?: string }>(query: string, items: T[]): T[] {
   const rule = VENUE_KINDS.find(([asked]) => asked.test(query));
   if (!rule) return items;
-  const kept = items.filter((p) => rule[1].test(`${p.title} ${p.address ?? ""}`));
+  const kept = items.filter((p) => {
+    const text = `${p.title} ${p.address ?? ""}`;
+    return rule[1].test(text) && !rule[2]?.test(text);
+  });
   // If nothing survives, the honest outcome is an empty list — which sends the
   // caller to the corpus rescue, where the real galleries are.
   return kept;
@@ -910,8 +1049,14 @@ export const searchPlaceForeigner: ToolDef = {
       terms,
       query,
     ].filter((c, i, all) => c && all.indexOf(c) === i);
+    const named = resolvePlaceCoord(area) ?? findPlaceInText(area) ?? findPlaceInText(query);
+    // Started here rather than at the return, so consulting our own knowledge
+    // runs inside the window the tourism API is already taking rather than
+    // after it.
+    const knowAhead = venuesWithHours(query, areaLabel, String(args.said ?? ""), neighbourhoodAnchor(area, query)).catch(
+      () => undefined,
+    );
     try {
-      const named = resolvePlaceCoord(area) ?? findPlaceInText(area) ?? findPlaceInText(query);
       const anchorCoord = named ? { lat: named.lat, lng: named.lng } : city;
       // A named neighbourhood means "walkable-ish"; a bare city means the metro area.
       const reachKm = area.trim() && !isSeoulText(area) ? 12 : 35;
@@ -959,7 +1104,11 @@ export const searchPlaceForeigner: ToolDef = {
         const rescued = await rescueBySearch(query, areaLabel, String(args.said ?? ""));
         if (rescued) return ok(mustSee + rescued, searchChoices(areaLabel, cat === "food"));
       }
-      return ok(mustSee + renderPlaces(query, places), searchChoices(areaLabel, cat === "food"));
+      const known = await knowAhead;
+      return ok(
+        mustSee + (known ?? "") + renderPlaces(query, places),
+        searchChoices(areaLabel, cat === "food", Boolean(known)),
+      );
     } catch {
       // Even when live data is slow, still serve the curated must-see lead so the
       // fallback doesn't vanish exactly when the API fails (P-V2 cold case).

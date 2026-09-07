@@ -224,6 +224,27 @@ const CHIP_MARKER = "<<<CHIPS>>>";
  * where they are standing, what the sky is doing, and what they have told us
  * about themselves. It is passed as fact, so quoting it is grounded.
  */
+/**
+ * The time blocks a day out is built from: morning, lunch, afternoon, evening.
+ *
+ * Structure, not a label. The previous test for "have we already given this
+ * traveller a course" matched our own heading — "1-day Seoul course — for a
+ * Couple" — and the composing layer rewrites headings, so it opened with "Here
+ * is a plan for a couple in Seoul" and the count stayed at zero. Asked for
+ * something else, they were handed the same five stops, word for word.
+ *
+ * This is the third time a change to how an answer reads has broken something
+ * that reads it. Time blocks survive the rewrite because they are the shape of
+ * the itinerary rather than our name for it: the composer is composing over
+ * them, not deciding whether to keep them.
+ */
+const COURSE_BLOCKS = /🌅|🌃|🍜|☕|👘|🌤️/gu;
+
+export function looksLikeACourse(text: string): boolean {
+  const marks = new Set(text.match(COURSE_BLOCKS) ?? []);
+  return marks.size >= 2;
+}
+
 async function composeAnswer(
   said: string,
   card: string,
@@ -677,9 +698,7 @@ ${partial.reply ?? ""}`.trim(),
     }
 
     if (toolCall.name === "recommendTripCourse" && !Number(filled.variant)) {
-      const alreadyShown = history.filter(
-        (h) => h.role === "assistant" && /course\s+—|코스\s*—|コース|课程|課程/.test(h.content ?? ""),
-      ).length;
+      const alreadyShown = history.filter((h) => h.role === "assistant" && looksLikeACourse(h.content ?? "")).length;
       if (alreadyShown > 0) filled.variant = alreadyShown;
     }
     // These two match on how a person phrases a problem — that is their whole
