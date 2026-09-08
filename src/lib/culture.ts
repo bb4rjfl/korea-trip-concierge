@@ -114,9 +114,26 @@ const ACCESSIBILITY: Card = {
     "Foreign disability cards are not part of the Korean registration system, so discounts are inconsistent — bring your card and passport and ask; palaces and national museums often accept them.",
 };
 
-/** Is this a question about how to behave? */
+/**
+ * Is this a question about how to behave?
+ *
+ * Two things used to be in here that do not belong, and routing accuracy is
+ * how they were found rather than guessed at:
+ *
+ * "what should i do" was meant as the behavioural question — what should I do
+ * when I meet someone, what should I not do at a temple. It also matches "what
+ * should I do in Jeju", which is the single most ordinary way a traveller asks
+ * for a recommendation, and that question was being answered with a card about
+ * bowing. Only the negative form and the explicitly behavioural phrasings are
+ * kept; a bare "what should I do" is a request for ideas.
+ *
+ * Tipping is a money question — how much, whether it is expected, whether
+ * refusing offends — and there is a card about paying that answers it with
+ * numbers. It lives in `explainPayment` now. This card still mentions tipping;
+ * it is just no longer what a question about tipping routes to.
+ */
 export function asksAboutEtiquette(text: string): boolean {
-  return /etiquette|manners|rude|offend|customs?\b|taboo|culture shock|what should i (?:not )?do|dos and don|tip(?:ping)?\b|bow(?:ing)?\b|chopstick|shoes off|예의|매너|실례|에티켓|팁\s*(?:줘|주나|문화)|マナー|礼儀|失礼|チップ|礼节|禮節|禮儀|小费|小費|忌讳|忌諱/i.test(
+  return /etiquette|manners|rude|offend|customs?\b|taboo|culture shock|what should i not do|how should i behave|is it (?:rude|okay|ok|fine) to|dos and don|bow(?:ing)?\b|chopstick|shoes off|예의|매너|실례|에티켓|マナー|礼儀|失礼|礼节|禮節|禮儀|忌讳|忌諱/i.test(
     text ?? "",
   );
 }

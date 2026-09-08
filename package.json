@@ -22,7 +22,8 @@
     "audit:facts": "tsx scripts/audit-facts.ts",
     "eval": "tsx scripts/eval.ts",
     "eval:rank": "tsx --env-file=.env scripts/rank-eval.ts",
-    "eval:rank:lang": "tsx --env-file=.env scripts/rank-eval.ts --lang"
+    "eval:rank:lang": "tsx --env-file=.env scripts/rank-eval.ts --lang",
+    "eval:route": "tsx --env-file=.env scripts/route-eval.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
