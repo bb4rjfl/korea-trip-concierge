@@ -35,6 +35,8 @@ export interface RankCase {
   kinds?: ("spot" | "landmark" | "area" | "dish" | "service" | "payment" | "card")[];
   /** Why this one is here, when it is not obvious. */
   note?: string;
+  /** What language this is typed in. English unless said otherwise. */
+  lang?: "en" | "ko" | "ja" | "zh";
 }
 
 export const RANK_CASES: RankCase[] = [

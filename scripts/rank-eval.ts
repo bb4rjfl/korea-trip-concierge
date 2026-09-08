@@ -19,9 +19,13 @@
 
 import { buildCorpus } from "../src/lib/corpus.js";
 import { search, corpusEmbedded, type SearchOptions } from "../src/lib/retrieval.js";
-import { RANK_CASES, KNOWN_GAPS } from "../eval/retrieval-set.js";
+import { RANK_CASES, KNOWN_GAPS, type RankCase } from "../eval/retrieval-set.js";
+import { MULTILINGUAL_CASES } from "../eval/retrieval-set-multilingual.js";
 
 const DEPTH = 8;
+
+// --lang runs the same questions in Korean, Japanese and Chinese instead.
+const CASES: RankCase[] = process.argv.includes("--lang") ? [...RANK_CASES, ...MULTILINGUAL_CASES] : RANK_CASES;
 
 /** 1-based position of the first answering document, or 0 for "not in the list". */
 async function rankOf(q: string, answers: string[], opts: SearchOptions): Promise<number> {
@@ -58,7 +62,7 @@ async function main(): Promise<void> {
   let msBase = 0;
   let msRerank = 0;
 
-  for (const c of RANK_CASES) {
+  for (const c of CASES) {
     const t0 = Date.now();
     const b = await rankOf(c.q, c.answers, { kinds: c.kinds });
     msBase += Date.now() - t0;
@@ -81,12 +85,31 @@ async function main(): Promise<void> {
   };
 
   console.log(`\n${"─".repeat(60)}`);
-  console.log(`${RANK_CASES.length} cases, top ${DEPTH}, reranking off → on`);
+  console.log(`${CASES.length} cases, top ${DEPTH}, reranking off → on`);
   line("top-1", B.top1, A.top1);
   line("MRR", B.mrr, A.mrr);
   line("found", B.found, A.found);
-  const n = RANK_CASES.length;
+  const n = CASES.length;
   console.log(`  latency  ${Math.round(msBase / n)}ms search → ${Math.round(msRerank / n)}ms with rerank  (+${Math.round((msRerank - msBase) / n)}ms)`);
+
+  // Per language, because the average is exactly where this hides. A service
+  // that answers 94% in English and 50% in Japanese reads as "82% overall",
+  // and 82% is a number nobody would investigate.
+  const langs = [...new Set(CASES.map((c) => c.lang ?? "en"))];
+  if (langs.length > 1) {
+    console.log("\nby language (the corpus is written in English)");
+    for (const lang of langs) {
+      const idx = CASES.map((c, i) => [c, i] as const).filter(([c]) => (c.lang ?? "en") === lang);
+      const b = summary(idx.map(([, i]) => before[i]));
+      const a = summary(idx.map(([, i]) => after[i]));
+      console.log(
+        `  ${lang}  n=${String(idx.length).padStart(2)}  top-1 ${pct(b.top1)}→${pct(a.top1)}` +
+          `   MRR ${pct(b.mrr)}→${pct(a.mrr)}   found ${pct(b.found)}→${pct(a.found)}`,
+      );
+      const missed = idx.filter(([, i]) => after[i] === 0).map(([c]) => c.q);
+      if (missed.length) console.log(`       unreachable: ${missed.join(" · ")}`);
+    }
+  }
 
   const gained = moved.filter((m) => m.startsWith("↑"));
   const lost = moved.filter((m) => m.startsWith("↓"));

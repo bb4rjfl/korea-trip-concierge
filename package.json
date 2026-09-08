@@ -21,7 +21,8 @@
     "test:watch": "vitest",
     "audit:facts": "tsx scripts/audit-facts.ts",
     "eval": "tsx scripts/eval.ts",
-    "eval:rank": "tsx --env-file=.env scripts/rank-eval.ts"
+    "eval:rank": "tsx --env-file=.env scripts/rank-eval.ts",
+    "eval:rank:lang": "tsx --env-file=.env scripts/rank-eval.ts --lang"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
