@@ -15,6 +15,7 @@ import { ENV, hasKey } from "../env.js";
 import { fetchJson } from "../http.js";
 import { TtlCache } from "../cache.js";
 import { romanizeHangul } from "../romanize.js";
+import { resolvePlaceCoord } from "../places.js";
 
 export interface PoiPlace {
   name: string;
@@ -161,10 +162,10 @@ export function parseFoursquare(json: FsqResponse): PoiPlace[] {
 // foreign visitors. Service Key via Bearer, dated version header.
 const FSQ_API_VERSION = "2025-06-17";
 
-async function foursquareSearch(lat: number, lng: number, query: string): Promise<PoiPlace[]> {
+async function foursquareSearch(lat: number, lng: number, query: string, nearestFirst = false): Promise<PoiPlace[]> {
   const url =
     `https://places-api.foursquare.com/places/search?ll=${lat},${lng}` +
-    `&radius=1500&query=${encodeURIComponent(query)}&limit=8`;
+    `&radius=1500&query=${encodeURIComponent(query)}&limit=8${nearestFirst ? "&sort=DISTANCE" : ""}`;
   const json = await fetchJson<FsqResponse>(url, {
     headers: {
       Authorization: `Bearer ${ENV.FOURSQUARE_API_KEY}`,
@@ -184,6 +185,24 @@ export interface PoiSearchOptions {
   query?: string; // e.g. "restaurant", "cafe"
   coord?: { lat: number; lng: number };
   limit?: number;
+  /**
+   * Closest first, rather than best match first.
+   *
+   * For a pharmacy, an ATM or a locker, nearest is the whole question — asked at
+   * Mangwon, relevance ranking returned three pharmacies in Seogyo-dong, 1.5 km
+   * away, ahead of the ones on the station's own street. For a restaurant the
+   * better one a few minutes further on is usually the right answer, so this is
+   * the caller's choice.
+   */
+  nearestFirst?: boolean;
+}
+
+/** The Korean name of a place we can locate — what a Korean search engine understands. */
+function koreanPlaceName(area?: string): string | undefined {
+  const a = (area ?? "").trim();
+  if (!a) return undefined;
+  if (/[가-힣]/.test(a)) return a;
+  return resolvePlaceCoord(a)?.aliases.find((alias) => /[가-힣]/.test(alias));
 }
 
 /**
@@ -193,7 +212,7 @@ export interface PoiSearchOptions {
 export async function searchForeignerPois(opts: PoiSearchOptions): Promise<PoiPlace[]> {
   const what = (opts.query ?? "restaurant").trim();
   const limit = opts.limit ?? 5;
-  const key = `poi:${opts.area}:${what}:${opts.nativeQuery ?? ""}`;
+  const key = `poi:${opts.area}:${what}:${opts.nativeQuery ?? ""}:${opts.nearestFirst ? "near" : "best"}`;
 
   const naverOk = hasKey("NAVER_CLIENT_ID") && hasKey("NAVER_CLIENT_SECRET");
   const fsqOk = hasKey("FOURSQUARE_API_KEY") && !!opts.coord;
@@ -201,9 +220,16 @@ export async function searchForeignerPois(opts: PoiSearchOptions): Promise<PoiPl
   // "Myeongdong restaurant", which is what the English keyword mapping produces.
   // A Korean-language visitor was getting hotel Western restaurants for 맛집.
   const nativeKo = (opts.nativeQuery ?? "").trim();
-  const naverQuery = /[가-힣]/.test(nativeKo) ? nativeKo : `${opts.area} ${what}`.trim();
+  // And the place goes in, in Korean. Naver searches text, not coordinates, so
+  // "맛집" alone is a search for restaurants anywhere — it answered "내 주변 맛집,
+  // near 성수역" with a list from City Hall. "명동 맛집" only ever worked because
+  // the traveller had typed 명동 themselves.
+  const areaKo = koreanPlaceName(opts.area);
+  const withArea = (q: string) =>
+    areaKo && !q.includes(areaKo.replace(/역$/, "")) ? `${areaKo} ${q}` : q;
+  const naverQuery = /[가-힣]/.test(nativeKo) ? withArea(nativeKo) : `${areaKo ?? opts.area} ${what}`.trim();
   const naver = () => naverSearch(naverQuery);
-  const fsq = () => foursquareSearch(opts.coord!.lat, opts.coord!.lng, what);
+  const fsq = () => foursquareSearch(opts.coord!.lat, opts.coord!.lng, what, opts.nearestFirst);
 
   const places = await cache.getOrLoad(key, async () => {
     // Korean keyword → Naver first (deep Korean coverage, converted to English).

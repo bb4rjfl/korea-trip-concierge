@@ -104,3 +104,30 @@ describe("grounded but unfaithful — the other half of the failure", () => {
     expect(droppedEssential("Jogyesa Temple is open.", "**Jogyesa Temple**")).toBeUndefined();
   });
 });
+
+describe("a list of places near somewhere, and the rewrite that forgot where", () => {
+  // Production: asked for a convenience store near Gongdeok Station, the rewrite
+  // said "CU, GS25, 7-Eleven and emart24 are near Gongdeok" — true, and every
+  // store the card had actually found, with its street, gone.
+  const card = [
+    "🏪 **Convenience store in Gongdeok Station**",
+    "The big chains are **7-Eleven**, **emart24**, CU and GS25 — all 24h.",
+    "**Nearby:**",
+    "**1. GS25 Gongdeok Station (GS25 공덕역점)**",
+    "   📍 Mapogu Baekbeomro 202, Seoul",
+    "**2. CU Mapo Dohwa (CU 마포도화점)**",
+    "   📍 Mapogu Baekbeomro 199, Seoul",
+    "**3. 7-Eleven Gongdeok Lotte (세븐일레븐 공덕롯데점)**",
+    "   📍 Dohwadong",
+  ].join("\n");
+
+  it("rejects an answer that kept the chain names and dropped the stores", () => {
+    const answer = "공덕역 근처 편의점은 **CU, GS25, 7-Eleven, emart24**가 있습니다. 모두 24시간 운영됩니다.";
+    expect(droppedEssential(answer, card)).toMatch(/located places were dropped/);
+  });
+
+  it("accepts a rewrite that keeps the stores, in either script", () => {
+    expect(droppedEssential("가까운 곳은 GS25 공덕역점과 CU 마포도화점이에요.", card)).toBeUndefined();
+    expect(droppedEssential("Try GS25 Gongdeok Station or CU Mapo Dohwa, both on Baekbeom-ro.", card)).toBeUndefined();
+  });
+});

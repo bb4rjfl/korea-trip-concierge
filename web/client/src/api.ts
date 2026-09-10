@@ -6,8 +6,8 @@ export interface Chip {
   emoji: string;
   cmdEn: string;
   cmdKo?: string;
-  /** Find the traveller on this device, then ask for a route from there to `to`. */
-  locate?: { to: string };
+  /** Find the traveller on this device, put the nearest place into `ask` at `{place}`, send that. */
+  locate?: { ask: string };
 }
 
 export interface ChatTurn {

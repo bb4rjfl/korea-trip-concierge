@@ -330,9 +330,19 @@ const NEIGHBOURHOOD_KM = 4;
  * genuinely cannot locate gets the benefit of the doubt, because dropping
  * those would quietly shrink the answer to whatever we happen to have mapped.
  */
-function inNeighbourhood(doc: { title: string; lat?: number; lng?: number }, anchor?: { lat: number; lng: number }): boolean {
+function inNeighbourhood(
+  doc: { title: string; area?: string; lat?: number; lng?: number },
+  anchor?: { lat: number; lng: number },
+): boolean {
   if (!anchor) return true;
-  const at = doc.lat != null && doc.lng != null ? { lat: doc.lat, lng: doc.lng } : resolvePlaceCoord(doc.title);
+  // Its own coordinates; failing that its name; failing that the neighbourhood
+  // it is filed under. "Cafe PLENO (Gangnam)" has no coordinates and no name the
+  // gazetteer knows, and was waved into a list of cafés near Mangwon — twelve
+  // kilometres away — under a label that said Gangnam the whole time.
+  const at =
+    doc.lat != null && doc.lng != null
+      ? { lat: doc.lat, lng: doc.lng }
+      : (resolvePlaceCoord(doc.title) ?? (doc.area ? resolvePlaceCoord(doc.area) : undefined));
   return !at || haversineKm(anchor, { lat: at.lat, lng: at.lng }) <= NEIGHBOURHOOD_KM;
 }
 

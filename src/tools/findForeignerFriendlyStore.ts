@@ -186,6 +186,54 @@ const NEED_BY_ALIAS: Record<string, Need> = {
   parcel: "post",
   mail: "post",
   ems: "post",
+  // The same needs as a Korean, Japanese or Chinese speaker writes them. Until
+  // these were here, "附近的药店" — a pharmacy nearby — got the generic menu of
+  // every essential, because nothing in this table was written in Chinese.
+  약국: "pharmacy",
+  薬局: "pharmacy",
+  ドラッグストア: "pharmacy",
+  药店: "pharmacy",
+  药房: "pharmacy",
+  藥局: "pharmacy",
+  藥房: "pharmacy",
+  편의점: "convenience",
+  コンビニ: "convenience",
+  便利店: "convenience",
+  便利商店: "convenience",
+  환전: "currencyExchange",
+  환전소: "currencyExchange",
+  両替: "currencyExchange",
+  换钱: "currencyExchange",
+  兑换: "currencyExchange",
+  換錢: "currencyExchange",
+  관광안내소: "touristInfo",
+  観光案内所: "touristInfo",
+  游客中心: "touristInfo",
+  旅游咨询: "touristInfo",
+  병원: "emergency",
+  응급: "emergency",
+  病院: "emergency",
+  医院: "emergency",
+  醫院: "emergency",
+  急诊: "emergency",
+  짐보관: "luggage",
+  물품보관함: "luggage",
+  コインロッカー: "luggage",
+  荷物預かり: "luggage",
+  行李寄存: "luggage",
+  빨래방: "laundry",
+  세탁: "laundry",
+  コインランドリー: "laundry",
+  洗衣: "laundry",
+  기도실: "prayer",
+  할랄: "prayer",
+  ハラール: "prayer",
+  祈祷室: "prayer",
+  清真: "prayer",
+  우체국: "post",
+  郵便局: "post",
+  邮局: "post",
+  郵局: "post",
 };
 
 /**
@@ -198,9 +246,14 @@ const ALIASES_BY_LENGTH = Object.keys(NEED_BY_ALIAS).sort((a, b) => b.length - a
 
 function resolveNeed(input?: string): Need | undefined {
   if (!input) return undefined;
-  const k = input.toLowerCase().replace(/[^a-z가-힣]/g, "");
+  // Japanese and Chinese are kept, not stripped: the filter used to allow only
+  // Latin and Hangul, so "药店" arrived here as an empty string.
+  const k = input.toLowerCase().replace(/[^a-z가-힣぀-ヿ一-鿿]/g, "");
   if (NEED_BY_ALIAS[k]) return NEED_BY_ALIAS[k];
-  const hit = ALIASES_BY_LENGTH.find((a) => a.length >= 3 && k.includes(a));
+  // A three-letter floor stops "atm" matching inside unrelated English words; a
+  // CJK word carries a whole meaning in two characters (약국, 薬局, 药店), so the
+  // floor does not apply to it.
+  const hit = ALIASES_BY_LENGTH.find((a) => (a.length >= 3 || /[^a-z]/.test(a)) && k.includes(a));
   return hit ? NEED_BY_ALIAS[hit] : undefined;
 }
 
@@ -221,6 +274,15 @@ const RETRY: Choice[] = [
   { emoji: "🔄", cmdEn: "Try again", cmdKo: "다시 시도", descEn: "retry the search" },
   { emoji: "🗺️", cmdEn: "Guide me around this area", descEn: "neighborhood overview instead" },
 ];
+
+/**
+ * A licensed pharmacy, by its name. Every one in Korea is called something-약국,
+ * so the name is the test — not the directory's category, which files Olive
+ * Young under "Pharmacy" too. Health-and-beauty chains are named outright,
+ * because they are the lookalike a traveller actually walks into.
+ */
+const IS_A_PHARMACY = /약국|yakguk|pharmac|薬局|药店|药房|藥局/i;
+const HEALTH_AND_BEAUTY = /올리브영|olive\s?young|olribeuyeong|랄라블라|lalavla|롭스|lohbs|시코르|chicor/i;
 
 function renderNearby(places: PoiPlace[], query: string, need: Need): string[] {
   // Guard against junk rows: empty address, or a name that's just the bare search
@@ -244,6 +306,11 @@ function renderNearby(places: PoiPlace[], query: string, need: Need): string[] {
     if (!name || !addr || name === q || name.startsWith(`${q} (`)) return false;
     if (ADULT_RE.test(hay)) return false;
     if (!foodNeed && (FOOD_RE.test(hay) || NOISE_RE.test(hay))) return false;
+    // Only a 약국 can sell medicine in Korea. Sorted nearest-first, a search for
+    // pharmacies near Mangwon put an Olive Young third — a cosmetics chain with a
+    // green-ish shopfront, and exactly where a traveller with a fever would go
+    // and find nothing to buy.
+    if (need === "pharmacy" && (!IS_A_PHARMACY.test(name) || HEALTH_AND_BEAUTY.test(name))) return false;
     return true;
   });
   if (!clean.length) return [];
@@ -390,6 +457,8 @@ export const findForeignerFriendlyStore: ToolDef = {
           query: e.query,
           coord: coord ? { lat: coord.lat, lng: coord.lng } : undefined,
           limit: 5,
+          // An essential is wanted close, not good — see PoiSearchOptions.
+          nearestFirst: true,
         });
         nearby = renderNearby(places, e.query, need);
       } catch {

@@ -21,15 +21,18 @@ export interface Chip {
   cmdKo?: string;
   /**
    * Not a sentence to send — an action for the client: find where the traveller
-   * is on their own device, then ask for a route from there to `to`.
+   * is on their own device, put the nearest place's name into `ask` where it
+   * says `{place}`, and send that.
    *
    * The button used to be the sentence "From my area to 뱅뱅사거리". The server
    * cannot know anyone's area — by design, coordinates never leave the phone —
    * so sending that sentence got the same "where are you starting from?" back,
    * with the same button under it, forever. The one part of the system that
-   * knows where the traveller is has to be the part that answers.
+   * knows where the traveller is has to be the part that answers. The template
+   * is written here, in the reader's language, so the client needs no idea
+   * what the question was about.
    */
-  locate?: { to: string };
+  locate?: { ask: string };
 }
 
 export interface ParsedToolMarkdown {

@@ -11,6 +11,7 @@
  * trailing "station"/"stn"/"역", then a confident fuzzy fallback.
  */
 import { cjkToKorean, resolveName } from "./fuzzy.js";
+import STATIONS_RAW from "./data/stationCoords.json" with { type: "json" };
 
 export interface GeoPlace {
   label: string;
@@ -71,6 +72,12 @@ export const PLACES: GeoPlace[] = [
   { label: "Gamcheon Culture Village (Busan)", lng: 129.0107, lat: 35.0976, aliases: ["gamcheon", "감천", "감천문화마을"] },
   { label: "Jeju City", lng: 126.5312, lat: 33.4996, aliases: ["jeju", "jeju city", "제주", "제주시", "済州", "濟州", "济州", "チェジュ"] },
   { label: "Seogwipo (Jeju)", lng: 126.5601, lat: 33.2542, aliases: ["seogwipo", "서귀포"] },
+  // Where most visitors to Jeju actually sleep. Without it, a phone in a Yeon-dong
+  // hotel snapped to "Jeju Int'l Airport", 2.7 km off — Jeju City's point above is
+  // the old town, and the new town grew up a few kilometres west of it.
+  { label: "Sinjeju (Yeon-dong · Nohyeong, Jeju)", lng: 126.4865, lat: 33.4872, aliases: ["sinjeju", "shinjeju", "yeon-dong", "yeondong", "nohyeong", "신제주", "연동", "노형", "노형동"] },
+  { label: "Aewol (Jeju)", lng: 126.3121, lat: 33.4627, aliases: ["aewol", "애월", "한담"] },
+  { label: "Hamdeok Beach (Jeju)", lng: 126.6694, lat: 33.5432, aliases: ["hamdeok", "함덕", "함덕해수욕장"] },
   // Airports, stations and terminals: the endpoints of almost every arrival-day
   // question, and none of them are tourism-database entries to be geocoded.
   { label: "Jeju Int'l Airport", lng: 126.4931, lat: 33.5071, aliases: ["jeju airport", "cju", "제주공항", "제주국제공항"] },
@@ -128,6 +135,96 @@ const placeKeys = (p: GeoPlace): string[] => [p.label, ...p.aliases];
 
 const ESC_RE = /[.*+?^${}()|[\]\\]/g;
 
+/* -------------------------------- stations -------------------------------- */
+
+/** A subway station, named in each language we serve. */
+export interface StationEntry {
+  k: string;
+  e: string;
+  j?: string;
+  z?: string;
+  lat: number;
+  lng: number;
+}
+
+/**
+ * Every subway station in the Seoul area — 653, from the city's own register
+ * (scripts/build-station-coords.ts).
+ *
+ * The phone names where a traveller is by the nearest station, so the server has
+ * to be able to place a station name too. Before this, "내 주변 맛집 (성수역
+ * 근처예요)" came back with restaurants at City Hall: 성수역 was not among the
+ * 82 landmarks above, the search could not place it, and it fell back to the
+ * middle of the city.
+ */
+export const STATIONS = STATIONS_RAW as StationEntry[];
+
+const bareStation = (s: string): string =>
+  s
+    .trim()
+    .toLowerCase()
+    .replace(/\s*(?:station|stn)\.?$/i, "")
+    .replace(/[역駅站驛]$/, "")
+    .trim();
+
+function stationPlace(s: StationEntry): GeoPlace {
+  const label = /station$/i.test(s.e) ? s.e : `${s.e} Station`;
+  return { label, lat: s.lat, lng: s.lng, aliases: [s.k, `${s.k}역`, s.e, label] };
+}
+
+/** Whole-value lookups: a place slot that says "성수" or "Seongsu Station" means the station. */
+const STATION_INDEX = new Map<string, GeoPlace>();
+/**
+ * Running-text lookups: only the suffixed form counts.
+ *
+ * Many station names are ordinary words — 오리 is a duck, 온수 hot water, 대화 a
+ * conversation, 개봉 a film coming out — and matched bare they would turn "오리고기
+ * 맛집" into a question about Ori Station. With the suffix they cannot be
+ * anything else.
+ */
+const STATION_IN_TEXT: { alias: string; place: GeoPlace }[] = [];
+const STATION_LATIN_BY_NAME = new Map<string, GeoPlace>();
+
+for (const s of STATIONS) {
+  const p = stationPlace(s);
+  for (const n of [s.k, s.e, s.j, s.z]) {
+    const key = n ? bareStation(n) : "";
+    if (key && !STATION_INDEX.has(key)) STATION_INDEX.set(key, p);
+  }
+  for (const alias of [`${s.k}역`, s.j ? `${s.j}駅` : "", s.z ? `${s.z}站` : ""]) {
+    if (alias) STATION_IN_TEXT.push({ alias: alias.toLowerCase(), place: p });
+  }
+  const e = bareStation(s.e);
+  if (/[a-z]/.test(e) && !STATION_LATIN_BY_NAME.has(e)) STATION_LATIN_BY_NAME.set(e, p);
+}
+
+/**
+ * English station names followed by "station" — one pattern, compiled once,
+ * longest names first so "Seoul Nat'l Univ. of Education Station" is not read
+ * as "Seoul Station".
+ */
+const STATION_LATIN_RE = new RegExp(
+  `\\b(${[...STATION_LATIN_BY_NAME.keys()]
+    .sort((a, b) => b.length - a.length)
+    .map((n) => n.replace(ESC_RE, "\\$&"))
+    .join("|")})\\s+(?:station|stn)\\b`,
+  "i",
+);
+
+/** A station named with its suffix somewhere in a sentence, longest first. */
+function stationInText(t: string): { place: GeoPlace; len: number } | undefined {
+  let best: { place: GeoPlace; len: number } | undefined;
+  const m = STATION_LATIN_RE.exec(t);
+  if (m) {
+    const place = STATION_LATIN_BY_NAME.get(m[1].toLowerCase());
+    if (place) best = { place, len: m[0].length };
+  }
+  for (const { alias, place } of STATION_IN_TEXT) {
+    if (alias.length > (best?.len ?? 0) && t.includes(alias)) best = { place, len: alias.length };
+  }
+  return best;
+}
+
 /** Find the most specific curated place named anywhere inside a free-text phrase
  *  ("things to see in Busan" → Busan; "attractions near Haeundae" → Haeundae), so
  *  a query that embeds a place still yields a geocode anchor for the radius
@@ -148,6 +245,10 @@ export function findPlaceInText(text: string): GeoPlace | undefined {
       if (hit && (!best || al.length > best.len)) best = { p, len: al.length };
     }
   }
+  // A station, named with its suffix — only when it says more than a landmark
+  // did, so "Hongdae" keeps meaning the neighbourhood.
+  const station = stationInText(t) ?? stationInText((text ?? "").toLowerCase());
+  if (station && (!best || station.len > best.len)) return station.place;
   return best?.p;
 }
 
@@ -159,6 +260,10 @@ export function resolvePlaceCoord(input: string): GeoPlace | undefined {
   if (!raw) return undefined;
   const direct = INDEX.get(raw.toLowerCase()) ?? INDEX.get(normalize(raw));
   if (direct) return direct;
+  // Every station, by exact name in any of our four languages — before the fuzzy
+  // pass, because an exact station is surer than a near-miss landmark.
+  const station = STATION_INDEX.get(bareStation(raw)) ?? STATION_INDEX.get(bareStation(input ?? ""));
+  if (station) return station;
   // Confident fuzzy match only (a wrong geocode would misroute) — else undefined
   // so the caller falls back to TourAPI geocoding.
   const r = resolveName(raw, PLACES, placeKeys, { exact: 0.84, suggest: 0.84, maxSuggest: 1 });

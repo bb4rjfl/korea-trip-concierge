@@ -109,6 +109,10 @@ export function extractFromTo(text: string): { from?: string; to?: string } | nu
   const to = firstMatch(text, [
     /(?:how (?:do|can) i get|how to get|best way|fastest way|way|directions?|route)\s+to\s+(.+?)(?:\?|$)/i,
     /(.+?)(?:까지|로|으로)?\s*가는\s*(?:법|길|방법)/,
+    // "뱅뱅사거리 어떻게 가요?" — the commonest way to ask, and the rule router
+    // only knew "가는 법". A leading 여기서 ("from here") is where they are, not
+    // part of where they are going, so it is consumed before the capture.
+    /^(?:(?:지금\s*)?(?:여기|거기)(?:에)?서\s*)?(.+?)(?:까지|에|로|으로)?\s*어떻게\s*가/,
     /(.+?)(?:へ|に)の?行き方/,
     /怎么去(.+?)(?:\?|？|$)/,
     /(.+?)怎么去/,

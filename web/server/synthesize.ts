@@ -169,11 +169,49 @@ export function ungroundedToken(answer: string, facts: string): string | undefin
  * Neither adds a claim, so neither could be caught by looking for added claims.
  */
 
-/** Bold names are how our cards mark the things being offered. */
-function offeredNames(text: string): string[] {
-  return [...text.matchAll(/\*\*([^*\n]{3,60}?)\*\*/g)]
-    .map((m) => m[1].replace(/\s*\([^)]*\)\s*$/, "").trim())
-    .filter((n) => /[A-Za-z가-힣]{3}/.test(n));
+/**
+ * Bold names are how our cards mark the things being offered — each as every
+ * form a rewrite might keep.
+ *
+ * The list number is not part of the name. It used to be: "**1. GS25 Gongdeok
+ * Station**" was read as "1. GS25 Gongdeok Station", so any rewrite that dropped
+ * the numbering — which is most of them — counted as keeping nothing, and good
+ * composed answers to numbered lists were thrown away for it.
+ */
+function offeredNames(text: string): string[][] {
+  return [...text.matchAll(/\*\*([^*\n]{3,80}?)\*\*/g)]
+    .map((m) => {
+      const full = m[1].replace(/^\d+\.\s*/, "").trim();
+      const inner = /\(([^)]+)\)\s*$/.exec(full)?.[1]?.trim();
+      const outer = full.replace(/\s*\([^)]*\)\s*$/, "").trim();
+      return [outer, inner].filter((f): f is string => Boolean(f && f.length >= 2));
+    })
+    .filter((forms) => forms.some((f) => /[A-Za-z가-힣]{3}|[가-힣]{2}/.test(f)));
+}
+
+/**
+ * The places a card gives an address for — a bold name with a 📍 line under it.
+ *
+ * Read off the card, which is ours and deterministic, never off the rewrite.
+ * The name is taken both whole and as its romanised half, because the card
+ * prints "Gippeumyakguk (기쁨약국)" and a rewrite in Korean keeps only 기쁨약국.
+ */
+function locatedPlaces(card: string): string[][] {
+  const lines = card.split("\n");
+  const out: string[][] = [];
+  for (let i = 0; i < lines.length - 1; i++) {
+    if (!/📍/.test(lines[i + 1])) continue;
+    const m = /\*\*(?:\d+\.\s*)?([^*\n]{2,80}?)\*\*/.exec(lines[i]);
+    if (!m) continue;
+    const full = m[1].trim();
+    const inner = /\(([^)]+)\)\s*$/.exec(full)?.[1]?.trim();
+    const outer = full.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    // Every form a rewrite might keep — an English answer keeps the romanised
+    // name, a Korean one the Hangul.
+    const forms = [outer, inner].filter((f): f is string => Boolean(f && f.length >= 2));
+    if (forms.length) out.push(forms);
+  }
+  return out;
 }
 
 /**
@@ -184,12 +222,22 @@ function offeredNames(text: string): string[] {
  * were offered, and losing the field that was the answer.
  */
 export function droppedEssential(answer: string, card: string): string | undefined {
-  const offered = [...new Set(offeredNames(card))];
+  const offered = offeredNames(card);
   if (offered.length >= 2) {
-    const kept = offered.filter((n) => answer.includes(n));
+    const kept = offered.filter((forms) => forms.some((f) => answer.includes(f)));
     // Two is the floor: one option, especially one reported as closed, is a
     // dead end where the card had a list.
     if (kept.length < 2) return `only ${kept.length} of ${offered.length} options survived`;
+  }
+  // A card that lists places with an address is answering "where, exactly".
+  // Asked for a convenience store near Gongdeok Station, the rewrite said "CU,
+  // GS25, 7-Eleven and emart24 are near Gongdeok" — every word true, and every
+  // actual store the card had found, with its street, gone. Two chain names from
+  // the tip were enough to pass the rule above.
+  const located = locatedPlaces(card);
+  if (located.length >= 2) {
+    const kept = located.filter((forms) => forms.some((f) => answer.includes(f)));
+    if (kept.length < 2) return `${located.length - kept.length} of ${located.length} located places were dropped`;
   }
   // A card carrying directions is answering "which way", and an arrival time
   // without one is not an answer.

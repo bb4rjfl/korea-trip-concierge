@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { sendChat, type ChatTurn, type Chip, type Lang, type PlaceImage, type StatusEvent } from "./api.js";
 import { STRINGS, SCENARIOS, SOURCE_CREDITS, TOOL_EMOJI, detectDefaultLang, type Scenario } from "./i18n.js";
 import { renderMarkdown } from "./markdown.js";
-import { nearestPlace } from "./geo.js";
+import type { Located } from "./geo.js";
+import { asksNearMe, asksFromHere, placeSaid, withPlace } from "../../../src/lib/here.js";
 import { Mascot, mascotEnabled, MASCOT_CREDIT } from "./mascot.js";
 import { Haru, HARU_CREDIT } from "./haru.js";
 
@@ -17,6 +18,17 @@ interface Msg {
 }
 
 const STORE_KEY = "ktc.msgs.v1";
+
+/**
+ * The station table is 20 KB compressed — most of the app again — and a visitor
+ * on roaming data who never asks "near me" should not pay for it. It loads the
+ * first time the phone is asked where it is, and stays loaded.
+ */
+let geo: typeof import("./geo.js") | null = null;
+async function loadGeo(): Promise<typeof import("./geo.js")> {
+  geo ??= await import("./geo.js");
+  return geo;
+}
 const LANGS: { value: Lang; label: string }[] = [
   { value: "en", label: "EN" },
   { value: "ko", label: "한국어" },
@@ -48,6 +60,9 @@ export function App() {
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // The last GPS fix, held on this device only and never sent — only the name
+  // derived from it is. Kept two minutes so a second question does not re-prompt.
+  const [fix, setFix] = useState<{ at: number; lat: number; lng: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const t = STRINGS[lang];
 
@@ -89,11 +104,77 @@ export function App() {
     return `${emoji} ${t.statusTool}`;
   }
 
-  async function send(text: string) {
+  const FIX_FRESH_MS = 120_000;
+
+  /** Where the phone is, as the nearest named place. Resolves null when it cannot say. */
+  async function findMe(): Promise<Located | null> {
+    if (!("geolocation" in navigator)) return null;
+    // Start loading the table while the phone is still getting a fix.
+    const table = loadGeo();
+    if (fix && Date.now() - fix.at < FIX_FRESH_MS) return (await table).locate(fix.lat, fix.lng, lang);
+    const pos = await new Promise<GeolocationPosition | null>((resolve) =>
+      navigator.geolocation.getCurrentPosition(resolve, () => resolve(null), {
+        timeout: 8000,
+        maximumAge: FIX_FRESH_MS,
+      }),
+    );
+    if (!pos) return null;
+    const { latitude: lat, longitude: lng } = pos.coords;
+    setFix({ at: Date.now(), lat, lng });
+    return (await table).locate(lat, lng, lang);
+  }
+
+  /** What to tell the traveller about the place we found — or why we could not. */
+  function whereNotice(spot: Located | null): string {
+    if (!spot || !geo) return t.locationNeedsTyping;
+    const distance = geo.formatDistance(spot.metres);
+    const filled = (s: string) => s.replace("{place}", spot.name).replace("{distance}", distance);
+    return spot.precise ? filled(t.locatedNotice) : filled(t.locationImprecise);
+  }
+
+  /** Look the phone up, showing that we are doing so. */
+  async function lookUp(): Promise<Located | null> {
+    setBusy(true);
+    setStatusText(t.findingYou);
+    try {
+      return await findMe();
+    } finally {
+      setBusy(false);
+      setStatusText(null);
+    }
+  }
+
+  /**
+   * Send what the traveller typed — and if it asks about "near me" without
+   * naming anywhere, say where first, from the phone.
+   *
+   * "Where is the nearest pharmacy", "내 주변 맛집", "近くのコンビニ" all need a
+   * place the server is never told. The phone finds the nearest station, and the
+   * question goes out with that name attached — visibly, in their own bubble, so
+   * a wrong guess is theirs to see and correct.
+   */
+  async function ask(text: string) {
+    const trimmed = text.trim();
+    if (!trimmed || busy) return;
+    // Cheap test first: most messages are not about "here", and those should
+    // not load the station table at all.
+    if ((!asksNearMe(trimmed) && !asksFromHere(trimmed)) || placeSaid(trimmed)) return send(trimmed);
+    // A place already named answers "near me" — unless it is where they are
+    // going, and "from here" is the part still missing.
+    const { findPlaceInText } = await loadGeo();
+    if (!asksFromHere(trimmed) && findPlaceInText(trimmed)) return send(trimmed);
+    setInput("");
+    const spot = await lookUp();
+    // Imprecise or unknown: send the question as it was. The server asks where
+    // they are, with a button to try the location again.
+    await send(spot?.precise ? withPlace(trimmed, spot.name, lang) : trimmed, whereNotice(spot));
+  }
+
+  async function send(text: string, note?: string) {
     const trimmed = text.trim();
     if (!trimmed || busy) return;
     setInput("");
-    setNotice(null);
+    setNotice(note ?? null);
     const nextMsgs: Msg[] = [...msgs, { role: "user" as const, content: trimmed }];
     setMsgs(nextMsgs);
     setBusy(true);
@@ -145,54 +226,36 @@ export function App() {
   }
 
   /**
-   * A route from wherever the traveller is standing.
+   * A button that needs to know where the traveller is.
    *
    * Runs inside the tap, so the browser's location prompt follows a gesture the
-   * person actually made. The position is turned into the nearest area name
-   * here, on the phone, and only that name is sent — the same promise the 📍
-   * button makes. If there is no position to be had, the fallback asks for the
-   * one thing still missing instead of repeating the question they tapped past.
+   * person actually made. The server wrote the question, in their language, with
+   * a hole where the place goes; the phone fills it with the nearest station and
+   * sends it. Nothing precise enough to call "here", and it asks them to type,
+   * rather than repeating the question they just tapped past.
    */
-  function routeFromHere(to: string) {
+  async function tapChip(c: Chip) {
     if (busy) return;
-    const ask = () => setNotice(t.routeNeedsOrigin.replace("{to}", to));
-    if (!("geolocation" in navigator)) return ask();
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const hit = nearestPlace(pos.coords.latitude, pos.coords.longitude);
-        if (!hit) return ask();
-        setNotice(t.locationPrivacy);
-        void send(t.routeFromHere.replace("{place}", hit.label).replace("{to}", to));
-      },
-      ask,
-      { timeout: 8000, maximumAge: 120_000 },
-    );
+    if (!c.locate?.ask) return void send(chipText(c));
+    const spot = await lookUp();
+    if (!spot?.precise) return setNotice(whereNotice(spot));
+    await send(c.locate.ask.replace("{place}", spot.name), whereNotice(spot));
   }
 
-  function tapChip(c: Chip) {
-    if (c.locate?.to) return routeFromHere(c.locate.to);
-    void send(chipText(c));
+  /** The 📍 button: what is around wherever the phone is. */
+  async function nearMe() {
+    if (busy) return;
+    const spot = await lookUp();
+    if (!spot?.precise) return setNotice(whereNotice(spot));
+    await send(t.nearMeQuery.replace("{place}", spot.name), whereNotice(spot));
   }
 
-  function nearMe() {
-    if (busy) return;
-    if (!("geolocation" in navigator)) {
-      setNotice(t.locationDenied);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const hit = nearestPlace(pos.coords.latitude, pos.coords.longitude);
-        if (!hit) {
-          setNotice(t.locationDenied);
-          return;
-        }
-        setNotice(t.locationPrivacy);
-        void send(t.nearMeQuery.replace("{place}", hit.label));
-      },
-      () => setNotice(t.locationDenied),
-      { timeout: 8000, maximumAge: 120_000 },
-    );
+  /** The chip's label, with the place we already know if the phone has a fresh fix. */
+  function chipLabel(c: Chip): string {
+    const base = chipText(c);
+    if (!c.locate || !fix || !geo || Date.now() - fix.at >= FIX_FRESH_MS) return base;
+    const spot = geo.locate(fix.lat, fix.lng, lang);
+    return spot?.precise ? `${base} · ${spot.name}` : base;
   }
 
   const lastAssistantIdx = (() => {
@@ -249,7 +312,7 @@ export function App() {
               <p class="scenarios-title">{t.scenariosTitle}</p>
               <div class="scenario-grid">
                 {SCENARIOS[lang].map((s: Scenario) => (
-                  <button key={s.send} class="scenario-card" onClick={() => void send(s.send)}>
+                  <button key={s.send} class="scenario-card" onClick={() => void ask(s.send)}>
                     <span class="scenario-emoji" aria-hidden="true">{s.emoji}</span>
                     <span class="scenario-label">{s.label}</span>
                   </button>
@@ -292,8 +355,8 @@ export function App() {
               {m.role === "assistant" && i === lastAssistantIdx && !busy && (m.chips?.length ?? 0) > 0 && (
                 <div class="chips" role="group" aria-label="Suggested next questions">
                   {m.chips!.map((c) => (
-                    <button key={c.cmdEn} class="chip" onClick={() => tapChip(c)}>
-                      <span aria-hidden="true">{c.emoji}</span> {chipText(c)}
+                    <button key={c.cmdEn} class="chip" onClick={() => void tapChip(c)}>
+                      <span aria-hidden="true">{c.emoji}</span> {chipLabel(c)}
                     </button>
                   ))}
                 </div>
@@ -331,7 +394,7 @@ export function App() {
           class="composer"
           onSubmit={(e) => {
             e.preventDefault();
-            void send(input);
+            void ask(input);
           }}
         >
           <button class="near-btn" type="button" onClick={nearMe} title={t.nearMe} aria-label={t.nearMe} disabled={busy}>

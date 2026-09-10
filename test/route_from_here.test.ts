@@ -66,13 +66,19 @@ describe("the web client is told to find the traveller, not to resend the words"
     delete process.env.GEMINI_API_KEY;
   });
 
-  it("marks the 📍 button as a location action carrying the destination", async () => {
+  it("marks the 📍 button as a location action: a question with a hole for the place", async () => {
     const res = await handleChat({ messages: [{ role: "user", content: "How do I get to 뱅뱅사거리?" }], uiLang: "en" });
     expect(res.meta.tool).toBe("getTransitRoute");
     const here = res.chips.find((c) => c.emoji === "📍");
-    expect(here?.locate).toEqual({ to: "뱅뱅사거리" });
+    expect(here?.locate?.ask).toBe("How do I get from {place} to 뱅뱅사거리?");
     // Every other button is still an ordinary question.
     for (const c of res.chips.filter((c) => c.emoji !== "📍")) expect(c.locate).toBeUndefined();
+  });
+
+  it("writes that question in the reader's language", async () => {
+    const res = await handleChat({ messages: [{ role: "user", content: "뱅뱅사거리 어떻게 가요?" }], uiLang: "ko" });
+    const here = res.chips.find((c) => c.emoji === "📍");
+    expect(here?.locate?.ask).toBe("{place}에서 뱅뱅사거리까지 어떻게 가요?");
   });
 
   it("does not advise changing the cuisine when the repeated answer is a route question", async () => {

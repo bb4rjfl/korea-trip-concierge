@@ -14,8 +14,13 @@ import { getGraph, lineLabel, planRoute, findStationCodes } from "../lib/sources
 import { getStationArrivals } from "../lib/sources/seoulSubway.js";
 import { planDirectBus } from "../lib/sources/busRoute.js";
 import { directionsLinks } from "../lib/maplinks.js";
+import { WHERE_I_AM } from "../lib/here.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
+
+// An origin that means "wherever I am" — shared with the web client, which
+// answers it on the device (src/lib/here.ts).
+export { WHERE_I_AM };
 
 /** Geocode a place: curated index first (instant + accurate), then TourAPI. */
 async function geocode(name: string): Promise<{ lng: number; lat: number } | undefined> {
@@ -46,10 +51,6 @@ const RETRY: Choice[] = [
   { emoji: "🔄", cmdEn: "Try again", cmdKo: "다시 시도", descEn: "retry routing" },
   { emoji: "💳", cmdEn: "How do I pay for transit?", descEn: "payment options" },
 ];
-
-/** An origin that means "wherever I am", in the four languages we serve. */
-export const WHERE_I_AM =
-  /^(?:(?:from\s+)?(?:my (?:area|location|place|hotel area|current location)|here|right here|where i am(?: now)?|current location|near me|my position)|내\s*위치|지금\s*(?:내\s*)?위치|여기(?:서)?|현\s*위치|현재\s*위치|現在地|ここ(?:から)?|今いる(?:場所|ところ)|我(?:的)?(?:位置|所在地)|这里|這裡|我现在的位置|我現在的位置)$/i;
 
 const MODE_ICON: Record<string, string> = { subway: "🚇", bus: "🚌", walk: "🚶" };
 

@@ -13,7 +13,7 @@ import { mapLinks, mapLinksAt } from "../src/lib/maplinks.js";
 import { buildGraph, findStationCodes, lineLabel, planRoute } from "../src/lib/sources/subwayGraph.js";
 import SUBWAY_SNAPSHOT from "../src/lib/data/subwayStations.json" with { type: "json" };
 import { SCENARIOS } from "../web/client/src/i18n.js";
-import { nearestPlace } from "../web/client/src/geo.js";
+import { locate } from "../web/client/src/geo.js";
 import type { Lang } from "../web/server/router.js";
 
 /* ------------------------------- chips parser ------------------------------- */
@@ -165,14 +165,14 @@ describe("place-name extraction for photo enrichment", () => {
 
 describe("on-device near-me snap", () => {
   it("snaps a Gwanghwamun coordinate to Gyeongbokgung", () => {
-    const hit = nearestPlace(37.579, 126.977);
-    expect(hit?.label).toBe("Gyeongbokgung Palace");
-    expect(hit!.km).toBeLessThan(0.5);
+    const hit = locate(37.579, 126.977, "en");
+    expect(hit?.name).toBe("Gyeongbokgung Palace");
+    expect(hit!.metres).toBeLessThan(500);
   });
 
   it("snaps a Hongdae coordinate to the Hongik area", () => {
-    const hit = nearestPlace(37.5568, 126.9236);
-    expect(hit?.label.toLowerCase()).toContain("hongik");
+    const hit = locate(37.5568, 126.9236, "en");
+    expect(hit?.name.toLowerCase()).toContain("hongik");
   });
 });
 

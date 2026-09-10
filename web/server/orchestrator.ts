@@ -14,6 +14,8 @@ import { understand, readingNote, isEmptyReading } from "../../src/lib/understan
 import { synthesize } from "./synthesize.js";
 import { getWeather, resolveCity as resolveCityGeo } from "../../src/lib/sources/weatherair.js";
 import { searchPlaces } from "../../src/lib/sources/tourapi.js";
+import { asksNearMe, placeSaid, withPlace, withPlaceTemplate, WHERE_I_AM } from "../../src/lib/here.js";
+import { findPlaceInText } from "../../src/lib/places.js";
 import {
   search as retrieve,
   confident as confidentHit,
@@ -433,6 +435,73 @@ const REPEAT_NOTE_PLAIN: Record<Lang, string> = {
 /** Tools whose answer is a list, where area, price, time and cuisine are what you change. */
 const LIST_TOOLS = new Set(["searchPlaceForeigner", "findForeignerFriendlyStore", "recommendTripCourse"]);
 
+/* ------------------------------ where they are ------------------------------ */
+
+/** Argument slots that hold a place — and so must not hold "me". */
+const PLACE_ARGS = ["area", "place", "from", "near", "location", "neighborhood", "stop"] as const;
+
+/** Where each tool looks for "where the traveller is". */
+const WHERE_SLOT: Record<string, string> = {
+  searchPlaceForeigner: "area",
+  findForeignerFriendlyStore: "area",
+  getAreaGuide: "area",
+  getTransitRoute: "from",
+  // "Your current or boarding station" — so only when the phone named a station.
+  trackSubwayArrival: "station",
+};
+
+/** A name the phone gave that is a station rather than a landmark. */
+const IS_A_STATION = /station$|역$|駅$|[站驛]$/i;
+
+/** The 📍 button's label. */
+const USE_MY_LOCATION: Record<Lang, string> = {
+  en: "Use my location",
+  ko: "내 위치 사용",
+  ja: "現在地を使う",
+  zh: "使用我的位置",
+};
+
+/** What the phone sends once it knows, for a route that was missing its start. */
+const ROUTE_FROM_HERE: Record<Lang, string> = {
+  en: "How do I get from {place} to {to}?",
+  ko: "{place}에서 {to}까지 어떻게 가요?",
+  ja: "{place}から{to}までどうやって行きますか？",
+  zh: "从{place}到{to}怎么走？",
+};
+
+/**
+ * Said when a "near me" question arrives and the phone could not say where.
+ *
+ * It says what is sent, because a location prompt is exactly the moment someone
+ * decides whether to trust a service, and "never your coordinates" is true.
+ */
+const WHERE_ARE_YOU: Record<Lang, string> = {
+  en: "📍 **Where are you right now?** Tap below to use your location — only the nearest station's name is sent, never your coordinates. Or type a station or neighbourhood.",
+  ko: "📍 **지금 어디 계세요?** 아래를 누르면 위치를 확인해요 — 좌표가 아니라 가장 가까운 역 이름만 전송돼요. 역이나 동네 이름을 직접 입력해도 돼요.",
+  ja: "📍 **今どこにいますか？** 下をタップすると現在地を確認します — 送信されるのは座標ではなく最寄り駅の名前だけです。駅名やエリア名を入力してもOKです。",
+  zh: "📍 **你现在在哪里？** 点下面可以使用你的位置 — 只发送最近车站的名字，绝不发送坐标。也可以直接输入车站或街区名。",
+};
+
+/** Somewhere to start when they would rather tap than type. */
+const POPULAR_AREAS: Record<Lang, string[]> = {
+  en: ["Myeongdong", "Hongdae", "Gangnam"],
+  ko: ["명동", "홍대", "강남"],
+  ja: ["明洞", "弘大", "江南"],
+  zh: ["明洞", "弘大", "江南"],
+};
+
+/**
+ * The buttons under "where are you?": the phone's location first, then the
+ * neighbourhood already talked about in this conversation if there is one —
+ * offered, not assumed, because having asked about Myeongdong is not the same
+ * as standing in it — then a couple of places most visitors pass through.
+ */
+function nearMeChips(text: string, lang: Lang, known?: string): Chip[] {
+  const here: Chip = { emoji: "📍", cmdEn: USE_MY_LOCATION[lang], locate: { ask: withPlaceTemplate(text, lang) } };
+  const areas = [known, ...POPULAR_AREAS[lang]].filter((a, i, all): a is string => Boolean(a) && all.indexOf(a) === i);
+  return [here, ...areas.slice(0, 3).map((a) => ({ emoji: "🗺️", cmdEn: withPlace(text, a, lang) }))];
+}
+
 const ERROR_MSG: Record<Lang, string> = {
   en: "Sorry — something hiccuped on my side. Please try that once more.",
   ja: "すみません、こちらの不具合です。もう一度お試しください。",
@@ -559,6 +628,16 @@ ${partial.reply ?? ""}`.trim(),
     }
   }
 
+  // "Near me", with nowhere named. The phone answers this itself when it can —
+  // it finds the nearest station on the device and sends the question with the
+  // name attached — so reaching here means it could not: location refused, no
+  // fix, or somewhere the station table does not cover. Asking is then the
+  // answer. Guessing is not: before this, these questions were searched for a
+  // place called "me", or not understood at all and met with the welcome text.
+  if (asksNearMe(text) && !placeSaid(text) && !findPlaceInText(text)) {
+    return done({ reply: WHERE_ARE_YOU[lang], chips: nearMeChips(text, lang, ctx.area), meta: { engine: "rules" } });
+  }
+
   try {
     // 1) LLM intent (optional, silent-fail) — skips junk like unknown tool names.
     let engine: ChatResponse["meta"]["engine"] = "none";
@@ -664,6 +743,20 @@ ${partial.reply ?? ""}`.trim(),
     // 4) Execute (zod-validated); missing required args → friendly clarify.
     onStatus?.({ stage: "tool", tool: toolCall.name });
     const filled = backfillArgs(toolCall.name, toolCall.args, ctx);
+    // "Me", "here", "nearby" are not places. The model wrote "me" into the area
+    // of "is there a convenience store near me" and the card came back titled
+    // "Convenience store in me". A place slot holding one of these is empty.
+    for (const k of PLACE_ARGS) {
+      if (typeof filled[k] === "string" && WHERE_I_AM.test(String(filled[k]).trim())) delete filled[k];
+    }
+    // Where the phone said they are, put where the tool looks for it — not left
+    // to the model to notice. "내 주변 맛집 (성수역 근처예요)" came back with
+    // restaurants at City Hall: the model kept the food and dropped the place,
+    // and the search fell back to the middle of the city. The phone only adds a
+    // place when the traveller named none, so it outranks anything guessed.
+    const phoneSaid = placeSaid(text);
+    const slot = WHERE_SLOT[toolCall.name];
+    if (phoneSaid && slot && (slot !== "station" || IS_A_STATION.test(phoneSaid))) filled[slot] = phoneSaid;
 
     // "Another one" has to mean another one. The course builder returns its
     // strongest day at variant 0 and a different day in a different part of the
@@ -783,7 +876,14 @@ ${partial.reply ?? ""}`.trim(),
     // it back out of the button's wording, which the translator rewrites.
     if (toolCall.name === "getTransitRoute") {
       const to = String(filled.to ?? "").trim();
-      if (to) for (const c of chips) if (c.emoji === "📍") c.locate = { to };
+      if (to) {
+        for (const c of chips) {
+          if (c.emoji !== "📍") continue;
+          c.locate = { ask: ROUTE_FROM_HERE[lang].replace("{to}", to) };
+          c.cmdEn = USE_MY_LOCATION[lang];
+          c.cmdKo = USE_MY_LOCATION.ko;
+        }
+      }
     }
     // The card is correct and ready now; composing over it takes another second
     // or two. Send the card first and replace it when the composed answer lands,
