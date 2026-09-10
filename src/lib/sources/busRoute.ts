@@ -19,6 +19,8 @@ import { fetchWithTimeout, ExternalApiError } from "../http.js";
 import { TtlCache } from "../cache.js";
 import { normalizeName, similarity } from "../fuzzy.js";
 import { romanizeText } from "../romanize.js";
+import { resolvePlaceCoord, findPlaceInText } from "../places.js";
+import { haversineKm } from "../courses.js";
 
 const BASE = "http://ws.bus.go.kr/api/rest";
 
@@ -26,6 +28,9 @@ export interface BusStop {
   stId: string;
   arsId: string;
   name: string;
+  /** WGS84, from the stop's own record — see nearThePlace for why it matters. */
+  lat?: number;
+  lng?: number;
 }
 
 export interface BusPlan {
@@ -60,6 +65,9 @@ interface RawStop {
   stId?: string;
   arsId?: string;
   stNm?: string;
+  /** Longitude and latitude, WGS84, despite the names. */
+  tmX?: string;
+  tmY?: string;
 }
 interface RawRoute {
   busRouteId?: string;
@@ -93,8 +101,43 @@ export async function findStops(name: string): Promise<BusStop[]> {
     const rows = await fetchJsonBody<RawStop>("/stationinfo/getStationByName", { stSrch: q });
     return rows
       .filter((r) => r.stId && r.arsId && r.stNm)
-      .map((r) => ({ stId: String(r.stId), arsId: String(r.arsId), name: String(r.stNm) }));
+      .map((r) => {
+        const lng = Number(r.tmX);
+        const lat = Number(r.tmY);
+        const located = Number.isFinite(lat) && Number.isFinite(lng) && lat > 30 && lng > 120;
+        return {
+          stId: String(r.stId),
+          arsId: String(r.arsId),
+          name: String(r.stNm),
+          ...(located ? { lat, lng } : {}),
+        };
+      });
   });
+}
+
+/** Far enough to cover every corner of a big junction; not so far it is another place. */
+const STOP_RADIUS_KM = 0.8;
+
+/**
+ * Only the stops that are actually at the place, when we know where it is.
+ *
+ * The bus API finds stops by name, and a name is not a place. Asked for a bus
+ * from Gangnam Station, `getStationByName("강남")` returns 118 stops — every
+ * one in Seoul with 강남 anywhere in its name — and the planner boarded the
+ * traveller at "LH수서.디아크리온강남아파트", an apartment complex seven
+ * kilometres away in Suseo, for a 37-minute ride to somewhere two kilometres
+ * down the road. The stop records carry their coordinates; we were dropping
+ * them.
+ *
+ * Where we cannot place the name, the stops are left alone — a specific name
+ * like 뱅뱅사거리 matches only the stops that really are there. Where we can and
+ * none of the matches are nearby, the honest answer is no direct bus, and the
+ * subway plan answers instead: every one of those matches is somewhere else.
+ */
+export function nearThePlace(stops: BusStop[], place: string): BusStop[] {
+  const at = resolvePlaceCoord(place) ?? findPlaceInText(place);
+  if (!at) return stops;
+  return stops.filter((s) => s.lat != null && s.lng != null && haversineKm(at, { lat: s.lat, lng: s.lng }) <= STOP_RADIUS_KM);
 }
 
 /** Routes calling at one stop. */
@@ -142,8 +185,8 @@ export async function planDirectBus(from: string, to: string): Promise<BusPlan |
   if (!ENV.BUS_API_KEY.trim()) return undefined;
   try {
     const [fromStops, toStops] = await Promise.all([findStops(from), findStops(to)]);
-    const aList = rankStops(fromStops, from).slice(0, 5);
-    const bList = rankStops(toStops, to).slice(0, 5);
+    const aList = rankStops(nearThePlace(fromStops, from), from).slice(0, 5);
+    const bList = rankStops(nearThePlace(toStops, to), to).slice(0, 5);
     if (!aList.length || !bList.length) return undefined;
 
     const [aRoutes, bRoutes] = await Promise.all([

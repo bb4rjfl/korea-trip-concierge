@@ -144,6 +144,36 @@ export function App() {
     void send(lastUser.content);
   }
 
+  /**
+   * A route from wherever the traveller is standing.
+   *
+   * Runs inside the tap, so the browser's location prompt follows a gesture the
+   * person actually made. The position is turned into the nearest area name
+   * here, on the phone, and only that name is sent — the same promise the 📍
+   * button makes. If there is no position to be had, the fallback asks for the
+   * one thing still missing instead of repeating the question they tapped past.
+   */
+  function routeFromHere(to: string) {
+    if (busy) return;
+    const ask = () => setNotice(t.routeNeedsOrigin.replace("{to}", to));
+    if (!("geolocation" in navigator)) return ask();
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const hit = nearestPlace(pos.coords.latitude, pos.coords.longitude);
+        if (!hit) return ask();
+        setNotice(t.locationPrivacy);
+        void send(t.routeFromHere.replace("{place}", hit.label).replace("{to}", to));
+      },
+      ask,
+      { timeout: 8000, maximumAge: 120_000 },
+    );
+  }
+
+  function tapChip(c: Chip) {
+    if (c.locate?.to) return routeFromHere(c.locate.to);
+    void send(chipText(c));
+  }
+
   function nearMe() {
     if (busy) return;
     if (!("geolocation" in navigator)) {
@@ -262,7 +292,7 @@ export function App() {
               {m.role === "assistant" && i === lastAssistantIdx && !busy && (m.chips?.length ?? 0) > 0 && (
                 <div class="chips" role="group" aria-label="Suggested next questions">
                   {m.chips!.map((c) => (
-                    <button key={c.cmdEn} class="chip" onClick={() => void send(chipText(c))}>
+                    <button key={c.cmdEn} class="chip" onClick={() => tapChip(c)}>
                       <span aria-hidden="true">{c.emoji}</span> {chipText(c)}
                     </button>
                   ))}

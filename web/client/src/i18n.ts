@@ -22,6 +22,10 @@ export interface Strings {
   nearMeQuery: string;
   locationDenied: string;
   locationPrivacy: string;
+  /** Sent after the 📍 route button finds where the traveller is. */
+  routeFromHere: string;
+  /** When it could not: ask for the one thing still missing, in words they would type. */
+  routeNeedsOrigin: string;
   aboutTitle: string;
   aboutBody: string;
   aboutSources: string;
@@ -67,6 +71,8 @@ export const STRINGS: Record<Lang, Strings> = {
     nearMeQuery: "What's near {place}?",
     locationDenied: "Location is off — you can just type a neighborhood name instead.",
     locationPrivacy: "📍 Your coordinates never leave this device — only the area name is sent.",
+    routeFromHere: "How do I get from {place} to {to}?",
+    routeNeedsOrigin: "Couldn't get your location — type the station or neighbourhood you're near (like “Gangnam Station”) and I'll route you to {to}.",
     aboutTitle: "About this service",
     aboutBody:
       "Korea Trip Concierge is a real-time conversational travel guide for visitors in Korea. It answers with live public data — not canned pages. No login, no tracking; your location never leaves your device.",
@@ -95,6 +101,8 @@ export const STRINGS: Record<Lang, Strings> = {
     nearMeQuery: "{place} 근처에 뭐 있어?",
     locationDenied: "위치가 꺼져 있어요 — 동네 이름을 직접 입력해도 돼요.",
     locationPrivacy: "📍 좌표는 기기 밖으로 나가지 않아요 — 동네 이름만 전송돼요.",
+    routeFromHere: "{place}에서 {to}까지 어떻게 가요?",
+    routeNeedsOrigin: "위치를 가져오지 못했어요 — 근처 역이나 동네 이름(예: “강남역”)을 입력하시면 {to}까지 안내할게요.",
     aboutTitle: "서비스 소개",
     aboutBody:
       "Korea Trip Concierge는 방한 여행자를 위한 실시간 대화형 여행 가이드입니다. 정적인 안내가 아니라 실시간 공공데이터로 답합니다. 로그인·추적 없음, 위치 좌표는 기기 밖으로 나가지 않습니다.",
@@ -123,6 +131,8 @@ export const STRINGS: Record<Lang, Strings> = {
     nearMeQuery: "{place}の近くに何がある？",
     locationDenied: "位置情報がオフです — エリア名を入力してもOKです。",
     locationPrivacy: "📍 座標が端末の外に出ることはありません — エリア名のみ送信されます。",
+    routeFromHere: "{place}から{to}までどうやって行きますか？",
+    routeNeedsOrigin: "現在地を取得できませんでした — 近くの駅やエリア名（例：「江南駅」）を入力すれば、{to}までご案内します。",
     aboutTitle: "このサービスについて",
     aboutBody:
       "Korea Trip Concierge は訪韓旅行者のためのリアルタイム対話型ガイドです。ログイン・トラッキングなし。位置座標が端末の外に出ることはありません。",
@@ -151,6 +161,8 @@ export const STRINGS: Record<Lang, Strings> = {
     nearMeQuery: "{place}附近有什么？",
     locationDenied: "定位未开启 — 也可以直接输入街区名。",
     locationPrivacy: "📍 坐标不会离开你的设备 — 只发送街区名称。",
+    routeFromHere: "从{place}到{to}怎么走？",
+    routeNeedsOrigin: "无法获取你的位置 — 输入附近的地铁站或街区名（如“江南站”），我帮你规划到{to}的路线。",
     aboutTitle: "关于本服务",
     aboutBody:
       "Korea Trip Concierge 是面向访韩游客的实时对话式旅行指南。无需登录、无跟踪，位置坐标不会离开你的设备。",

@@ -19,6 +19,17 @@ export interface Chip {
   cmdEn: string;
   /** Korean phrasing, when the tool provided one. */
   cmdKo?: string;
+  /**
+   * Not a sentence to send — an action for the client: find where the traveller
+   * is on their own device, then ask for a route from there to `to`.
+   *
+   * The button used to be the sentence "From my area to 뱅뱅사거리". The server
+   * cannot know anyone's area — by design, coordinates never leave the phone —
+   * so sending that sentence got the same "where are you starting from?" back,
+   * with the same button under it, forever. The one part of the system that
+   * knows where the traveller is has to be the part that answers.
+   */
+  locate?: { to: string };
 }
 
 export interface ParsedToolMarkdown {

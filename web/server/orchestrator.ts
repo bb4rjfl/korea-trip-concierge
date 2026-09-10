@@ -415,6 +415,24 @@ const REPEAT_NOTE: Record<Lang, string> = {
   ko: "_위와 같은 결과예요. 지역·가격·시간·종류 중 무엇을 바꿀지 알려주시면 다시 찾아볼게요._",
 };
 
+/**
+ * The same, for everything that is not a list of places.
+ *
+ * "Tell me a different area, price, time or cuisine" was being appended to a
+ * route planner asking where the traveller was starting from — advice about
+ * cuisine, under a question about a bus. The hint only makes sense where those
+ * are the dials; elsewhere it just says what happened.
+ */
+const REPEAT_NOTE_PLAIN: Record<Lang, string> = {
+  en: "_That's the same answer as above — tell me what to change and I'll look again._",
+  ja: "_先ほどと同じ内容です。変えたい点を教えてください。_",
+  zh: "_和上面的结果相同。告诉我要改什么，我再查一次。_",
+  ko: "_위와 같은 결과예요. 무엇을 바꿀지 알려주시면 다시 찾아볼게요._",
+};
+
+/** Tools whose answer is a list, where area, price, time and cuisine are what you change. */
+const LIST_TOOLS = new Set(["searchPlaceForeigner", "findForeignerFriendlyStore", "recommendTripCourse"]);
+
 const ERROR_MSG: Record<Lang, string> = {
   en: "Sorry — something hiccuped on my side. Please try that once more.",
   ja: "すみません、こちらの不具合です。もう一度お試しください。",
@@ -760,6 +778,13 @@ ${partial.reply ?? ""}`.trim(),
     }
 
     const { body, chips } = parseToolMarkdown(result.markdown);
+    // "From where I am" is an action, not a sentence — see Chip.locate. The
+    // destination comes from the arguments the tool ran with, not from reading
+    // it back out of the button's wording, which the translator rewrites.
+    if (toolCall.name === "getTransitRoute") {
+      const to = String(filled.to ?? "").trim();
+      if (to) for (const c of chips) if (c.emoji === "📍") c.locate = { to };
+    }
     // The card is correct and ready now; composing over it takes another second
     // or two. Send the card first and replace it when the composed answer lands,
     // which is the same two-stage path that took non-English answers from 9.1s
@@ -811,9 +836,10 @@ ${partial.reply ?? ""}`.trim(),
     // The client sends its own transcript back, so the previous card is right here.
     const lastAssistant = [...history].reverse().find((h) => h.role === "assistant")?.content?.trim();
     if (lastAssistant && lastAssistant === localizedRaw.body.trim()) {
+      const note = LIST_TOOLS.has(toolCall.name) ? REPEAT_NOTE[lang] : REPEAT_NOTE_PLAIN[lang];
       localizedRaw.body = `${localizedRaw.body}
 
-${REPEAT_NOTE[lang]}`;
+${note}`;
     }
 
     const localized = hant

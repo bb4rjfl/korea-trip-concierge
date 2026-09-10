@@ -47,6 +47,10 @@ const RETRY: Choice[] = [
   { emoji: "💳", cmdEn: "How do I pay for transit?", descEn: "payment options" },
 ];
 
+/** An origin that means "wherever I am", in the four languages we serve. */
+export const WHERE_I_AM =
+  /^(?:(?:from\s+)?(?:my (?:area|location|place|hotel area|current location)|here|right here|where i am(?: now)?|current location|near me|my position)|내\s*위치|지금\s*(?:내\s*)?위치|여기(?:서)?|현\s*위치|현재\s*위치|現在地|ここ(?:から)?|今いる(?:場所|ところ)|我(?:的)?(?:位置|所在地)|这里|這裡|我现在的位置|我現在的位置)$/i;
+
 const MODE_ICON: Record<string, string> = { subway: "🚇", bus: "🚌", walk: "🚶" };
 
 /** Primary mode of a route — used to label the option (🚇 / 🚌 / both). */
@@ -351,7 +355,12 @@ export const getTransitRoute: ToolDef = {
     openWorldHint: true,
   },
   handler: async (args) => {
-    const from = String(args.from ?? "").trim();
+    // "From here", "from my area", "여기서" — the traveller's position, which
+    // this server never learns. Treated as no origin at all, so the answer is
+    // the question that gets them one, rather than an attempt to geocode the
+    // words "my area" into somewhere.
+    const said = String(args.from ?? "").trim();
+    const from = WHERE_I_AM.test(said) ? "" : said;
     const to = String(args.to ?? "").trim();
 
     // U3: a transit route needs a starting point. If the user only gave a
@@ -380,9 +389,13 @@ export const getTransitRoute: ToolDef = {
         "Where are you starting from?",
         `I can route you to **${dest}** — tap a common starting point, or tell me a station/landmark/address.`,
         [
+          // 📍 first: it is the one most people standing somewhere actually want.
+          // In the web client this button finds the nearest area on the phone
+          // and asks from there; the emoji is what marks it, because it is the
+          // same glyph as the location button and nothing else uses it.
+          { emoji: "📍", cmdEn: `From where I am to ${dest}`, cmdKo: `지금 내 위치에서 ${dest}까지`, descEn: "use your location" },
           { emoji: "🚉", cmdEn: `From Seoul Station to ${dest}`, descEn: "route from Seoul Station" },
           { emoji: "✈️", cmdEn: `From Incheon Airport to ${dest}`, descEn: "route from the airport" },
-          { emoji: "🏨", cmdEn: `From my area to ${dest}`, descEn: "tell me your neighborhood" },
         ],
       );
     }
