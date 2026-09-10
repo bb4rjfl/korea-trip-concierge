@@ -50,6 +50,8 @@ const REPORT_PATH = "eval/last-run.md";
 
 interface Chip {
   cmdEn: string;
+  /** A device action (find me, then route), not a sentence — the harness cannot perform it. */
+  locate?: { to: string };
 }
 interface Answer {
   body: string;
@@ -178,6 +180,15 @@ interface TurnResult {
   hardFail?: string;
 }
 
+/** The answer without the "that's the same answer as above" line we append to repeats. */
+function stripRepeat(markdown: string): string {
+  return markdown
+    .split("\n")
+    .filter((l) => !/same answer as above|先ほどと同じ|和上面的结果相同|위와 같은 결과/i.test(l))
+    .join("\n")
+    .trim();
+}
+
 /** The bolded names an answer offers — its stops, places or dishes. */
 function namesIn(markdown: string): Set<string> {
   const out = new Set<string>();
@@ -213,7 +224,11 @@ async function runScenario(scenario: Scenario): Promise<TurnResult[]> {
   for (const turn of scenario.turns) {
     // A `follow` turn taps what we ourselves offered, which is the only way to
     // reach the failures that come from our own suggestions.
-    const said = turn.say ?? lastChips[(turn.follow ?? 1) - 1]?.cmdEn;
+    // Chips that are device actions are skipped when counting positions: the
+    // harness is not a phone and cannot be located, so "tap the first chip" means
+    // the first one a harness can actually tap.
+    const tappable = lastChips.filter((c) => !c.locate);
+    const said = turn.say ?? tappable[(turn.follow ?? 1) - 1]?.cmdEn;
     if (!said) {
       results.push({
         scenario: scenario.name,
@@ -240,7 +255,15 @@ async function runScenario(scenario: Scenario): Promise<TurnResult[]> {
     lastChips = answer.chips;
 
     const previous = results[results.length - 1]?.answer;
-    const hardFail = checkGuards(turn, answer.body, previous);
+    // A button we offered that leads straight back to the answer it was offered
+    // under is a loop, whatever a judge makes of the wording. A traveller tapped
+    // "From my area to 뱅뱅사거리" and got the same question, the same button,
+    // indefinitely; this is the check that would have caught it.
+    const looped =
+      turn.follow != null && previous != null && stripRepeat(answer.body) === stripRepeat(previous)
+        ? `our own button led back to the same answer ("${said}")`
+        : undefined;
+    const hardFail = looped ?? checkGuards(turn, answer.body, previous);
     const verdict = hardFail ? { score: 0, why: hardFail } : await judge(said, turn.expect, answer.body, previous);
 
     results.push({

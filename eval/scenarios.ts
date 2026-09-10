@@ -82,6 +82,28 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   {
+    // The screenshot. A destination and no origin: we ask where they are, and
+    // every button under that question has to lead to a route — not back to the
+    // question. "From my area to 뱅뱅사거리" did, forever. The 📍 button is now a
+    // device action the harness skips; the first button it can tap must route.
+    name: "destination only → our buttons",
+    guards: "a button we offer under a question must not loop back to the question",
+    turns: [
+      {
+        say: "How do I get to 뱅뱅사거리?",
+        expect:
+          "Asks where the traveller is starting from, because that is genuinely missing, and offers starting points they can tap.",
+      },
+      {
+        follow: 1,
+        expect:
+          "An actual route to 뱅뱅사거리 from the starting point that was tapped — which bus or line, where to get on and off, how long.",
+        mustNotMatch: [/Where are you starting from/i, ...DEAD_END],
+        mustMatch: [/뱅뱅사거리|Baengbaeng/i],
+      },
+    ],
+  },
+  {
     name: "route with nothing given",
     guards: "we never route to the city the traveller is standing in, or from the literal words 'my area'",
     turns: [
