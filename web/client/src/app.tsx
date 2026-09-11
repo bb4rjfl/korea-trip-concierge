@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { sendChat, type ChatTurn, type Chip, type Lang, type PlaceImage, type StatusEvent } from "./api.js";
+import { sendChat, type ChatTurn, type Chip, type Here, type Lang, type PlaceImage, type StatusEvent } from "./api.js";
 import { STRINGS, SCENARIOS, SOURCE_CREDITS, TOOL_EMOJI, detectDefaultLang, type Scenario } from "./i18n.js";
 import { renderMarkdown } from "./markdown.js";
-import type { Located } from "./geo.js";
-import { asksNearMe, asksFromHere, placeSaid, withPlace } from "../../../src/lib/here.js";
+import { asksNearMe, asksFromHere } from "../../../src/lib/here.js";
 import { Mascot, mascotEnabled, MASCOT_CREDIT } from "./mascot.js";
 import { Haru, HARU_CREDIT } from "./haru.js";
 
@@ -18,16 +17,17 @@ interface Msg {
 }
 
 const STORE_KEY = "ktc.msgs.v1";
+/** Whether the traveller has chosen to answer from their location — the choice, never the position. */
+const SHARE_KEY = "ktc.here";
 
-/**
- * The station table is 20 KB compressed — most of the app again — and a visitor
- * on roaming data who never asks "near me" should not pay for it. It loads the
- * first time the phone is asked where it is, and stays loaded.
- */
-let geo: typeof import("./geo.js") | null = null;
-async function loadGeo(): Promise<typeof import("./geo.js")> {
-  geo ??= await import("./geo.js");
-  return geo;
+/** "±15 m", "±1.2 km". */
+function formatMetres(m: number): string {
+  return m < 1000 ? `${Math.max(5, Math.round(m / 5) * 5)} m` : `${(m / 1000).toFixed(1)} km`;
+}
+
+/** A pin at the exact spot, opened in Kakao Map — "where does it think I am?" answered at a glance. */
+function pinLink(h: Here): string {
+  return `https://map.kakao.com/link/map/${encodeURIComponent("📍")},${h.lat},${h.lng}`;
 }
 const LANGS: { value: Lang; label: string }[] = [
   { value: "en", label: "EN" },
@@ -60,9 +60,17 @@ export function App() {
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  // The last GPS fix, held on this device only and never sent — only the name
-  // derived from it is. Kept two minutes so a second question does not re-prompt.
-  const [fix, setFix] = useState<{ at: number; lat: number; lng: number } | null>(null);
+  // Location, the way a map app has it: once the traveller allows it, every
+  // question is answered from where they are — until they switch it off. The
+  // choice is remembered on this device; the position itself is fetched fresh.
+  const [sharing, setSharing] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(SHARE_KEY) === "on";
+    } catch {
+      return false;
+    }
+  });
+  const [fix, setFix] = useState<(Here & { at: number }) | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const t = STRINGS[lang];
 
@@ -104,73 +112,101 @@ export function App() {
     return `${emoji} ${t.statusTool}`;
   }
 
-  const FIX_FRESH_MS = 120_000;
+  /** A fix this recent is still where they are; a walking traveller moves ~40 m a half-minute. */
+  const FIX_FRESH_MS = 30_000;
+  /** Beyond this the phone does not really know — a desktop guessing from its IP address. */
+  const USABLE_ACCURACY_M = 1500;
 
-  /** Where the phone is, as the nearest named place. Resolves null when it cannot say. */
-  async function findMe(): Promise<Located | null> {
+  /**
+   * The phone's position, asking permission the first time.
+   *
+   * High-accuracy mode, because the answer is "which pharmacy is 140 m away",
+   * and the network-only estimate a phone gives by default can be off by a
+   * kilometre — enough to put the traveller in the next neighbourhood.
+   */
+  async function getFix(): Promise<(Here & { at: number }) | null> {
     if (!("geolocation" in navigator)) return null;
-    // Start loading the table while the phone is still getting a fix.
-    const table = loadGeo();
-    if (fix && Date.now() - fix.at < FIX_FRESH_MS) return (await table).locate(fix.lat, fix.lng, lang);
+    if (fix && Date.now() - fix.at < FIX_FRESH_MS) return fix;
     const pos = await new Promise<GeolocationPosition | null>((resolve) =>
       navigator.geolocation.getCurrentPosition(resolve, () => resolve(null), {
-        timeout: 8000,
+        enableHighAccuracy: true,
+        timeout: 10_000,
         maximumAge: FIX_FRESH_MS,
       }),
     );
     if (!pos) return null;
-    const { latitude: lat, longitude: lng } = pos.coords;
-    setFix({ at: Date.now(), lat, lng });
-    return (await table).locate(lat, lng, lang);
+    const next = {
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      accuracy: Math.round(pos.coords.accuracy),
+      at: Date.now(),
+    };
+    setFix(next);
+    // Allowed once, used from then on — the way a map app behaves — with the
+    // switch in plain sight above the input.
+    if (!sharing) {
+      setSharing(true);
+      try {
+        localStorage.setItem(SHARE_KEY, "on");
+      } catch {
+        /* private mode — sharing lasts this visit */
+      }
+    }
+    return next;
   }
 
-  /** What to tell the traveller about the place we found — or why we could not. */
-  function whereNotice(spot: Located | null): string {
-    if (!spot || !geo) return t.locationNeedsTyping;
-    const distance = geo.formatDistance(spot.metres);
-    const filled = (s: string) => s.replace("{place}", spot.name).replace("{distance}", distance);
-    return spot.precise ? filled(t.locatedNotice) : filled(t.locationImprecise);
+  /** A fix good enough to answer "near me" from, or nothing. */
+  const usable = (f: Here | null): Here | undefined =>
+    f && (f.accuracy ?? 0) <= USABLE_ACCURACY_M ? { lat: f.lat, lng: f.lng, accuracy: f.accuracy } : undefined;
+
+  /** Why we could not use the position, when we could not. */
+  function whyNot(f: Here | null): string {
+    if (!f) return t.locationNeedsTyping;
+    return t.locationImprecise.replace("{accuracy}", formatMetres(f.accuracy ?? 0));
   }
 
-  /** Look the phone up, showing that we are doing so. */
-  async function lookUp(): Promise<Located | null> {
+  /** Get the position, showing that we are doing so. */
+  async function lookUp(): Promise<(Here & { at: number }) | null> {
     setBusy(true);
     setStatusText(t.findingYou);
     try {
-      return await findMe();
+      return await getFix();
     } finally {
       setBusy(false);
       setStatusText(null);
     }
   }
 
+  function stopSharing() {
+    setSharing(false);
+    setFix(null);
+    try {
+      localStorage.setItem(SHARE_KEY, "off");
+    } catch {
+      /* nothing to forget */
+    }
+  }
+
   /**
-   * Send what the traveller typed — and if it asks about "near me" without
-   * naming anywhere, say where first, from the phone.
+   * Send what the traveller typed, from where they are when that matters.
    *
-   * "Where is the nearest pharmacy", "내 주변 맛집", "近くのコンビニ" all need a
-   * place the server is never told. The phone finds the nearest station, and the
-   * question goes out with that name attached — visibly, in their own bubble, so
-   * a wrong guess is theirs to see and correct.
+   * With location on, every question carries the position — so "how do I get
+   * to Myeongdong" starts from them without asking. With it off, a question that
+   * is about "here" ("where is the nearest pharmacy", "내 주변 맛집") asks the
+   * phone first, which is the moment the browser asks permission.
    */
   async function ask(text: string) {
     const trimmed = text.trim();
     if (!trimmed || busy) return;
-    // Cheap test first: most messages are not about "here", and those should
-    // not load the station table at all.
-    if ((!asksNearMe(trimmed) && !asksFromHere(trimmed)) || placeSaid(trimmed)) return send(trimmed);
-    // A place already named answers "near me" — unless it is where they are
-    // going, and "from here" is the part still missing.
-    const { findPlaceInText } = await loadGeo();
-    if (!asksFromHere(trimmed) && findPlaceInText(trimmed)) return send(trimmed);
+    const aboutHere = asksNearMe(trimmed) || asksFromHere(trimmed);
+    if (!sharing && !aboutHere) return send(trimmed);
     setInput("");
-    const spot = await lookUp();
-    // Imprecise or unknown: send the question as it was. The server asks where
-    // they are, with a button to try the location again.
-    await send(spot?.precise ? withPlace(trimmed, spot.name, lang) : trimmed, whereNotice(spot));
+    const f = aboutHere ? await lookUp() : await getFix();
+    const here = usable(f);
+    await send(trimmed, aboutHere && !here ? whyNot(f) : undefined, here);
   }
 
-  async function send(text: string, note?: string) {
+  async function send(text: string, note?: string, here?: Here) {
     const trimmed = text.trim();
     if (!trimmed || busy) return;
     setInput("");
@@ -186,6 +222,7 @@ export function App() {
         lang,
         (e) => setStatusText(statusLabel(e)),
         (d) => setDraft(d),
+        here,
       );
       const content = res.toolMarkdown ?? res.reply ?? "";
       setMsgs([
@@ -236,26 +273,22 @@ export function App() {
    */
   async function tapChip(c: Chip) {
     if (busy) return;
-    if (!c.locate?.ask) return void send(chipText(c));
-    const spot = await lookUp();
-    if (!spot?.precise) return setNotice(whereNotice(spot));
-    await send(c.locate.ask.replace("{place}", spot.name), whereNotice(spot));
+    if (!c.locate?.ask) return void send(chipText(c), undefined, sharing ? usable(fix) : undefined);
+    const f = await lookUp();
+    const here = usable(f);
+    if (!here) return setNotice(whyNot(f));
+    // The question the server wrote, with "my current location" where the place
+    // goes; the position itself travels alongside it.
+    await send(c.locate.ask.replace("{place}", t.myLocation), undefined, here);
   }
 
-  /** The 📍 button: what is around wherever the phone is. */
+  /** The 📍 button: what is around the traveller, from exactly where they are. */
   async function nearMe() {
     if (busy) return;
-    const spot = await lookUp();
-    if (!spot?.precise) return setNotice(whereNotice(spot));
-    await send(t.nearMeQuery.replace("{place}", spot.name), whereNotice(spot));
-  }
-
-  /** The chip's label, with the place we already know if the phone has a fresh fix. */
-  function chipLabel(c: Chip): string {
-    const base = chipText(c);
-    if (!c.locate || !fix || !geo || Date.now() - fix.at >= FIX_FRESH_MS) return base;
-    const spot = geo.locate(fix.lat, fix.lng, lang);
-    return spot?.precise ? `${base} · ${spot.name}` : base;
+    const f = await lookUp();
+    const here = usable(f);
+    if (!here) return setNotice(whyNot(f));
+    await send(t.nearMeQuery, undefined, here);
   }
 
   const lastAssistantIdx = (() => {
@@ -356,7 +389,7 @@ export function App() {
                 <div class="chips" role="group" aria-label="Suggested next questions">
                   {m.chips!.map((c) => (
                     <button key={c.cmdEn} class="chip" onClick={() => void tapChip(c)}>
-                      <span aria-hidden="true">{c.emoji}</span> {chipLabel(c)}
+                      <span aria-hidden="true">{c.emoji}</span> {chipText(c)}
                     </button>
                   ))}
                 </div>
@@ -390,6 +423,25 @@ export function App() {
           </p>
         )}
         {notice && <p class="notice">{notice}</p>}
+        {sharing && (
+          <p class="here-bar">
+            <span class="here-dot" aria-hidden="true" />
+            {t.sharingOn}
+            {fix?.accuracy != null && <span class="here-acc"> · ±{formatMetres(fix.accuracy)}</span>}
+            {fix && (
+              <>
+                {" · "}
+                <a href={pinLink(fix)} target="_blank" rel="noopener noreferrer">
+                  {t.viewOnMap}
+                </a>
+              </>
+            )}
+            {" · "}
+            <button type="button" class="here-off" onClick={stopSharing}>
+              {t.turnOff}
+            </button>
+          </p>
+        )}
         <form
           class="composer"
           onSubmit={(e) => {

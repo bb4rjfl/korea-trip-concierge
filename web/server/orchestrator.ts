@@ -14,8 +14,10 @@ import { understand, readingNote, isEmptyReading } from "../../src/lib/understan
 import { synthesize } from "./synthesize.js";
 import { getWeather, resolveCity as resolveCityGeo } from "../../src/lib/sources/weatherair.js";
 import { searchPlaces } from "../../src/lib/sources/tourapi.js";
-import { asksNearMe, placeSaid, withPlace, withPlaceTemplate, WHERE_I_AM } from "../../src/lib/here.js";
+import { asksNearMe, asksFromHere, placeSaid, withPlace, WHERE_I_AM } from "../../src/lib/here.js";
 import { findPlaceInText } from "../../src/lib/places.js";
+import { withHere, HERE_AREA, type Here } from "../../src/lib/hereContext.js";
+import { nearestLandmark, nearestStation, stationName } from "../../src/lib/nearest.js";
 import {
   search as retrieve,
   confident as confidentHit,
@@ -44,6 +46,8 @@ const AREA_TOOLS = new Set(["findForeignerFriendlyStore", "getAreaGuide"]);
 export interface ChatRequest {
   messages: ChatTurn[];
   uiLang?: Lang;
+  /** The phone's GPS fix, when the traveller allowed it — see src/lib/hereContext.ts. */
+  here?: Here;
 }
 
 export interface PlaceImage {
@@ -438,7 +442,7 @@ const LIST_TOOLS = new Set(["searchPlaceForeigner", "findForeignerFriendlyStore"
 /* ------------------------------ where they are ------------------------------ */
 
 /** Argument slots that hold a place — and so must not hold "me". */
-const PLACE_ARGS = ["area", "place", "from", "near", "location", "neighborhood", "stop"] as const;
+const PLACE_ARGS = ["area", "place", "from", "near", "location", "neighborhood", "stop", "station"] as const;
 
 /** Where each tool looks for "where the traveller is". */
 const WHERE_SLOT: Record<string, string> = {
@@ -452,6 +456,23 @@ const WHERE_SLOT: Record<string, string> = {
 
 /** A name the phone gave that is a station rather than a landmark. */
 const IS_A_STATION = /station$|역$|駅$|[站驛]$/i;
+
+/**
+ * "Here", in the form each tool can use.
+ *
+ * Searches and routes take the exact position — they read it from the request
+ * (hereContext) when the slot says HERE_AREA. A subway board needs a station to
+ * read arrivals for, and an area guide needs a neighbourhood to describe, so
+ * those get the nearest one by name.
+ */
+function whatHereMeans(tool: string, here: Here): string {
+  if (tool === "trackSubwayArrival") {
+    const s = nearestStation(here.lat, here.lng);
+    return s ? stationName(s.station, "en") : HERE_AREA;
+  }
+  if (tool === "getAreaGuide") return nearestLandmark(here.lat, here.lng)?.label ?? HERE_AREA;
+  return HERE_AREA;
+}
 
 /** The 📍 button's label. */
 const USE_MY_LOCATION: Record<Lang, string> = {
@@ -470,16 +491,17 @@ const ROUTE_FROM_HERE: Record<Lang, string> = {
 };
 
 /**
- * Said when a "near me" question arrives and the phone could not say where.
+ * Said when a "near me" question arrives and the phone did not say where.
  *
- * It says what is sent, because a location prompt is exactly the moment someone
- * decides whether to trust a service, and "never your coordinates" is true.
+ * It says what happens to the position, because a location prompt is exactly
+ * the moment someone decides whether to trust a service — and it has to be
+ * true: the position is used to answer and is not kept.
  */
 const WHERE_ARE_YOU: Record<Lang, string> = {
-  en: "📍 **Where are you right now?** Tap below to use your location — only the nearest station's name is sent, never your coordinates. Or type a station or neighbourhood.",
-  ko: "📍 **지금 어디 계세요?** 아래를 누르면 위치를 확인해요 — 좌표가 아니라 가장 가까운 역 이름만 전송돼요. 역이나 동네 이름을 직접 입력해도 돼요.",
-  ja: "📍 **今どこにいますか？** 下をタップすると現在地を確認します — 送信されるのは座標ではなく最寄り駅の名前だけです。駅名やエリア名を入力してもOKです。",
-  zh: "📍 **你现在在哪里？** 点下面可以使用你的位置 — 只发送最近车站的名字，绝不发送坐标。也可以直接输入车站或街区名。",
+  en: "📍 **Where are you right now?** Tap below to share your location — I'll answer from exactly where you are, and it isn't stored. Or type a station or neighbourhood.",
+  ko: "📍 **지금 어디 계세요?** 아래를 누르면 현재 위치로 바로 찾아드려요 — 위치는 답변에만 쓰이고 저장되지 않아요. 역이나 동네 이름을 직접 입력해도 돼요.",
+  ja: "📍 **今どこにいますか？** 下をタップすると現在地からお探しします — 位置は回答にだけ使い、保存しません。駅名やエリア名を入力してもOKです。",
+  zh: "📍 **你现在在哪里？** 点下面分享位置，我会按你所在的确切位置来找 — 位置只用于回答，不会保存。也可以直接输入车站或街区名。",
 };
 
 /** Somewhere to start when they would rather tap than type. */
@@ -497,7 +519,8 @@ const POPULAR_AREAS: Record<Lang, string[]> = {
  * as standing in it — then a couple of places most visitors pass through.
  */
 function nearMeChips(text: string, lang: Lang, known?: string): Chip[] {
-  const here: Chip = { emoji: "📍", cmdEn: USE_MY_LOCATION[lang], locate: { ask: withPlaceTemplate(text, lang) } };
+  // Their own question, unchanged: the phone sends its position alongside it.
+  const here: Chip = { emoji: "📍", cmdEn: USE_MY_LOCATION[lang], locate: { ask: text } };
   const areas = [known, ...POPULAR_AREAS[lang]].filter((a, i, all): a is string => Boolean(a) && all.indexOf(a) === i);
   return [here, ...areas.slice(0, 3).map((a) => ({ emoji: "🗺️", cmdEn: withPlace(text, a, lang) }))];
 }
@@ -634,7 +657,7 @@ ${partial.reply ?? ""}`.trim(),
   // fix, or somewhere the station table does not cover. Asking is then the
   // answer. Guessing is not: before this, these questions were searched for a
   // place called "me", or not understood at all and met with the welcome text.
-  if (asksNearMe(text) && !placeSaid(text) && !findPlaceInText(text)) {
+  if (!req.here && asksNearMe(text) && !placeSaid(text) && !findPlaceInText(text)) {
     return done({ reply: WHERE_ARE_YOU[lang], chips: nearMeChips(text, lang, ctx.area), meta: { engine: "rules" } });
   }
 
@@ -661,6 +684,12 @@ ${partial.reply ?? ""}`.trim(),
         const salvage = routeText(text, lang);
         if (salvage) {
           toolCall = { name: salvage.tool, args: salvage.args };
+          engine = "rules";
+        } else if (req.here && (asksNearMe(text) || asksFromHere(text)) && !findPlaceInText(text)) {
+          // "What is around me" came back as "What neighborhood are you in?" —
+          // with the traveller's position in the request. A service that has
+          // been told where you are does not ask; it looks around you.
+          toolCall = { name: "searchPlaceForeigner", args: { query: text, area: HERE_AREA } };
           engine = "rules";
         } else {
           return done({ reply: decision.text, chips: DEFAULT_CHIPS_BY_LANG[lang], meta: { engine: "llm" } });
@@ -742,6 +771,18 @@ ${partial.reply ?? ""}`.trim(),
 
     // 4) Execute (zod-validated); missing required args → friendly clarify.
     onStatus?.({ stage: "tool", tool: toolCall.name });
+    // "What's around me", with the phone's position, is a map app's nearby list —
+    // not an essay on the nearest neighbourhood we happen to have written one
+    // for, which from Yangjae was COEX, kilometres off.
+    if (
+      req.here &&
+      toolCall.name === "getAreaGuide" &&
+      (asksNearMe(text) || asksFromHere(text)) &&
+      !findPlaceInText(text) &&
+      !placeSaid(text)
+    ) {
+      toolCall = { name: "searchPlaceForeigner", args: { query: text, area: HERE_AREA } };
+    }
     const filled = backfillArgs(toolCall.name, toolCall.args, ctx);
     // "Me", "here", "nearby" are not places. The model wrote "me" into the area
     // of "is there a convenience store near me" and the card came back titled
@@ -756,7 +797,23 @@ ${partial.reply ?? ""}`.trim(),
     // place when the traveller named none, so it outranks anything guessed.
     const phoneSaid = placeSaid(text);
     const slot = WHERE_SLOT[toolCall.name];
-    if (phoneSaid && slot && (slot !== "station" || IS_A_STATION.test(phoneSaid))) filled[slot] = phoneSaid;
+    if (phoneSaid && !WHERE_I_AM.test(phoneSaid) && slot && (slot !== "station" || IS_A_STATION.test(phoneSaid))) {
+      filled[slot] = phoneSaid;
+    }
+    // With the phone's position, "here" is somewhere the tools can work from —
+    // exactly, the way a map app does. A route with no start begins where the
+    // traveller is; "near me" is around them, not around the nearest station.
+    if (req.here && slot) {
+      const empty = !String(filled[slot] ?? "").trim();
+      const nearMe = asksNearMe(text) || asksFromHere(text);
+      // "Near me" with no place named: whatever area the model put in the slot
+      // is its guess, and a guess loses to the phone. "내 주변 맛집" was sent
+      // with area "Seoul" and came back with restaurants in Yongsan.
+      const guessed = nearMe && !findPlaceInText(text) && !phoneSaid;
+      if ((empty && (toolCall.name === "getTransitRoute" || nearMe)) || guessed) {
+        filled[slot] = whatHereMeans(toolCall.name, req.here);
+      }
+    }
 
     // "Another one" has to mean another one. The course builder returns its
     // strongest day at variant 0 and a different day in a different part of the
@@ -843,7 +900,7 @@ ${partial.reply ?? ""}`.trim(),
       }
     }
 
-    let result = await executeTool(toolCall.name, filled);
+    let result = await withHere(req.here, () => executeTool(toolCall!.name, filled));
     if (!result.ok) {
       // A missing argument is not always a missing answer. "I'm vegan and my
       // friend eats only halal, where can we eat together" was routed to the
@@ -853,7 +910,9 @@ ${partial.reply ?? ""}`.trim(),
       const hits = await retrieve(text, { limit: 3, rerank: true }).catch(() => []);
       const rescue = hits.find((h) => h.doc.route && h.doc.route.tool !== toolCall!.name)?.doc;
       if (rescue?.route && confidentHit(hits)) {
-        const retry = await executeTool(rescue.route.tool, backfillArgs(rescue.route.tool, rescue.route.args, ctx));
+        const retry = await withHere(req.here, () =>
+          executeTool(rescue.route!.tool, backfillArgs(rescue.route!.tool, rescue.route!.args, ctx)),
+        );
         if (retry.ok) {
           toolCall = { name: rescue.route.tool, args: rescue.route.args };
           result = retry;

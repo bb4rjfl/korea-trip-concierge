@@ -15,6 +15,8 @@ import { asksAboutMalls, mallsCard } from "../lib/malls.js";
 import { search, confident } from "../lib/retrieval.js";
 import { haversineKm } from "../lib/courses.js";
 import { resolveLandmark, landmarkVerdict } from "../lib/landmarks.js";
+import { getHere, isHere, metresFromHere, distanceLabel } from "../lib/hereContext.js";
+import { nearestPlace } from "../lib/nearest.js";
 import { understand, expandQuery, readingNote, shouldAvoid } from "../lib/understand.js";
 import { searchForeignerPois, hasPoiProvider, type PoiPlace } from "../lib/sources/poi.js";
 import {
@@ -470,6 +472,82 @@ async function rescueBySearch(query: string, areaLabel?: string, said = ""): Pro
     "",
     "_Matched from this service's own place knowledge rather than a keyword search, so tell me if I read you wrong._",
   ].join("\n");
+}
+
+/**
+ * What is around the traveller's exact position — a map app's "nearby".
+ *
+ * Asked on a phone 690 m from Yangjae Station, the answer used to be about
+ * Yangjae Station: the phone had been reduced to its nearest station's name,
+ * and the search ran from there. With the GPS fix it runs from the traveller:
+ * everything within a walk, each with its distance from *them*, nearest first,
+ * with a pin that opens at the place itself.
+ */
+async function aroundYou(
+  query: string,
+  cat: ReturnType<typeof inferCategory>,
+  language: ReturnType<typeof normalizeLang>,
+  here: { lat: number; lng: number },
+): Promise<ReturnType<typeof ok>> {
+  const WALK_M = 1500;
+  const chips = searchChoices(undefined, cat === "food");
+  const heading = (what: string) => `📍 **${what} near you** — _nearest first, measured from where you are_`;
+
+  if (cat === "food" && hasPoiProvider()) {
+    const pois = await searchForeignerPois({
+      area: "",
+      query: foodKeyword(query),
+      nativeQuery: query,
+      around: here,
+      limit: 6,
+    }).catch(() => []);
+    if (pois.length) {
+      const lines = pois.map((p, i) => {
+        const kind = p.category ? ` · _${p.category}_` : "";
+        const far = p.metres != null ? ` · 🚶 **${distanceLabel(p.metres)}**` : "";
+        const map = p.lat != null && p.lng != null ? mapLinksAt(p.name, p.lat, p.lng) : mapLinks(p.name);
+        return `**${i + 1}. ${p.name}**${kind}\n   📍 ${p.address}${far}\n   ${map}`;
+      });
+      return ok([heading(query.trim() || "Places to eat"), "", ...lines].join("\n"), chips);
+    }
+  }
+
+  // The tourism board's own search by coordinate, already sorted by distance.
+  // Hospitals and clinics are in the same listing as parks and galleries; asked
+  // what is fun nearby, a general hospital is not an answer unless they asked.
+  const wantsMedical = /hospital|clinic|doctor|medical|병원|의원|병의원|病院|医院|醫院|诊所/i.test(query);
+  const places = await searchPlacesNearby({ lat: here.lat, lng: here.lng, radius: WALK_M, category: cat, limit: 12, language })
+    .then((list) =>
+      ofRequestedKind(query, list).filter(
+        (p) => !IS_AN_EVENT.test(p.title) && (wantsMedical || !/hospital|clinic|병원|의원|치과|한의원/i.test(p.title)),
+      ),
+    )
+    .catch(() => [] as Place[]);
+  const measured = places
+    .map((p) => ({ p, m: p.mapy != null && p.mapx != null ? metresFromHere(p.mapy, p.mapx) : undefined }))
+    .filter((x) => x.m == null || x.m <= WALK_M)
+    .sort((a, b) => (a.m ?? Infinity) - (b.m ?? Infinity))
+    .slice(0, 6);
+  if (measured.length) {
+    const lines = measured.map(({ p, m }, i) => {
+      const far = m != null ? ` · 🚶 **${distanceLabel(m)}**` : "";
+      const map = p.mapy != null && p.mapx != null ? mapLinksAt(p.title, p.mapy, p.mapx) : mapLinks(p.title);
+      return `**${i + 1}. ${p.title}**\n   📍 ${p.address}${far}\n   ${map}`;
+    });
+    return ok([heading(query.trim() || "Things to see"), "", ...lines].join("\n"), chips);
+  }
+
+  // Nothing listed within a walk — say so, and offer the nearest known names.
+  const spot = nearestPlace(here.lat, here.lng, "en");
+  return ok(
+    [
+      heading(query.trim() || "Places"),
+      "",
+      `I couldn't find listings for that within a ${distanceLabel(WALK_M)} walk of you.` +
+        (spot ? ` The nearest place I know by name is **${spot.name}**, ${distanceLabel(spot.metres)} away.` : ""),
+    ].join("\n"),
+    chips,
+  );
 }
 
 function renderPlaces(query: string, places: Place[]): string {
@@ -951,10 +1029,14 @@ export const searchPlaceForeigner: ToolDef = {
   },
   handler: async (args) => {
     const query = String(args.query ?? "");
-    const area = correctArea(args.area ? String(args.area) : ""); // typo → known area (Y6)
     const category = args.category ? String(args.category) : undefined;
     const cat = inferCategory(query, category);
     const language = normalizeLang(args.language as string | undefined);
+    // Before the area is "corrected" — the fuzzy matcher would happily turn "your
+    // current location" into the nearest-sounding neighbourhood.
+    const here = isHere(args.area) ? getHere() : undefined;
+    if (here) return aroundYou(query, cat, language, here);
+    const area = correctArea(args.area ? String(args.area) : ""); // typo → known area (Y6)
     // A neighbourhood/city label for contextual follow-up chips (D-035): the given
     // area, else a place name extracted from the query ("cafes in Seongsu" → Seongsu).
     const areaLabel = area.trim() || findPlaceInText(query)?.label || undefined;

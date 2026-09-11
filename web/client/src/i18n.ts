@@ -22,10 +22,14 @@ export interface Strings {
   nearMeQuery: string;
   /** Shown while the phone works out where it is. */
   findingYou: string;
-  /** What we found, and the promise about it. {place} {distance}. */
-  locatedNotice: string;
-  /** Found something, but too far away to call "here". {place} {distance}. */
+  /** The phone's fix is too rough to answer "near me" from. {accuracy}. */
   locationImprecise: string;
+  /** "my current location", where a question needs a place said out loud. */
+  myLocation: string;
+  /** The location bar: on, check it on a map, switch it off. */
+  sharingOn: string;
+  viewOnMap: string;
+  turnOff: string;
   /** No position at all: ask for the one thing still missing, in words they would type. */
   locationNeedsTyping: string;
   aboutTitle: string;
@@ -70,14 +74,17 @@ export const STRINGS: Record<Lang, Strings> = {
     attribution: "Source: ⓒKorea Tourism Organization & public data",
     photoCredit: "Photos: ⓒKorea Tourism Organization",
     nearMe: "Near me",
-    nearMeQuery: "What's near {place}?",
+    nearMeQuery: "What's around me?",
     findingYou: "📍 Finding where you are…",
-    locatedNotice: "📍 You're near {place} ({distance}) — only that name was sent; your coordinates stay on this device.",
-    locationImprecise: "📍 The nearest place I know is {place}, {distance} away — too far to call it where you are. Type the station or area you're in.",
+    locationImprecise: "📍 Your phone only knows where you are to within ±{accuracy} — too rough to say what's near you. Type the station or area you're in.",
+    myLocation: "my current location",
+    sharingOn: "Using your location",
+    viewOnMap: "View on map",
+    turnOff: "Turn off",
     locationNeedsTyping: "📍 Couldn't get your location — type the station or neighbourhood you're near (like “Gangnam Station”).",
     aboutTitle: "About this service",
     aboutBody:
-      "Korea Trip Concierge is a real-time conversational travel guide for visitors in Korea. It answers with live public data — not canned pages. No login, no tracking; your location never leaves your device.",
+      "Korea Trip Concierge is a real-time conversational travel guide for visitors in Korea. It answers with live public data — not canned pages. No login, no tracking. Your location is used only when you allow it, to answer from where you are, and is never stored.",
     aboutSources: "Data sources",
     close: "Close",
     welcome:
@@ -100,14 +107,17 @@ export const STRINGS: Record<Lang, Strings> = {
     attribution: "출처: ⓒ한국관광공사 및 공공데이터",
     photoCredit: "사진: ⓒ한국관광공사",
     nearMe: "내 주변",
-    nearMeQuery: "{place} 근처에 뭐 있어?",
+    nearMeQuery: "내 주변에 뭐 있어?",
     findingYou: "📍 위치 확인 중…",
-    locatedNotice: "📍 {place} 근처({distance})로 확인했어요 — 그 이름만 전송됐고, 좌표는 기기 밖으로 나가지 않아요.",
-    locationImprecise: "📍 가장 가까운 곳이 {place}인데 {distance} 떨어져 있어요 — 현재 위치라고 하기엔 멀어요. 계신 역이나 동네를 입력해 주세요.",
+    locationImprecise: "📍 폰이 아는 위치 오차가 ±{accuracy}라 주변을 찾기엔 너무 부정확해요. 계신 역이나 동네를 입력해 주세요.",
+    myLocation: "현재 위치",
+    sharingOn: "현재 위치 사용 중",
+    viewOnMap: "지도에서 보기",
+    turnOff: "끄기",
     locationNeedsTyping: "📍 위치를 가져오지 못했어요 — 근처 역이나 동네 이름(예: “강남역”)을 입력해 주세요.",
     aboutTitle: "서비스 소개",
     aboutBody:
-      "Korea Trip Concierge는 방한 여행자를 위한 실시간 대화형 여행 가이드입니다. 정적인 안내가 아니라 실시간 공공데이터로 답합니다. 로그인·추적 없음, 위치 좌표는 기기 밖으로 나가지 않습니다.",
+      "Korea Trip Concierge는 방한 여행자를 위한 실시간 대화형 여행 가이드입니다. 정적인 안내가 아니라 실시간 공공데이터로 답합니다. 로그인·추적 없음. 위치는 허용하셨을 때만 현재 위치 기준으로 답하는 데 쓰이고, 저장되지 않습니다.",
     aboutSources: "데이터 출처",
     close: "닫기",
     welcome:
@@ -130,14 +140,17 @@ export const STRINGS: Record<Lang, Strings> = {
     attribution: "出典: ⓒ韓国観光公社・公共データ",
     photoCredit: "写真: ⓒ韓国観光公社",
     nearMe: "現在地周辺",
-    nearMeQuery: "{place}の近くに何がある？",
+    nearMeQuery: "近くに何がある？",
     findingYou: "📍 現在地を確認中…",
-    locatedNotice: "📍 {place}の近く（{distance}）と判定しました — 送信したのはその名前だけで、座標は端末の外に出ません。",
-    locationImprecise: "📍 一番近い場所は{place}ですが{distance}離れています — 現在地とは言えません。いる駅やエリア名を入力してください。",
+    locationImprecise: "📍 現在地の誤差が±{accuracy}あり、周辺を探すには粗すぎます。いる駅やエリア名を入力してください。",
+    myLocation: "現在地",
+    sharingOn: "現在地を使用中",
+    viewOnMap: "地図で見る",
+    turnOff: "オフにする",
     locationNeedsTyping: "📍 現在地を取得できませんでした — 近くの駅やエリア名（例：「江南駅」）を入力してください。",
     aboutTitle: "このサービスについて",
     aboutBody:
-      "Korea Trip Concierge は訪韓旅行者のためのリアルタイム対話型ガイドです。ログイン・トラッキングなし。位置座標が端末の外に出ることはありません。",
+      "Korea Trip Concierge は訪韓旅行者のためのリアルタイム対話型ガイドです。ログイン・トラッキングなし。位置情報は許可された時だけ現在地から答えるために使い、保存しません。",
     aboutSources: "データ出典",
     close: "閉じる",
     welcome:
@@ -160,14 +173,17 @@ export const STRINGS: Record<Lang, Strings> = {
     attribution: "来源: ⓒ韩国观光公社及公共数据",
     photoCredit: "照片: ⓒ韩国观光公社",
     nearMe: "我的附近",
-    nearMeQuery: "{place}附近有什么？",
+    nearMeQuery: "附近有什么？",
     findingYou: "📍 正在确认你的位置…",
-    locatedNotice: "📍 你在{place}附近（{distance}）— 只发送了这个名字，坐标不会离开你的设备。",
-    locationImprecise: "📍 最近的地点是{place}，距离{distance} — 太远了，不能算作你的位置。请输入你所在的车站或街区。",
+    locationImprecise: "📍 手机定位误差有±{accuracy}，太粗略，无法查找附近。请输入你所在的车站或街区。",
+    myLocation: "我现在的位置",
+    sharingOn: "正在使用你的位置",
+    viewOnMap: "在地图上查看",
+    turnOff: "关闭",
     locationNeedsTyping: "📍 无法获取你的位置 — 请输入附近的地铁站或街区名（如“江南站”）。",
     aboutTitle: "关于本服务",
     aboutBody:
-      "Korea Trip Concierge 是面向访韩游客的实时对话式旅行指南。无需登录、无跟踪，位置坐标不会离开你的设备。",
+      "Korea Trip Concierge 是面向访韩游客的实时对话式旅行指南。无需登录、无跟踪。位置仅在你允许时用于按你所在位置回答，且不会保存。",
     aboutSources: "数据来源",
     close: "关闭",
     welcome:

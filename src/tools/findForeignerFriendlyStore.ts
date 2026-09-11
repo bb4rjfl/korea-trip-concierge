@@ -4,6 +4,7 @@ import { ok, fail } from "../lib/responses.js";
 import { search, confident } from "../lib/retrieval.js";
 import { searchForeignerPois, hasPoiProvider, type PoiPlace } from "../lib/sources/poi.js";
 import { resolvePlaceCoord } from "../lib/places.js";
+import { getHere, isHere, distanceLabel } from "../lib/hereContext.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -316,7 +317,9 @@ function renderNearby(places: PoiPlace[], query: string, need: Need): string[] {
   if (!clean.length) return [];
   const lines = clean.map((p, i) => {
     const tel = p.tel ? ` · ☎ ${p.tel}` : "";
-    return `**${i + 1}. ${p.name}**\n   📍 ${p.address}${tel}`;
+    // How far from the traveller — the number a map app puts first.
+    const far = p.metres != null ? ` · 🚶 **${distanceLabel(p.metres)}**` : "";
+    return `**${i + 1}. ${p.name}**\n   📍 ${p.address}${far}${tel}`;
   });
   return ["", "**Nearby:**", ...lines];
 }
@@ -434,8 +437,11 @@ export const findForeignerFriendlyStore: ToolDef = {
       return ok(renderOverview(area), OVERVIEW_CHOICES);
     }
 
+    // Where the traveller is standing, if the phone told us. Then this is a map
+    // app's "near me": around their exact point, measured from them.
+    const here = isHere(area) ? getHere() : undefined;
     const e = ESSENTIALS[need];
-    const head = [`${e.emoji} **${e.label} in ${area}**`, "", e.tip];
+    const head = [`${e.emoji} **${e.label} ${here ? "near you" : `in ${area}`}**`, "", e.tip];
     // A second stated need gets its own section rather than being dropped. Two
     // people at one table with different requirements is the common case, and
     // answering one of them reads as not having listened to the other.
@@ -451,7 +457,7 @@ export const findForeignerFriendlyStore: ToolDef = {
     let nearby: string[] = [];
     if (hasPoiProvider()) {
       try {
-        const coord = resolvePlaceCoord(area);
+        const coord = here ?? resolvePlaceCoord(area);
         const places = await searchForeignerPois({
           area,
           query: e.query,
@@ -459,6 +465,9 @@ export const findForeignerFriendlyStore: ToolDef = {
           limit: 5,
           // An essential is wanted close, not good — see PoiSearchOptions.
           nearestFirst: true,
+          ...(here ? { around: here } : {}),
+          // Even for a named area, how far each one is from the traveller.
+          ...(getHere() ? { from: getHere() } : {}),
         });
         nearby = renderNearby(places, e.query, need);
       } catch {

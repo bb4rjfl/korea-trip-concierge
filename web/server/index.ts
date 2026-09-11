@@ -6,6 +6,7 @@ import { ENV, hasKey } from "../../src/lib/env.js";
 import { warmUpSources, warmCoursePool, warmCorpus } from "../../src/lib/warmup.js";
 import { corpusSize, corpusEmbedded } from "../../src/lib/retrieval.js";
 import { trippedHosts } from "../../src/lib/http.js";
+import { parseHere } from "../../src/lib/hereContext.js";
 import { warmCityList } from "../../src/lib/sources/tago.js";
 import { CATALOG } from "./catalog.js";
 import { handleChat, type ChatRequest } from "./orchestrator.js";
@@ -67,6 +68,9 @@ app.post("/api/chat", rateLimit, async (req: Request, res: Response) => {
   const messages = body.messages
     .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
     .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }));
+  // The phone's GPS fix, when the traveller allowed it. Used to answer this one
+  // request and dropped with it: never logged, never stored (see logMeta).
+  const here = parseHere((body as { here?: unknown }).here);
 
   const logMeta = (r: Awaited<ReturnType<typeof handleChat>>): void => {
     // Ops log: tool + timing + engine only — never message text (no PII).
@@ -86,7 +90,7 @@ app.post("/api/chat", rateLimit, async (req: Request, res: Response) => {
     };
     try {
       const response = await handleChat(
-        { messages, uiLang: body.uiLang },
+        { messages, uiLang: body.uiLang, here },
         (e) => send("status", e),
         (d) => send("draft", d),
       );
@@ -100,7 +104,7 @@ app.post("/api/chat", rateLimit, async (req: Request, res: Response) => {
     return;
   }
 
-  const response = await handleChat({ messages, uiLang: body.uiLang });
+  const response = await handleChat({ messages, uiLang: body.uiLang, here });
   logMeta(response);
   res.json(response);
 });

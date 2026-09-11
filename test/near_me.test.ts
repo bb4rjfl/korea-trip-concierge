@@ -147,10 +147,10 @@ describe("the server, when the phone could not say where", () => {
       // Neither of the two old failures.
       expect(text).not.toMatch(/in me\b/i);
       expect(text).not.toMatch(/Korea trip concierge|컨시어지입니다/i);
-      // The phone gets a question to finish, with the traveller's words intact.
+      // The phone re-asks the traveller's own question, with its position
+      // travelling alongside it.
       const here = res.chips.find((c) => c.locate);
-      expect(here?.locate?.ask).toContain(q);
-      expect(here?.locate?.ask).toContain("{place}");
+      expect(here?.locate?.ask).toBe(q);
     });
   }
 

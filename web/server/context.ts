@@ -13,6 +13,7 @@
  */
 
 import type { ChatTurn } from "./llm.js";
+import { normalizeName } from "../../src/lib/fuzzy.js";
 
 export interface ConvoContext {
   /** Places named in recent answers, most recent first. */
@@ -153,7 +154,18 @@ export function backfillArgs(
       put("from", ctx.station ?? ctx.area);
       // Asking the way to where you already are is not a route; drop the origin
       // so the tool asks a sensible question instead of routing X to X.
-      if (typeof out.from === "string" && typeof out.to === "string" && out.from.trim().toLowerCase() === out.to.trim().toLowerCase()) {
+      //
+      // Compared as places, not strings. "How do I get to Yangjae Station" puts
+      // Yangjae in focus, the line above made it the origin, and "yangjae" !==
+      // "yangjae station" let it through — so the answer was "you're already at
+      // Yangjae Station" to someone 840 m away. The station named in a route
+      // question is where they are going.
+      if (
+        typeof out.from === "string" &&
+        typeof out.to === "string" &&
+        normalizeName(out.from) &&
+        normalizeName(out.from) === normalizeName(out.to)
+      ) {
         delete out.from;
       }
       break;
