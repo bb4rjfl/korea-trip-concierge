@@ -47,6 +47,8 @@ export interface DeviceStrings {
   fromYourSpot: string;
   noStationNear: string;
   cantPlace: string;
+  /** Another city: a train or a coach, not the subway. */
+  intercityHead: string;
   /** Trains card. */
   trainsHead: string;
   boardDown: string;
@@ -77,6 +79,8 @@ export interface DeviceStrings {
     pharmacy: string;
     convenience: string;
     sightsNear: string;
+    intercityFrom: string;
+    intercityTo: string;
   };
   /** Kakao's own category words, for the label under a name. */
   categories: [RegExp, string][];
@@ -136,6 +140,7 @@ const EN: DeviceStrings = {
   fromYourSpot: "🧭 Directions from your exact spot:",
   noStationNear: "There's no subway station within a walk of you, so the map apps will do better from here — they include buses:",
   cantPlace: "I couldn't find where **{to}** is on the map. Try its Korean name, or open it in a map app:",
+  intercityHead: "🚄 **{to}** is about {km} from you — that's a trip between cities, by KTX, express bus or a flight, not the subway.",
   trainsHead: "🚇 Next trains at **{station}** — {m}, about {min} min on foot",
   boardDown: "The live board isn't answering right now — try again in a minute.",
   toward: "toward {to}",
@@ -162,6 +167,8 @@ const EN: DeviceStrings = {
     pharmacy: "Pharmacy near me",
     convenience: "Convenience store near me",
     sightsNear: "What's worth seeing near me?",
+    intercityFrom: "How do I get from {city} to {to}?",
+    intercityTo: "How do I get to {to} from another city?",
   },
   categories: [
     [/약국/, "Pharmacy"],
@@ -254,6 +261,7 @@ const KO: DeviceStrings = {
   fromYourSpot: "🧭 지금 계신 곳에서 길찾기:",
   noStationNear: "걸어갈 만한 거리에 지하철역이 없어요. 버스까지 알려주는 지도 앱이 더 정확해요:",
   cantPlace: "**{to}**의 위치를 찾지 못했어요. 지도 앱에서 열어 보세요:",
+  intercityHead: "🚄 **{to}**까지는 약 {km} — 지하철이 아니라 KTX·고속버스·비행기로 가는 도시 간 이동이에요.",
   trainsHead: "🚇 **{station}**역 다음 열차 — {m}, 걸어서 약 {min}분",
   boardDown: "지금 실시간 도착 정보가 응답하지 않아요 — 잠시 후 다시 시도해 주세요.",
   toward: "{to}행",
@@ -280,6 +288,8 @@ const KO: DeviceStrings = {
     pharmacy: "내 주변 약국",
     convenience: "내 주변 편의점",
     sightsNear: "내 주변 볼거리",
+    intercityFrom: "{city}에서 {to} 가는 방법",
+    intercityTo: "다른 도시에서 {to} 가는 방법",
   },
   categories: [],
 };
@@ -338,6 +348,7 @@ const JA: DeviceStrings = {
   fromYourSpot: "🧭 現在地からのルート：",
   noStationNear: "歩ける範囲に地下鉄駅がありません。バスも案内する地図アプリの方が確実です：",
   cantPlace: "**{to}**の場所が見つかりませんでした。地図アプリで開いてみてください：",
+  intercityHead: "🚄 **{to}**までは約{km} — 地下鉄ではなく、KTX・高速バス・飛行機で行く都市間の移動です。",
   trainsHead: "🚇 **{station}駅**の次の電車 — {m}、徒歩約{min}分",
   boardDown: "リアルタイム到着情報が応答していません — 少し後でもう一度お試しください。",
   toward: "{to}行き",
@@ -364,6 +375,8 @@ const JA: DeviceStrings = {
     pharmacy: "近くの薬局",
     convenience: "近くのコンビニ",
     sightsNear: "近くの見どころは？",
+    intercityFrom: "{city}から{to}への行き方",
+    intercityTo: "他の都市から{to}への行き方",
   },
   categories: [
     [/약국/, "薬局"],
@@ -456,6 +469,7 @@ const ZH: DeviceStrings = {
   fromYourSpot: "🧭 从你所在位置导航：",
   noStationNear: "步行范围内没有地铁站。能查公交的地图应用会更准确：",
   cantPlace: "没有找到**{to}**的位置。可以在地图应用里打开：",
+  intercityHead: "🚄 **{to}**离你约{km} — 这是城市之间的行程，要坐KTX、高速巴士或飞机，而不是地铁。",
   trainsHead: "🚇 **{station}站**下一班车 — {m}，步行约{min}分钟",
   boardDown: "实时到站信息暂时没有响应 — 请稍后再试。",
   toward: "开往{to}",
@@ -482,6 +496,8 @@ const ZH: DeviceStrings = {
     pharmacy: "附近的药店",
     convenience: "附近的便利店",
     sightsNear: "附近有什么值得看的？",
+    intercityFrom: "从{city}去{to}怎么走？",
+    intercityTo: "从其他城市去{to}怎么走？",
   },
   categories: [
     [/약국/, "药店"],

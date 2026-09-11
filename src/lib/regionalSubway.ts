@@ -24,12 +24,22 @@ function all(): { id: string; graph: SubwayGraph }[] {
 /**
  * A ride between two named stations in one of the regional networks — both
  * ends must be in the same city's network, which is also what keeps Daegu's
- * 중앙로 from answering for Daejeon's.
+ * 중앙로 from answering for Daejeon's. It carries its own station labels:
+ * Busan's 교대 is not Seoul's, and the Seoul index would name it as if it were.
  */
-export function planRegional(from: string, to: string): (SubwayRoute & { network: string }) | undefined {
+export function planRegional(
+  from: string,
+  to: string,
+): (SubwayRoute & { network: string; label: (ko: string) => string }) | undefined {
   for (const { id, graph } of all()) {
     const r = planRoute(graph, from, to);
-    if (r) return { ...r, fareWon: regionalFare(id, r.stops), network: id };
+    if (!r) continue;
+    const label = (ko: string): string => {
+      const s = graph.stations.find((x) => x.ko === ko);
+      const bare = ko.replace(/역$/, "");
+      return s && s.en && s.en !== ko ? `${s.en} (${bare})` : ko;
+    };
+    return { ...r, fareWon: regionalFare(id, r.stops), network: id, label };
   }
   return undefined;
 }

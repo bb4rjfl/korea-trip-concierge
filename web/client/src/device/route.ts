@@ -29,6 +29,30 @@ const WALKABLE_M = 1200;
 /** How far someone will walk to a station, at either end. */
 const TO_STATION_M = 1500;
 const FROM_STATION_M = 1200;
+/** Beyond this the trip is between cities: a train or a coach, not a subway. */
+const INTERCITY_M = 40_000;
+
+/** The cities a visitor is likely to be in, by their centres. */
+const CITIES: { lat: number; lng: number; name: Record<Lang, string> }[] = [
+  { lat: 37.5665, lng: 126.978, name: { en: "Seoul", ko: "서울", ja: "ソウル", zh: "首尔" } },
+  { lat: 37.4563, lng: 126.7052, name: { en: "Incheon", ko: "인천", ja: "仁川", zh: "仁川" } },
+  { lat: 37.2636, lng: 127.0286, name: { en: "Suwon", ko: "수원", ja: "水原", zh: "水原" } },
+  { lat: 35.1796, lng: 129.0756, name: { en: "Busan", ko: "부산", ja: "釜山", zh: "釜山" } },
+  { lat: 35.8714, lng: 128.6014, name: { en: "Daegu", ko: "대구", ja: "大邱", zh: "大邱" } },
+  { lat: 35.1595, lng: 126.8526, name: { en: "Gwangju", ko: "광주", ja: "光州", zh: "光州" } },
+  { lat: 36.3504, lng: 127.3845, name: { en: "Daejeon", ko: "대전", ja: "大田", zh: "大田" } },
+  { lat: 35.8562, lng: 129.2247, name: { en: "Gyeongju", ko: "경주", ja: "慶州", zh: "庆州" } },
+  { lat: 35.8242, lng: 127.148, name: { en: "Jeonju", ko: "전주", ja: "全州", zh: "全州" } },
+  { lat: 37.7519, lng: 128.8761, name: { en: "Gangneung", ko: "강릉", ja: "江陵", zh: "江陵" } },
+  { lat: 38.207, lng: 128.5918, name: { en: "Sokcho", ko: "속초", ja: "束草", zh: "束草" } },
+  { lat: 33.4996, lng: 126.5312, name: { en: "Jeju", ko: "제주", ja: "済州", zh: "济州" } },
+];
+
+/** The city the traveller is in, if they are within one — for a button they choose to tap. */
+function cityOf(at: Point, lang: Lang): string | undefined {
+  const best = CITIES.map((c) => ({ c, m: metres(at, c) })).sort((a, b) => a.m - b.m)[0];
+  return best && best.m < 30_000 ? best.c.name[lang] : undefined;
+}
 
 export interface Plan {
   board: Stop;
@@ -86,6 +110,15 @@ export async function runRoute(task: RouteTask, at: Fix, lang: Lang): Promise<De
 
   // A short straight line is a walk — unless it goes up a mountain.
   const direct = metres(at, dest);
+
+  // Another city is not a subway trip. Say so, and offer the intercity answer —
+  // the button names the city they are in, which they choose to send by tapping.
+  if (direct > INTERCITY_M) {
+    const city = cityOf(at, lang);
+    const ask = city ? fill(t.chip.intercityFrom, { city, to: task.to }) : fill(t.chip.intercityTo, { to: task.to });
+    const markdown = [...lead, fill(t.intercityHead, { to: task.to, km: distance(direct, lang) }), "", t.onDevice].join("\n");
+    return { markdown, chips: [askChip("🚄", ask), ...chips.slice(0, 1)], local };
+  }
   if (direct <= WALKABLE_M && !task.climb) {
     const markdown = [
       ...lead,

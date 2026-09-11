@@ -345,3 +345,43 @@ describe("a destination up a hill", () => {
     expect(card.markdown).not.toMatch(/From Myeong-?dong \(명동\), \*\*\d/);
   });
 });
+
+describe("a subway network outside the capital", () => {
+  it("plans a ride with a transfer on the same planner, and prices it by the city's fare", async () => {
+    const { graphFromNetwork, planBetween, regionalFare, lineLabel } = await import("../src/lib/subwayPlan.js");
+    // A tiny Busan: Line 1 A–B–C, Line 2 D–B–E (B is the transfer).
+    const net = {
+      stations: [
+        { c: "70101", k: "가역", e: "Ga", l: "부산 1호선", lat: 35.1, lng: 129.0 },
+        { c: "70102", k: "서면", e: "Seomyeon", l: "부산 1호선", lat: 35.11, lng: 129.0 },
+        { c: "70103", k: "다역", e: "Da", l: "부산 1호선", lat: 35.12, lng: 129.0 },
+        { c: "70201", k: "라역", e: "Ra", l: "부산 2호선", lat: 35.11, lng: 128.99 },
+        { c: "70202", k: "서면", e: "Seomyeon", l: "부산 2호선", lat: 35.1101, lng: 129.0001 },
+        { c: "70203", k: "해운대", e: "Haeundae", l: "부산 2호선", lat: 35.11, lng: 129.01 },
+      ],
+      edges: [["70101", "70102"], ["70102", "70103"], ["70201", "70202"], ["70202", "70203"]] as [string, string][],
+      transfers: [["70102", "70202"]] as [string, string][],
+    };
+    const g = graphFromNetwork(net);
+    const r = planBetween(g, ["70101"], ["70203"]);
+    expect(r?.legs.map((l) => l.line)).toEqual(["부산 1호선", "부산 2호선"]);
+    expect(r?.transfers).toBe(1);
+    expect(regionalFare("busan", r!.stops)).toBe(1600);
+    expect(regionalFare("busan", 15)).toBe(1800);
+    expect(lineLabel("부산 2호선")).toBe("Busan Line 2");
+    expect(lineName("대구 3호선", "ja")).toBe("大邱3号線");
+  });
+});
+
+describe("a route to another city", () => {
+  it("is not a subway trip: it says so and offers the intercity answer from the city they are in", async () => {
+    vi.stubGlobal("fetch", async () => new Response("{}", { status: 503 }));
+    const card = await runRoute(
+      { kind: "route", to: "Gyeongbokgung Palace", dest: { lat: 37.5796, lng: 126.977 }, destStation: "경복궁" },
+      { lat: 35.1587, lng: 129.1604 }, // Haeundae, Busan
+      "en",
+    );
+    expect(card.markdown).toMatch(/trip between cities/);
+    expect(card.chips[0].cmdEn).toBe("How do I get from Busan to Gyeongbokgung Palace?");
+  });
+});

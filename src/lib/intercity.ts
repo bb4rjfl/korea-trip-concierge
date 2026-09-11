@@ -87,9 +87,14 @@ const BOOK_LINKS = [
  */
 export async function renderIntercity(from: string, to: string, hit: IntercityHit): Promise<string> {
   const far = hit.dest ?? hit.origin!;
+  // The city we recognised, not the words it came in: asked "is my KTX from
+  // Seoul to Busan delayed today?", the destination arrived as "Busan delayed
+  // today" and the card was headed "Seoul → Busan delayed today".
+  const a = hit.origin?.label ?? from;
+  const b = hit.dest?.label ?? to;
   const dirNote = hit.dest
-    ? `**${from} → ${to}** is an intercity trip — beyond city subway/bus.`
-    : `**${from} → ${to}** is an intercity trip from ${hit.origin!.label} — beyond city subway/bus.`;
+    ? `**${a} → ${b}** is an intercity trip — beyond city subway/bus.`
+    : `**${a} → ${b}** is an intercity trip from ${hit.origin!.label} — beyond city subway/bus.`;
 
   const date = todayYmdKST();
   // No rail or road reaches Jeju; asking the feeds can only produce a wrong answer.

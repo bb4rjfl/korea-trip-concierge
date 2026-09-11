@@ -198,10 +198,26 @@ const REGIONAL_LANDMARK_STATION: [RegExp, string][] = [
   [/seomyeon|서면|西面/i, "서면"],
   [/centum|센텀|shinsegae centum|신세계 센텀/i, "센텀시티"],
   [/busan station|부산역|釜山駅|釜山站/i, "부산역"],
+  [/gimhae\s*(?:int'?l\s*|international\s*)?airport|김해\s*(?:국제)?공항|金海(?:国际|國際)?(?:机场|機場|空港)/i, "공항"],
+  [/gukje market|국제시장|国際市場|国际市场|busan tower|용두산|yongdusan/i, "남포"],
+  // Before Busan's Songjeong Beach, which would otherwise take the station name.
+  [/gwangju\s*songjeong|광주\s*송정/i, "광주송정"],
+  [/songjeong\s*beach|송정\s*해수욕장|송정\s*해변/i, "송정"],
+  [/osiria|오시리아|lotte world busan|롯데월드\s*부산/i, "오시리아"],
+  [/oncheonjang|온천장|허심청/i, "온천장"],
+  [/beomeosa|범어사/i, "범어사"],
+  [/busan cinema center|영화의전당|shinsegae centum|신세계\s*센텀/i, "센텀시티"],
+  [/bexco|벡스코/i, "벡스코"],
+  [/kyungsung|pukyong|경성대|부경대/i, "경성대·부경대"],
   [/dongseongro|동성로|東城路|东城路/i, "중앙로"],
   [/seomun market|서문시장|西門市場|西门市场/i, "서문시장"],
+  [/suseong\s*(?:lake|mot)|수성못/i, "수성못"],
+  [/dongdaegu|동대구/i, "동대구역"],
   [/asia culture center|국립아시아문화전당|문화전당|\bacc\b/i, "문화전당"],
+  [/yangdong market|양동시장/i, "양동시장"],
   [/daejeon station|대전역|大田駅|大田站/i, "대전역"],
+  [/yuseong|유성\s*온천|儒城/i, "유성온천"],
+  [/sungsimdang|성심당/i, "중앙로"],
 ];
 
 /** Map a free-text endpoint to a station name the graph knows, if we can. */
@@ -265,9 +281,12 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
     // The capital's network first, then Busan, Daegu, Gwangju and Daejeon —
     // our own graphs, before the metered service whose daily allowance runs out.
     const seoul = planRoute(graph, toStationName(from), toStationName(to));
-    const route = seoul ?? planRegional(toStationName(from), toStationName(to));
+    const elsewhere = seoul ? undefined : planRegional(toStationName(from), toStationName(to));
+    const route = seoul ?? elsewhere;
     if (!route) return undefined;
     const regional = !seoul;
+    // A city's stations by that city's own names.
+    const station = (ko: string): string => (elsewhere ? elsewhere.label(ko) : stationLabel(ko));
 
     const first = route.legs[0];
     // The live board for the boarding station makes this a real-time answer, not a
@@ -311,7 +330,7 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
 
     const lines = route.legs.map((l, i) => {
       const label = lineLabel(l.line);
-      return `${i === 0 ? "🚇" : "🔁"} **${label}** ${stationLabel(l.from)} → ${stationLabel(l.to)} _(${l.stops} stop${l.stops === 1 ? "" : "s"})_`;
+      return `${i === 0 ? "🚇" : "🔁"} **${label}** ${station(l.from)} → ${station(l.to)} _(${l.stops} stop${l.stops === 1 ? "" : "s"})_`;
     });
 
     // Quoting a 7-minute ride at 3am would be a lie: the trains are in the depot.
