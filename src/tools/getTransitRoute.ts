@@ -10,6 +10,8 @@ import { resolvePlaceCoord } from "../lib/places.js";
 import { detectIntercity, renderIntercity } from "../lib/intercity.js";
 import { normalizeName } from "../lib/fuzzy.js";
 import { exitLine } from "../lib/exits.js";
+import { accessFor } from "../lib/access.js";
+import { planRegional } from "../lib/regionalSubway.js";
 import { getGraph, lineLabel, planRoute, findStationCodes } from "../lib/sources/subwayGraph.js";
 import { getStationArrivals } from "../lib/sources/seoulSubway.js";
 import { planDirectBus } from "../lib/sources/busRoute.js";
@@ -184,10 +186,38 @@ const LANDMARK_STATION: [RegExp, string][] = [
   [/seoul station|서울역|ソウル駅|首尔站|首爾站/i, "서울역"],
 ];
 
+/**
+ * The same, for the cities outside the capital: where visitors actually say
+ * they are going, and the station that gets them there.
+ */
+const REGIONAL_LANDMARK_STATION: [RegExp, string][] = [
+  [/haeundae|해운대|海雲台|海云台/i, "해운대"],
+  [/gwangalli|gwangan|광안리|広安里|广安里/i, "광안"],
+  [/jagalchi|자갈치|チャガルチ|札嘎其/i, "자갈치"],
+  [/nampo|남포동|南浦洞|biff/i, "남포"],
+  [/seomyeon|서면|西面/i, "서면"],
+  [/centum|센텀|shinsegae centum|신세계 센텀/i, "센텀시티"],
+  [/busan station|부산역|釜山駅|釜山站/i, "부산역"],
+  [/dongseongro|동성로|東城路|东城路/i, "중앙로"],
+  [/seomun market|서문시장|西門市場|西门市场/i, "서문시장"],
+  [/asia culture center|국립아시아문화전당|문화전당|\bacc\b/i, "문화전당"],
+  [/daejeon station|대전역|大田駅|大田站/i, "대전역"],
+];
+
 /** Map a free-text endpoint to a station name the graph knows, if we can. */
 export function toStationName(name: string): string {
+  // A place whose last leg is a bus or a climb is reached through its gateway.
+  const gateway = accessFor(name)?.gateway;
+  if (gateway) return gateway;
   for (const [re, station] of LANDMARK_STATION) if (re.test(name)) return station;
+  for (const [re, station] of REGIONAL_LANDMARK_STATION) if (re.test(name)) return station;
   return name;
+}
+
+/** How the last leg goes, for a destination where it is a bus, a climb or a ferry. */
+function accessLine(to: string): string {
+  const a = accessFor(to);
+  return a ? `🧗 ${a.note}` : "";
 }
 
 /**
@@ -232,14 +262,20 @@ async function busBetween(from: string, to: string) {
 async function trySubwayGraph(from: string, to: string, dir: string) {
   try {
     const graph = await getGraph();
-    const route = planRoute(graph, toStationName(from), toStationName(to));
+    // The capital's network first, then Busan, Daegu, Gwangju and Daejeon —
+    // our own graphs, before the metered service whose daily allowance runs out.
+    const seoul = planRoute(graph, toStationName(from), toStationName(to));
+    const route = seoul ?? planRegional(toStationName(from), toStationName(to));
     if (!route) return undefined;
+    const regional = !seoul;
 
     const first = route.legs[0];
     // The live board for the boarding station makes this a real-time answer, not a
     // timetable lookup — and it is the thing a waiting passenger actually wants.
+    // Seoul publishes one; the other cities do not.
     let live = "";
     try {
+      if (regional) throw new Error("no live board outside Seoul");
       const arrivals = await getStationArrivals(first.from);
       const next = arrivals.slice(0, 2);
       if (next.length) {
@@ -258,7 +294,8 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
     // A direct bus, when one exists, is often the nicer ride — no stairs, no
     // transfer — so offer it alongside the rails rather than instead of them.
     const lastLeg = route.legs[route.legs.length - 1];
-    const bus = await busBetween(first.from, lastLeg.to);
+    // Seoul's bus data only — a Busan station pair would find nothing, slowly.
+    const bus = regional ? undefined : await busBetween(first.from, lastLeg.to);
     // Only worth offering if it is in the same league as the train; a bus that
     // takes twice as long is not an alternative, it is a wrong turn.
     const busWorthIt = bus && bus.minutes <= route.minutes * 1.6 + 5;
@@ -266,8 +303,11 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
       ? `\n🚌 **Or one bus, no transfer —** **${bus.routeName}** from ${stationLabel(bus.boardAt)} to ${stationLabel(bus.alightAt)} _(${bus.stops} stops, about ${bus.minutes} min)_`
       : "";
 
-    // Arriving at the station is only half of it; the exit is what saves the walk.
+    // Arriving at the station is only half of it; the exit is what saves the walk
+    // — and for a place up a hill or out along a coast, the bus or cable car from
+    // the station is the rest of the trip.
     const exit = exitLine(to);
+    const access = accessLine(to);
 
     const lines = route.legs.map((l, i) => {
       const label = lineLabel(l.line);
@@ -315,12 +355,15 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
         "",
         ...lines,
         exit ?? "",
+        access,
         busLine,
         live,
         "",
         dir,
         "",
-        "_Routes from Seoul subway & bus open data (ⓒ서울특별시); times are typical._",
+        regional
+          ? "_Routes from city subway open data; times are typical, fares are the card fare._"
+          : "_Routes from Seoul subway & bus open data (ⓒ서울특별시); times are typical._",
       ]
         .filter(Boolean)
         .join("\n"),
@@ -461,6 +504,7 @@ export const getTransitRoute: ToolDef = {
           "",
           `🚌 Take bus **${onlyBus.routeName}** at **${stationLabel(onlyBus.boardAt)}**, get off at **${stationLabel(onlyBus.alightAt)}**.`,
           `Tap the stop name on the bus screen or count the stops — announcements are in English too.`,
+          accessLine(to),
           "",
           dir,
           "",
@@ -478,9 +522,17 @@ export const getTransitRoute: ToolDef = {
       );
     }
 
+    // Where we know how the trip ends — the express bus to Seongsan, the circular
+    // bus up Namsan — that is an answer in itself when the routing service has
+    // none: its daily allowance ran out one evening mid-question.
+    const known = accessLine(to);
+    const fromKnowledge = (): ReturnType<typeof ok> =>
+      ok([`🚌 **${from} → ${to}**`, "", known, "", dir].join("\n"), CHOICES);
+
     try {
       const [a, b] = await Promise.all([geocode(from), geocode(to)]);
       if (!a || !b) {
+        if (known) return fromKnowledge();
         return fail(
           "Couldn't locate one of the places",
           `I couldn't pin coordinates for ${!a ? `**${from}**` : `**${to}**`}. Try a well-known landmark or station name — or open it directly:\n\n${dir}`,
@@ -489,6 +541,7 @@ export const getTransitRoute: ToolDef = {
       }
       const routes = await routesBetween(a, b);
       if (routes.length === 0) {
+        if (known) return fromKnowledge();
         return fail("No transit route found", `No public-transit path from **${from}** to **${to}** was returned.\n\n${dir}`, RETRY);
       }
       const options = pickOptions(routes);
@@ -499,6 +552,7 @@ export const getTransitRoute: ToolDef = {
         `🚇🚌 **${from} → ${to}** — pick how you want to go`,
         "",
         top,
+        ...(accessLine(to) ? ["", accessLine(to)] : []),
         "",
         dir,
         `📋 _For the walk to/from the stop, search **${to}** in **Naver Map** — Google Maps walking/driving directions don't work in Korea._`,
@@ -506,6 +560,7 @@ export const getTransitRoute: ToolDef = {
       // Dynamic chips: tap a mode to jump into live tracking (journey UX, Phase 1).
       return ok(body, trackChips(options.map((o) => o.route)));
     } catch {
+      if (known) return fromKnowledge();
       return fail(
         "Couldn't reach the routing service",
         `The transit routing source didn't respond in time — you can still get there:\n\n${dir}\n\nOr tap Refresh to retry.`,

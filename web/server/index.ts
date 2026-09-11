@@ -8,6 +8,7 @@ import { corpusSize, corpusEmbedded } from "../../src/lib/retrieval.js";
 import { trippedHosts } from "../../src/lib/http.js";
 import { sightsFile, warmSightsIndex } from "../../src/lib/sources/sightsIndex.js";
 import { trainBoard } from "../../src/lib/sources/trainBoard.js";
+import { pharmacyFile } from "../../src/lib/sources/pharmacyIndex.js";
 import { normalizeLang, getPlaceDetail } from "../../src/lib/sources/tourapi.js";
 import { warmCityList } from "../../src/lib/sources/tago.js";
 import { CATALOG } from "./catalog.js";
@@ -155,6 +156,22 @@ app.get("/api/sights/:lang", rateLimit, async (req: Request, res: Response) => {
   sendJson(req, res, b, "public, max-age=1800");
 });
 
+// Every pharmacy in Korea with its opening hours: the phone reads which near it
+// is open now. 503 until the National Medical Center service is approved for us.
+app.get("/api/pharmacies", rateLimit, async (req: Request, res: Response) => {
+  const b = await pharmacyFile().catch(() => undefined);
+  if (!b) {
+    res.status(503).json({ error: "unavailable" });
+    return;
+  }
+  res.setHeader("ETag", b.etag);
+  if (req.headers["if-none-match"] === b.etag) {
+    res.status(304).end();
+    return;
+  }
+  sendJson(req, res, b, "public, max-age=21600");
+});
+
 // One sight in full — for the phone's "tell me about this one" on a sight it
 // listed. What is asked for is a place the traveller chose, by its id, the same
 // as typing its name; nothing about where they are comes with it.
@@ -270,6 +287,7 @@ app.listen(port, () => {
     warmCoursePool();
     // After the rest has settled: a few dozen tourism-API pages, once a day.
     setTimeout(() => void warmSightsIndex(), 20_000).unref();
+    setTimeout(() => void pharmacyFile().catch(() => undefined), 40_000).unref();
   } catch {
     /* best-effort warmup */
   }

@@ -89,6 +89,10 @@ export interface RouteTask {
   destStation?: string;
   /** "Exit 5 — the palace gate is straight ahead", already in the reader's language. */
   exit?: string;
+  /** How the last leg goes when it is not a walk — a hill bus, a cable car, a ferry (src/lib/access.ts). */
+  access?: string;
+  /** Up a mountain or long steps: never offered as a flat walk, however close in a straight line. */
+  climb?: boolean;
   /** Anything that must lead the card — the ambulance number, when the question was an emergency. */
   tip?: string;
 }

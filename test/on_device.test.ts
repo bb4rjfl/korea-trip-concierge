@@ -169,3 +169,21 @@ describe("the task builder", () => {
     expect(JSON.stringify(t)).not.toMatch(/lat|lng/);
   });
 });
+
+describe("the last leg the server knows about", () => {
+  it("sends a hilltop's gateway station and how to get up it, and forbids calling it a walk", async () => {
+    delete process.env.GEMINI_API_KEY;
+    const res = await handleChat({ messages: [{ role: "user", content: "how do I get to N Seoul Tower from here" }], uiLang: "en" });
+    expect(res.device).toMatchObject({ kind: "route", destStation: "명동", climb: true });
+    expect(res.device?.kind === "route" && res.device.access).toMatch(/01A/);
+  });
+
+  it("does not take Namsangol Hanok Village at the foot of the hill for the tower", async () => {
+    const { accessFor } = await import("../src/lib/access.js");
+    expect(accessFor("Namsangol Hanok Village")).toBeUndefined();
+    expect(accessFor("남산골 한옥마을")).toBeUndefined();
+    expect(accessFor("남산타워")?.gateway).toBe("명동");
+    expect(accessFor("Seongsan-dong")).toBeUndefined();
+    expect(accessFor("성산일출봉")?.climb).toBe(true);
+  });
+});

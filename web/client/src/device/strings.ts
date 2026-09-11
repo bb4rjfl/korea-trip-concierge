@@ -34,6 +34,8 @@ export interface DeviceStrings {
   stops: string;
   walkFromStation: string;
   summary: string;
+  /** When the last leg is a bus or a climb from the station: time and fare to the station. */
+  summaryToGateway: string;
   noTransfer: string;
   transfer: string;
   transfers: string;
@@ -59,6 +61,8 @@ export interface DeviceStrings {
   noStationForTrains: string;
   listingsDown: string;
   noTrainsNow: string;
+  /** Pharmacy hours. */
+  rx: { open: string; until: string; allDay: string; closedOpens: string; closedLater: string; closed: string; openFirst: string; noneOpen: string; credit: string };
   /** Sights types. */
   kind: { attraction: string; culture: string; leisure: string };
   /** Buttons. */
@@ -120,6 +124,7 @@ const EN: DeviceStrings = {
   stops: "stops",
   walkFromStation: "🚶 From {station}, **{m}** (about {min} min) to {to}",
   summary: "⏱️ about **{min} min** door to door · {transfers} · 💳 around **₩{fare}**",
+  summaryToGateway: "⏱️ about **{min} min** to {station} station · {transfers} · 💳 around **₩{fare}**",
   noTransfer: "no transfers",
   transfer: "1 transfer",
   transfers: "{n} transfers",
@@ -144,6 +149,7 @@ const EN: DeviceStrings = {
   noStationForTrains: "There's no subway station within a walk of you.",
   listingsDown: "Couldn't load the sights list just now — try again in a minute.",
   noTrainsNow: "No trains are reported at this station right now.",
+  rx: { open: "🟢 **Open now**", until: "until {t}", allDay: "🟢 **Open 24 hours today**", closedOpens: "🔴 Closed · opens {t}", closedLater: "🔴 Closed · next opens {t} another day", closed: "🔴 Closed", openFirst: "open ones first", noneOpen: "No pharmacy within {m} is open right now. Convenience stores sell basic painkillers and cold medicine around the clock; for anything serious, call **119**.", credit: "_Hours: National Medical Center (ⓒ국립중앙의료원) — call ahead late at night._" },
   kind: { attraction: "Sight", culture: "Culture", leisure: "Leisure" },
   chip: {
     about: "Tell me about {name}",
@@ -236,6 +242,7 @@ const KO: DeviceStrings = {
   stops: "개 역",
   walkFromStation: "🚶 {station}역에서 {to}까지 **{m}** (약 {min}분)",
   summary: "⏱️ 도착까지 약 **{min}분** · {transfers} · 💳 약 **{fare}원**",
+  summaryToGateway: "⏱️ {station}역까지 약 **{min}분** · {transfers} · 💳 약 **{fare}원**",
   noTransfer: "환승 없음",
   transfer: "환승 1회",
   transfers: "환승 {n}회",
@@ -260,6 +267,7 @@ const KO: DeviceStrings = {
   noStationForTrains: "걸어갈 만한 거리에 지하철역이 없어요.",
   listingsDown: "지금 볼거리 목록을 불러오지 못했어요 — 잠시 후 다시 시도해 주세요.",
   noTrainsNow: "지금 이 역에 도착 예정인 열차 정보가 없어요.",
+  rx: { open: "🟢 **영업 중**", until: "{t}까지", allDay: "🟢 **오늘 24시간 영업**", closedOpens: "🔴 영업 종료 · {t} 오픈", closedLater: "🔴 영업 종료 · 다음 영업일 {t} 오픈", closed: "🔴 영업 종료", openFirst: "영업 중인 곳 먼저", noneOpen: "{m} 안에 지금 문을 연 약국이 없어요. 편의점에서 기본 진통제·감기약은 24시간 살 수 있고, 위급하면 **119**에 전화하세요.", credit: "_영업시간: 국립중앙의료원 약국 정보 (ⓒ국립중앙의료원) — 늦은 밤엔 전화로 확인하세요._" },
   kind: { attraction: "관광지", culture: "문화시설", leisure: "레포츠" },
   chip: {
     about: "{name} 알려줘",
@@ -318,6 +326,7 @@ const JA: DeviceStrings = {
   stops: "駅",
   walkFromStation: "🚶 {station}駅から{to}まで**{m}**（約{min}分）",
   summary: "⏱️ 到着まで約**{min}分** · {transfers} · 💳 約**₩{fare}**",
+  summaryToGateway: "⏱️ {station}駅まで約**{min}分** · {transfers} · 💳 約**₩{fare}**",
   noTransfer: "乗り換えなし",
   transfer: "乗り換え1回",
   transfers: "乗り換え{n}回",
@@ -342,6 +351,7 @@ const JA: DeviceStrings = {
   noStationForTrains: "歩ける範囲に地下鉄駅がありません。",
   listingsDown: "見どころリストを読み込めませんでした — 少し後でもう一度お試しください。",
   noTrainsNow: "現在この駅の到着予定情報はありません。",
+  rx: { open: "🟢 **営業中**", until: "{t}まで", allDay: "🟢 **本日24時間営業**", closedOpens: "🔴 営業時間外 · {t}開店", closedLater: "🔴 営業時間外 · 次の営業日{t}開店", closed: "🔴 営業時間外", openFirst: "営業中を先に", noneOpen: "{m}以内に今開いている薬局はありません。コンビニでは基本的な鎮痛剤や風邪薬を24時間買えます。緊急時は**119**へ。", credit: "_営業時間：国立中央医療院 薬局情報（ⓒ국립중앙의료원）— 深夜は電話で確認を。_" },
   kind: { attraction: "観光地", culture: "文化施設", leisure: "レジャー" },
   chip: {
     about: "{name}について教えて",
@@ -434,6 +444,7 @@ const ZH: DeviceStrings = {
   stops: "站",
   walkFromStation: "🚶 从{station}站到{to}步行**{m}**（约{min}分钟）",
   summary: "⏱️ 全程约**{min}分钟** · {transfers} · 💳 约**₩{fare}**",
+  summaryToGateway: "⏱️ 到{station}站约**{min}分钟** · {transfers} · 💳 约**₩{fare}**",
   noTransfer: "无需换乘",
   transfer: "换乘1次",
   transfers: "换乘{n}次",
@@ -458,6 +469,7 @@ const ZH: DeviceStrings = {
   noStationForTrains: "步行范围内没有地铁站。",
   listingsDown: "暂时无法加载景点列表 — 请稍后再试。",
   noTrainsNow: "这个车站目前没有到站信息。",
+  rx: { open: "🟢 **营业中**", until: "营业至{t}", allDay: "🟢 **今天24小时营业**", closedOpens: "🔴 已打烊 · {t}开门", closedLater: "🔴 已打烊 · 下一营业日{t}开门", closed: "🔴 已打烊", openFirst: "营业中的优先", noneOpen: "{m}内目前没有营业中的药店。便利店24小时出售基本止痛药和感冒药；情况紧急请拨打**119**。", credit: "_营业时间：国立中央医疗院药店信息（ⓒ국립중앙의료원）— 深夜请先打电话确认。_" },
   kind: { attraction: "景点", culture: "文化设施", leisure: "休闲" },
   chip: {
     about: "介绍一下{name}",
@@ -522,9 +534,14 @@ export function distance(m: number, lang: Lang): string {
   return lang === "ko" ? `${km}km` : `${km} km`;
 }
 
-/** A visitor with a bag walks about 75 m a minute. */
+/**
+ * Minutes on foot for a straight-line distance. A visitor with a bag walks
+ * about 75 m a minute, and streets are about a quarter longer than the straight
+ * line between two points — quoting the straight line promised walks that
+ * took longer than we said.
+ */
 export function walkMinutes(m: number): number {
-  return Math.max(1, Math.round(m / 75));
+  return Math.max(1, Math.round((m * 1.25) / 75));
 }
 
 /** The label Kakao's category path reads as, in the reader's language (Korean readers get Kakao's own). */

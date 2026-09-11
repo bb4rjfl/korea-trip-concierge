@@ -4,6 +4,9 @@ import { ok, fail } from "../lib/responses.js";
 import { search, confident } from "../lib/retrieval.js";
 import { searchForeignerPois, hasPoiProvider, type PoiPlace } from "../lib/sources/poi.js";
 import { resolvePlaceCoord } from "../lib/places.js";
+import { pharmaciesNear } from "../lib/sources/pharmacyIndex.js";
+import { romanizeHangul } from "../lib/romanize.js";
+import { mapLinksAt } from "../lib/maplinks.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -460,6 +463,36 @@ export const findForeignerFriendlyStore: ToolDef = {
     }
     if (extraNeeds.length) {
       head.push("", "_You named more than one requirement, so both are above — Itaewon and Haebangchon sit next to each other, which is why a mixed table usually ends up there._");
+    }
+
+    // A pharmacy is wanted *open*: with the National Medical Center's hours we
+    // can say which one is, and until when — "no 24-hour pharmacy is listed"
+    // was true and no help to someone with a fever at 11pm.
+    if (need === "pharmacy") {
+      const coord = resolvePlaceCoord(area);
+      const hours = coord ? await pharmaciesNear(coord.lat, coord.lng, 1500, 5).catch(() => undefined) : undefined;
+      const open = hours?.filter((p) => p.state.open) ?? [];
+      // Late at night the nearest open one may be further off than a walk.
+      const wider = hours && open.length < 2 && coord ? await pharmaciesNear(coord.lat, coord.lng, 5000, 5).catch(() => undefined) : undefined;
+      const list = (wider?.some((p) => p.state.open) ? wider : hours) ?? [];
+      if (list.length) {
+        const lines = list.map((p, i) => {
+          const status = p.state.open
+            ? p.state.allDay
+              ? "🟢 **Open 24 hours today**"
+              : `🟢 **Open now** · until ${p.state.until}`
+            : p.state.opens
+              ? `🔴 Closed · opens ${p.state.opens}${p.state.opensLater ? " (a later day)" : ""}`
+              : "🔴 Closed";
+          const tel = p.tel ? ` · ☎ ${p.tel}` : "";
+          const name = romanizeHangul(p.name);
+          return `**${i + 1}. ${name && name !== p.name ? `${name} (${p.name})` : p.name}**\n   ${status} · ${(p.m / 1000).toFixed(1)} km from ${area}${tel}\n   ${mapLinksAt(p.name, p.lat, p.lng)}`;
+        });
+        return ok(
+          [...head, "", "**Open now first:**", ...lines, "", "_Hours: National Medical Center pharmacy data (ⓒ국립중앙의료원); call ahead late at night._"].join("\n"),
+          CHOICES,
+        );
+      }
     }
 
     // Curated guidance always renders; add live nearby spots when a POI key exists.

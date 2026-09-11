@@ -24,13 +24,34 @@ const NAMED: Record<string, Record<Lang, string>> = {
   "GTX-A": { en: "GTX-A", ko: "GTX-A", ja: "GTX-A", zh: "GTX-A" },
 };
 
-/** "03호선" → "Line 3" / "3호선" / "3号線" / "3号线"; named lines by their names. */
+/** The cities outside the capital with a subway, as each reader names them. */
+const CITY: Record<string, Record<Lang, string>> = {
+  부산: { en: "Busan", ko: "부산", ja: "釜山", zh: "釜山" },
+  대구: { en: "Daegu", ko: "대구", ja: "大邱", zh: "大邱" },
+  광주: { en: "Gwangju", ko: "광주", ja: "光州", zh: "光州" },
+  대전: { en: "Daejeon", ko: "대전", ja: "大田", zh: "大田" },
+};
+
+const REGIONAL_NAMED: Record<string, Record<Lang, string>> = {
+  부산김해경전철: { en: "Busan–Gimhae LRT", ko: "부산김해경전철", ja: "釜山金海軽電鉄", zh: "釜山金海轻轨" },
+  동해선: { en: "Donghae Line", ko: "동해선", ja: "東海線", zh: "东海线" },
+};
+
+/** "03호선" → "Line 3" / "3호선" / "3号線" / "3号线"; "부산 1호선" → "Busan Line 1"; named lines by their names. */
 export function lineName(line: string, lang: Lang): string {
   const m = /^0?(\d+)호선$/.exec(line);
   if (m) {
     const n = Number(m[1]);
     return lang === "en" ? `Line ${n}` : lang === "ko" ? `${n}호선` : lang === "ja" ? `${n}号線` : `${n}号线`;
   }
+  const r = /^(부산|대구|광주|대전)\s*(\d)호선$/.exec(line);
+  if (r) {
+    const city = CITY[r[1]][lang];
+    const n = r[2];
+    return lang === "en" ? `${city} Line ${n}` : lang === "ko" ? `${city} ${n}호선` : lang === "ja" ? `${city}${n}号線` : `${city}${n}号线`;
+  }
+  const named = Object.entries(REGIONAL_NAMED).find(([k]) => line.replace(/[\s-]/g, "").includes(k));
+  if (named) return named[1][lang];
   return NAMED[line]?.[lang] ?? line;
 }
 

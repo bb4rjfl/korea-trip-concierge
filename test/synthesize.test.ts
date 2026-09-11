@@ -9,7 +9,8 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { ungroundedToken, droppedEssential } from "../web/server/synthesize.js";
+import { ungroundedToken, droppedEssential, inventedStatus } from "../web/server/synthesize.js";
+import { laterToday, type Departure } from "../src/lib/sources/intercityApi.js";
 
 const FACTS = [
   "Gyeongbokgung Palace 09:00-18:00, closed Tuesdays.",
@@ -129,5 +130,45 @@ describe("a list of places near somewhere, and the rewrite that forgot where", (
   it("accepts a rewrite that keeps the stores, in either script", () => {
     expect(droppedEssential("가까운 곳은 GS25 공덕역점과 CU 마포도화점이에요.", card)).toBeUndefined();
     expect(droppedEssential("Try GS25 Gongdeok Station or CU Mapo Dohwa, both on Baekbeom-ro.", card)).toBeUndefined();
+  });
+});
+
+describe("a live status the facts never gave", () => {
+  // Asked "is my KTX from Seoul to Busan delayed today?", production answered
+  // "Your KTX from Seoul to Busan is not delayed today" over a timetable.
+  const timetable = [
+    "🚄 **Today's last train has left — first trains tomorrow:**",
+    "- **KTX** 05:13 → 07:50 _(2h37)_ · 💳 ₩59,800",
+    "⏱️ _Timetable only, not live status — delays and platform changes show in the **Korail Talk** app and on the station boards._",
+  ].join("\n");
+
+  it("is rejected, in all four languages", () => {
+    expect(inventedStatus("Your KTX from Seoul to Busan is not delayed today.", timetable)).toBeTruthy();
+    expect(inventedStatus("The 05:13 KTX is running on time.", timetable)).toBeTruthy();
+    expect(inventedStatus("There are no delays on the Busan line.", timetable)).toBeTruthy();
+    expect(inventedStatus("오늘 부산행 KTX는 지연이 없습니다.", timetable)).toBeTruthy();
+    expect(inventedStatus("KTXは定刻通り運行しています。", timetable)).toBeTruthy();
+    expect(inventedStatus("今天去釜山的KTX没有延误。", timetable)).toBeTruthy();
+  });
+
+  it("lets an answer that says where to find the status through", () => {
+    expect(inventedStatus("For delays, check the Korail Talk app — this is the timetable.", timetable)).toBeUndefined();
+    expect(inventedStatus("지연 여부는 코레일톡 앱에서 확인하세요.", timetable)).toBeUndefined();
+    expect(inventedStatus("The first KTX tomorrow leaves at 05:13.", timetable)).toBeUndefined();
+  });
+});
+
+describe("departures still to come today", () => {
+  const dep = (depart: string): Departure => ({ grade: "KTX", depart, arrive: "08:00", minutes: 160 }) as Departure;
+  const list = [dep("05:13"), dep("12:00"), dep("22:40")];
+
+  it("are the ones after now, Korea time", () => {
+    const at2230 = Date.UTC(2026, 8, 11, 13, 30); // 22:30 KST
+    expect(laterToday(list, at2230).map((d) => d.depart)).toEqual(["22:40"]);
+  });
+
+  it("are none once the last has gone — so the card can say so", () => {
+    const at2308 = Date.UTC(2026, 8, 11, 14, 8); // 23:08 KST
+    expect(laterToday(list, at2308)).toEqual([]);
   });
 });

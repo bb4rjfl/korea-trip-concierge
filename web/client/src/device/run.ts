@@ -11,6 +11,7 @@ import { runSights } from "./sights.js";
 import { runRoute } from "./route.js";
 import { runTrains } from "./trains.js";
 import { runSight } from "./sight.js";
+import { runPharmacies } from "./pharmacies.js";
 
 export type { DeviceCard, Fix };
 export { pickedPlace, pickedTask } from "./followup.js";
@@ -18,6 +19,10 @@ export { pickedPlace, pickedTask } from "./followup.js";
 export function runTask(task: DeviceTask, at: Fix, lang: Lang): Promise<DeviceCard> {
   switch (task.kind) {
     case "nearby":
+      // A pharmacy is wanted open: the hours decide, when we have them.
+      if (task.need === "pharmacy") {
+        return runPharmacies(task, at, lang).then((card) => card ?? runNearby(task, at, lang));
+      }
       return runNearby(task, at, lang);
     case "sights":
       return runSights(task, at, lang);

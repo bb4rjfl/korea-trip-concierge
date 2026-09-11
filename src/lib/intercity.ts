@@ -12,8 +12,21 @@ import {
   busesBetween,
   todayYmdKST,
   upcoming,
+  laterToday,
   type Departure,
 } from "./sources/intercityApi.js";
+
+/** Tomorrow's date, Korea time, as the feeds write it. */
+function tomorrowYmdKST(): string {
+  const k = new Date(Date.now() + 9 * 3600_000 + 24 * 3600_000);
+  return `${k.getUTCFullYear()}${String(k.getUTCMonth() + 1).padStart(2, "0")}${String(k.getUTCDate()).padStart(2, "0")}`;
+}
+
+/** The wording for a departures list: today's still to come, or — once the last has gone — tomorrow's first. */
+const LABELS = {
+  train: { today: (n: number) => `🚄 **Next trains today** (${n} more today):`, tomorrow: "🚄 **Today's last train has left — first trains tomorrow:**" },
+  bus: { today: (n: number) => `🚌 **Next buses today** (${n} more today):`, tomorrow: "🚌 **Today's last bus has left — first buses tomorrow:**" },
+};
 
 interface City {
   keys: RegExp;
@@ -92,12 +105,21 @@ export async function renderIntercity(from: string, to: string, hit: IntercityHi
     `- **${d.grade}** ${d.depart} → ${d.arrive} _(${Math.floor(d.minutes / 60)}h${String(d.minutes % 60).padStart(2, "0")})_` +
     (d.fareWon ? ` · 💳 ₩${d.fareWon.toLocaleString()}` : "");
 
-  const live: string[] = [];
+  // At 23:00 "next trains today" listed 05:13 — today's first, not anything
+  // still to come — under a count of every train of the day. Once today's last
+  // has gone, the answer is tomorrow's first, from tomorrow's own timetable.
+  const section = async (kind: "train" | "bus", today: Departure[], limit: number): Promise<string[]> => {
+    if (!today.length) return [];
+    const left = laterToday(today);
+    if (left.length) return ["", LABELS[kind].today(left.length), ...upcoming(today, limit).map(line)];
+    const next = await (kind === "train" ? trainsBetween : busesBetween)(from, to, tomorrowYmdKST()).catch(() => [] as Departure[]);
+    return ["", LABELS[kind].tomorrow, ...(next.length ? next : today).slice(0, limit).map(line)];
+  };
+  const live: string[] = [...(await section("train", trains, 3)), ...(await section("bus", buses, 2))];
   if (trains.length) {
-    live.push("", `🚄 **Next trains today** (${trains.length} more running):`, ...upcoming(trains, 3).map(line));
-  }
-  if (buses.length) {
-    live.push("", `🚌 **Next buses today** (${buses.length} more running):`, ...upcoming(buses, 2).map(line));
+    // A timetable is not a status report, and a traveller asking "is it
+    // delayed?" was told it was not — by a model reading this very list.
+    live.push("", "⏱️ _Timetable only, not live status — delays and platform changes show in the **Korail Talk** app and on the station boards._");
   }
   if (live.length) {
     // The feeds cover intercity rail and coach, not commuter rail or flights — so

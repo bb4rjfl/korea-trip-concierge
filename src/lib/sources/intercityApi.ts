@@ -296,8 +296,13 @@ export function todayYmdKST(): string {
 
 /** The next few departures after the current Korea time, or the first of the day. */
 export function upcoming(list: Departure[], limit = 3): Departure[] {
-  const k = new Date(Date.now() + 9 * 3600_000);
-  const now = `${String(k.getUTCHours()).padStart(2, "0")}:${String(k.getUTCMinutes()).padStart(2, "0")}`;
-  const later = list.filter((d) => d.depart >= now);
+  const later = laterToday(list);
   return (later.length ? later : list).slice(0, limit);
+}
+
+/** The departures still to leave today, Korea time. */
+export function laterToday(list: Departure[], at = Date.now()): Departure[] {
+  const k = new Date(at + 9 * 3600_000);
+  const now = `${String(k.getUTCHours()).padStart(2, "0")}:${String(k.getUTCMinutes()).padStart(2, "0")}`;
+  return list.filter((d) => d.depart >= now);
 }

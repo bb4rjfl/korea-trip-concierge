@@ -113,11 +113,38 @@ const NAMED_LINES: Record<string, string> = {
   "GTX-A": "GTX-A",
 };
 
-/** "02호선" → "Line 2"; named lines keep their English name. */
+const REGIONAL_CITY: Record<string, string> = { 부산: "Busan", 대구: "Daegu", 광주: "Gwangju", 대전: "Daejeon" };
+
+/** "02호선" → "Line 2"; "부산 1호선" → "Busan Line 1"; named lines keep their English name. */
 export function lineLabel(lineNum: string): string {
   const m = /^0?(\d+)호선$/.exec(lineNum);
   if (m) return `Line ${Number(m[1])}`;
+  const r = /^(부산|대구|광주|대전)\s*(\d)호선$/.exec(lineNum);
+  if (r) return `${REGIONAL_CITY[r[1]]} Line ${r[2]}`;
+  if (/부산\s*-?\s*김해/.test(lineNum)) return "Busan–Gimhae LRT";
+  if (/동해선/.test(lineNum)) return "Donghae Line";
   return NAMED_LINES[lineNum] ?? lineNum;
+}
+
+/**
+ * Card fares outside the capital — quoted as "around" wherever they appear;
+ * the operators change them every few years. Busan (since 2024-05) and
+ * Daejeon charge more beyond about 10 km, roughly nine stops; Daegu and
+ * Gwangju charge one flat fare.
+ */
+export function regionalFare(network: string, stops: number): number {
+  switch (network) {
+    case "busan":
+      return stops <= 9 ? 1600 : 1800;
+    case "daegu":
+      return 1500;
+    case "gwangju":
+      return 1250;
+    case "daejeon":
+      return stops <= 9 ? 1400 : 1500;
+    default:
+      return 1500;
+  }
 }
 
 function toStation(r: StationRow): Station {
@@ -334,6 +361,53 @@ export function fromSnapshot(): SubwayGraph {
     LINE_NUM: r.l,
   }));
   return buildGraph(rows);
+}
+
+/**
+ * A network outside the capital, as scripts/build-regional-subway.ts writes it:
+ * stations with their line, the links along each line, and the transfers.
+ */
+export interface RegionalNetwork {
+  stations: { c: string; k: string; e: string; l: string; lat: number; lng: number }[];
+  edges: [string, string][];
+  transfers: [string, string][];
+}
+
+/** Minutes between stations on the regional lines: the light-rail and monorail stops are closer together. */
+function regionalPace(line: string): number {
+  if (/동해선/.test(line)) return 3.0;
+  if (/경전철|대구 3호선/.test(line)) return 2.0;
+  return MIN_PER_STOP;
+}
+
+/** A regional network as a graph the same planner runs on. */
+export function graphFromNetwork(net: RegionalNetwork): SubwayGraph {
+  const stations: Station[] = net.stations.map((s) => ({ code: s.c, ko: s.k, en: s.e, ja: s.e, zh: s.e, line: s.l }));
+  const byCode = new Map(stations.map((s) => [s.code, s]));
+  const edges = new Map<string, { to: string; minutes: number; transfer: boolean }[]>();
+  const link = (a: string, b: string, minutes: number, transfer: boolean): void => {
+    if (!byCode.has(a) || !byCode.has(b)) return;
+    if (!edges.has(a)) edges.set(a, []);
+    if (!edges.get(a)!.some((e) => e.to === b)) edges.get(a)!.push({ to: b, minutes, transfer });
+  };
+  for (const [a, b] of net.edges) {
+    const pace = regionalPace(byCode.get(a)?.line ?? "");
+    link(a, b, pace, false);
+    link(b, a, pace, false);
+  }
+  for (const [a, b] of net.transfers) {
+    link(a, b, MIN_PER_TRANSFER, true);
+    link(b, a, MIN_PER_TRANSFER, true);
+  }
+  const byName = new Map<string, string[]>();
+  for (const s of stations) {
+    for (const key of [normalizeName(s.ko), normalizeName(s.en)]) {
+      if (!key) continue;
+      if (!byName.has(key)) byName.set(key, []);
+      if (!byName.get(key)!.includes(s.code)) byName.get(key)!.push(s.code);
+    }
+  }
+  return { stations, edges, byName, byCode };
 }
 
 /** Resolve a name in any of the four languages to that station's codes. */

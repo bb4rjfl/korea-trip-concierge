@@ -66,6 +66,7 @@ const SYSTEM = [
   "6. If the facts offer several places, keep several. Never reduce a list to one — and if the one you lead with is closed or unavailable right now, say so and immediately give the next one.",
   "7. Keep the field that answers the question: a direction for an arrival time, an exit for a station, a price for a fare, a closed day for opening hours.",
   "8. Never mention tools, data sources, prompts, models, or that you were given facts.",
+  "9. Never say whether a train, bus or flight is delayed, on time, cancelled or running normally unless the facts say exactly that. A timetable is not a status report.",
   "",
   "Length: shorter than the facts you were given, never longer.",
 ].join("\n");
@@ -246,6 +247,52 @@ export function droppedEssential(answer: string, card: string): string | undefin
   return undefined;
 }
 
+/**
+ * A statement about how a service is running right now, in any of our four
+ * languages: delayed or not, on time, cancelled, suspended, running normally.
+ *
+ * Asked "is my KTX from Seoul to Busan delayed today?", the answer opened "Your
+ * KTX from Seoul to Busan is not delayed today" — over a card that was a
+ * timetable. Nothing in it was a number or a name the facts lacked, so the
+ * other two checks passed it. We have no live-status feed for any train, bus or
+ * flight, so a status the facts do not state is always invented.
+ */
+const STATUS_CLAIM = new RegExp(
+  [
+    String.raw`\b(?:is|are|was|were|isn't|aren't|wasn't|not|no)\s+(?:currently\s+|being\s+)?(?:delayed|cancel+ed|suspended)\b`,
+    String.raw`\bno\s+(?:reported\s+)?delays?\b`,
+    String.raw`\bwithout\s+(?:any\s+)?delays?\b`,
+    String.raw`\b(?:running|operating|departing|arriving)\s+(?:on\s+time|on\s+schedule|normally|as\s+(?:normal|usual|scheduled))\b`,
+    String.raw`\bis\s+on\s+(?:time|schedule)\b`,
+    "지연(?:이|은|된|되|되고|되지|없|돼)",
+    "정시(?:\\s*운행|에\\s*(?:출발|도착|운행))",
+    "정상\\s*운행",
+    "운행\\s*(?:중단|중지|취소)",
+    "결항",
+    "운휴",
+    "遅延(?:は|が|して|なし|なく|中)",
+    "遅れ(?:て|は|が|なし)",
+    "定刻(?:通り|どおり)",
+    "平常(?:運転|運行)",
+    "運休",
+    "運転見合わせ",
+    "延误",
+    "晚点",
+    "准点",
+    "正点",
+    "正常运行",
+    "停运",
+  ].join("|"),
+  "i",
+);
+
+/** A live status the answer states and the facts do not. */
+export function inventedStatus(answer: string, card: string): string | undefined {
+  const claim = STATUS_CLAIM.exec(answer)?.[0];
+  if (!claim) return undefined;
+  return STATUS_CLAIM.test(card) ? undefined : claim;
+}
+
 const LANG_NAME: Record<string, string> = {
   en: "English",
   ko: "Korean",
@@ -334,6 +381,11 @@ export async function synthesize(input: SynthesisInput): Promise<string | undefi
     const lost = droppedEssential(text, input.card);
     if (lost) {
       console.warn(`[synth] discarded: ${lost}`);
+      return undefined;
+    }
+    const status = inventedStatus(text, input.card);
+    if (status) {
+      console.warn(`[synth] discarded: a live status ("${status}") the facts do not state`);
       return undefined;
     }
     return text;

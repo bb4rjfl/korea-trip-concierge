@@ -22,3 +22,6 @@ biz-local/
 # the baseline scores are.
 eval/last-run.md
 eval/.embeddings.json
+
+# ODsay responses cached by scripts/build-regional-subway.ts
+scripts/.cache/

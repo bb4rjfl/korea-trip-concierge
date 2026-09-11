@@ -316,3 +316,32 @@ describe("lines and stations, named for the reader", () => {
     expect(stationLabel(s, "ko")).toBe("양재");
   });
 });
+
+describe("a destination up a hill", () => {
+  const NAMSAN = {
+    kind: "route" as const,
+    to: "N Seoul Tower",
+    dest: { lat: 37.5512, lng: 126.9882 },
+    destStation: "명동",
+    climb: true,
+    access: "🧗 **N Seoul Tower sits on top of Namsan.** From **Myeongdong Station**, ride the **Namsan circular bus 01A or 01B** up to the tower.",
+  };
+
+  it("is never 'a short walk' from a hotel at its foot", async () => {
+    vi.stubGlobal("fetch", async () => new Response("{}", { status: 503 }));
+    const card = await runRoute(NAMSAN, { lat: 37.5609, lng: 126.9847 }, "en");
+    // It used to say: "Walk to N Seoul Tower — 1.1 km, about 15 min".
+    expect(card.markdown).not.toMatch(/Walk to N Seoul Tower/);
+    expect(card.markdown).toMatch(/to \*\*Myeong-?dong \(명동\)\*\* station/);
+    expect(card.markdown).toMatch(/01A or 01B/);
+  });
+
+  it("rides to the station the climb starts from, then says how to go up", async () => {
+    vi.stubGlobal("fetch", async () => new Response("{}", { status: 503 }));
+    const card = await runRoute(NAMSAN, YANGJAE_SIDE_STREET, "en");
+    expect(card.markdown).toMatch(/→ Myeong-?dong \(명동\)/);
+    expect(card.markdown).toMatch(/to Myeong-?dong \(명동\) station/);
+    expect(card.markdown).toMatch(/01A or 01B/);
+    expect(card.markdown).not.toMatch(/From Myeong-?dong \(명동\), \*\*\d/);
+  });
+});

@@ -15,6 +15,7 @@ import { essentialFor, type Need } from "../../src/tools/findForeignerFriendlySt
 import { inferCategory, foodKeyword } from "../../src/tools/searchPlaceForeigner.js";
 import { geocode, toStationName } from "../../src/tools/getTransitRoute.js";
 import { exitLine } from "../../src/lib/exits.js";
+import { accessFor } from "../../src/lib/access.js";
 
 type Search = Pick<NearbyTask, "queries" | "radius" | "order" | "pharmacyOnly" | "noFood" | "searchKo">;
 
@@ -196,7 +197,10 @@ export function nearbyTaskFor(tool: string, args: Record<string, unknown>, said:
  */
 export async function routeTaskFor(to: string): Promise<DeviceTask> {
   const dest = await geocode(to).catch(() => undefined);
-  const station = toStationName(to);
+  // A place whose last leg is a bus, a climb or a ferry is reached through its
+  // gateway station, and the phone is told how the rest goes.
+  const access = accessFor(to);
+  const station = access?.gateway ?? toStationName(to);
   const exit = exitLine(to);
   return {
     kind: "route",
@@ -204,5 +208,6 @@ export async function routeTaskFor(to: string): Promise<DeviceTask> {
     ...(dest ? { dest: { lat: dest.lat, lng: dest.lng } } : {}),
     ...(/[가-힣]/.test(station) ? { destStation: station } : {}),
     ...(exit ? { exit } : {}),
+    ...(access ? { access: `🧗 ${access.note}`, ...(access.climb ? { climb: true } : {}) } : {}),
   };
 }

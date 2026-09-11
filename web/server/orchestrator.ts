@@ -535,11 +535,12 @@ async function localizeTask(task: DeviceTask, lang: Lang, hant: boolean): Promis
   if (lang === "en") return task;
   const tr = (s: string): Promise<string> =>
     localizeToolBody(s, lang, hant).then((t) => (hant ? toTraditional(t) : t));
-  const [tip, exit] = await Promise.all([
+  const [tip, exit, access] = await Promise.all([
     task.tip ? tr(task.tip) : undefined,
     task.kind === "route" && task.exit ? tr(task.exit) : undefined,
+    task.kind === "route" && task.access ? tr(task.access) : undefined,
   ]);
-  return { ...task, ...(tip ? { tip } : {}), ...(exit ? { exit } : {}) };
+  return { ...task, ...(tip ? { tip } : {}), ...(exit ? { exit } : {}), ...(access ? { access } : {}) };
 }
 
 /** Somewhere to start when they would rather tap than type. */
