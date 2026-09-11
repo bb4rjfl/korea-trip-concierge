@@ -3,9 +3,10 @@
  *
  * Asked "How do I get to 뱅뱅사거리?", we asked where they were starting from
  * and offered a button: "From my area to 뱅뱅사거리". Tapping it sent those
- * words to a server that cannot know anyone's area — coordinates never leave the
- * phone, by design — so it asked the same question again, with the same button
- * under it, plus a note suggesting they try a different cuisine.
+ * words to a server that is never told anyone's area, so it asked the same
+ * question again, with the same button under it, plus a note suggesting they try
+ * a different cuisine. The button now carries the route for the phone to plan
+ * from its own fix (src/lib/deviceTask.ts).
  *
  * And once past that, the next thing waiting was a 37-minute bus from an
  * apartment complex in Suseo, because a stop named "…강남아파트" matched the
@@ -66,19 +67,22 @@ describe("the web client is told to find the traveller, not to resend the words"
     delete process.env.GEMINI_API_KEY;
   });
 
-  it("marks the 📍 button as a location action: a question with a hole for the place", async () => {
+  it("marks the 📍 button as a location action: the route, for the phone to plan", async () => {
     const res = await handleChat({ messages: [{ role: "user", content: "How do I get to 뱅뱅사거리?" }], uiLang: "en" });
     expect(res.meta.tool).toBe("getTransitRoute");
     const here = res.chips.find((c) => c.emoji === "📍");
-    expect(here?.locate?.ask).toBe("How do I get from {place} to 뱅뱅사거리?");
+    expect(here?.locate?.task).toMatchObject({ kind: "route", to: "뱅뱅사거리" });
+    // And the same route, for a phone that already knows where it is.
+    expect(res.device).toEqual(here?.locate?.task);
     // Every other button is still an ordinary question.
     for (const c of res.chips.filter((c) => c.emoji !== "📍")) expect(c.locate).toBeUndefined();
   });
 
-  it("writes that question in the reader's language", async () => {
+  it("labels that button in the reader's language", async () => {
     const res = await handleChat({ messages: [{ role: "user", content: "뱅뱅사거리 어떻게 가요?" }], uiLang: "ko" });
     const here = res.chips.find((c) => c.emoji === "📍");
-    expect(here?.locate?.ask).toBe("{place}에서 뱅뱅사거리까지 어떻게 가요?");
+    expect(here?.cmdEn).toBe("내 위치 사용");
+    expect(here?.locate?.task.kind).toBe("route");
   });
 
   it("does not advise changing the cuisine when the repeated answer is a route question", async () => {

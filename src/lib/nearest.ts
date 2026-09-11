@@ -71,6 +71,25 @@ export function nearestLandmark(lat: number, lng: number): { label: string; metr
   return best ? { label: best.label, metres: Math.round(best.km * 1000) } : null;
 }
 
+/**
+ * The stations within a walk of a point, nearest first — more than one,
+ * because the nearest is not always the best to board at: the one 300 m
+ * further on may be on the line that goes there without a change.
+ */
+export function stationsNear(lat: number, lng: number, maxMetres: number, limit: number): { station: StationEntry; metres: number }[] {
+  return STATIONS.map((s) => ({ station: s, metres: Math.round(km(lat, lng, s.lat, s.lng) * 1000) }))
+    .filter((x) => x.metres <= maxMetres)
+    .sort((a, b) => a.metres - b.metres)
+    .slice(0, limit);
+}
+
+/** A station by its Korean name, as the realtime board and the route planner write it. */
+export function stationByKo(ko: string): StationEntry | undefined {
+  const bare = (s: string): string => s.replace(/역$/, "").replace(/\s*\(.*\)\s*$/, "").trim();
+  const k = bare(ko);
+  return STATIONS.find((s) => bare(s.k) === k);
+}
+
 /** The nearest subway station to a point, with the walk to it. */
 export function nearestStation(lat: number, lng: number): { station: StationEntry; metres: number } | null {
   let best: { station: StationEntry; km: number } | null = null;

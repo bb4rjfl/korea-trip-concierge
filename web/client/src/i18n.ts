@@ -24,8 +24,6 @@ export interface Strings {
   findingYou: string;
   /** The phone's fix is too rough to answer "near me" from. {accuracy}. */
   locationImprecise: string;
-  /** "my current location", where a question needs a place said out loud. */
-  myLocation: string;
   /** The location bar: on, check it on a map, switch it off. */
   sharingOn: string;
   viewOnMap: string;
@@ -77,14 +75,13 @@ export const STRINGS: Record<Lang, Strings> = {
     nearMeQuery: "What's around me?",
     findingYou: "📍 Finding where you are…",
     locationImprecise: "📍 Your phone only knows where you are to within ±{accuracy} — too rough to say what's near you. Type the station or area you're in.",
-    myLocation: "my current location",
-    sharingOn: "Using your location",
+    sharingOn: "Location on — used only on this phone",
     viewOnMap: "View on map",
     turnOff: "Turn off",
     locationNeedsTyping: "📍 Couldn't get your location — type the station or neighbourhood you're near (like “Gangnam Station”).",
     aboutTitle: "About this service",
     aboutBody:
-      "Korea Trip Concierge is a real-time conversational travel guide for visitors in Korea. It answers with live public data — not canned pages. No login, no tracking. Your location is used only when you allow it, to answer from where you are, and is never stored.",
+      "Korea Trip Concierge is a real-time conversational travel guide for visitors in Korea. It answers with live public data — not canned pages. No login, no tracking. When you allow location, “near me” is worked out on your phone itself: it asks Kakao Maps directly and measures there. Your location is never sent to our server.",
     aboutSources: "Data sources",
     close: "Close",
     welcome:
@@ -110,14 +107,13 @@ export const STRINGS: Record<Lang, Strings> = {
     nearMeQuery: "내 주변에 뭐 있어?",
     findingYou: "📍 위치 확인 중…",
     locationImprecise: "📍 폰이 아는 위치 오차가 ±{accuracy}라 주변을 찾기엔 너무 부정확해요. 계신 역이나 동네를 입력해 주세요.",
-    myLocation: "현재 위치",
-    sharingOn: "현재 위치 사용 중",
+    sharingOn: "위치 사용 중 — 휴대폰 안에서만",
     viewOnMap: "지도에서 보기",
     turnOff: "끄기",
     locationNeedsTyping: "📍 위치를 가져오지 못했어요 — 근처 역이나 동네 이름(예: “강남역”)을 입력해 주세요.",
     aboutTitle: "서비스 소개",
     aboutBody:
-      "Korea Trip Concierge는 방한 여행자를 위한 실시간 대화형 여행 가이드입니다. 정적인 안내가 아니라 실시간 공공데이터로 답합니다. 로그인·추적 없음. 위치는 허용하셨을 때만 현재 위치 기준으로 답하는 데 쓰이고, 저장되지 않습니다.",
+      "Korea Trip Concierge는 방한 여행자를 위한 실시간 대화형 여행 가이드입니다. 정적인 안내가 아니라 실시간 공공데이터로 답합니다. 로그인·추적 없음. 위치를 허용하시면 ‘내 주변’은 휴대폰 안에서 직접 찾아요 — 휴대폰이 카카오맵에 바로 묻고 거리도 휴대폰에서 잽니다. 위치는 저희 서버로 전송되지 않습니다.",
     aboutSources: "데이터 출처",
     close: "닫기",
     welcome:
@@ -143,14 +139,13 @@ export const STRINGS: Record<Lang, Strings> = {
     nearMeQuery: "近くに何がある？",
     findingYou: "📍 現在地を確認中…",
     locationImprecise: "📍 現在地の誤差が±{accuracy}あり、周辺を探すには粗すぎます。いる駅やエリア名を入力してください。",
-    myLocation: "現在地",
-    sharingOn: "現在地を使用中",
+    sharingOn: "現在地オン — このスマホの中だけで使用",
     viewOnMap: "地図で見る",
     turnOff: "オフにする",
     locationNeedsTyping: "📍 現在地を取得できませんでした — 近くの駅やエリア名（例：「江南駅」）を入力してください。",
     aboutTitle: "このサービスについて",
     aboutBody:
-      "Korea Trip Concierge は訪韓旅行者のためのリアルタイム対話型ガイドです。ログイン・トラッキングなし。位置情報は許可された時だけ現在地から答えるために使い、保存しません。",
+      "Korea Trip Concierge は訪韓旅行者のためのリアルタイム対話型ガイドです。ログイン・トラッキングなし。位置情報を許可すると「近く」の検索はスマホの中で行います — スマホがカカオマップに直接問い合わせ、距離もスマホで測ります。位置情報が当サービスのサーバーに送られることはありません。",
     aboutSources: "データ出典",
     close: "閉じる",
     welcome:
@@ -176,14 +171,13 @@ export const STRINGS: Record<Lang, Strings> = {
     nearMeQuery: "附近有什么？",
     findingYou: "📍 正在确认你的位置…",
     locationImprecise: "📍 手机定位误差有±{accuracy}，太粗略，无法查找附近。请输入你所在的车站或街区。",
-    myLocation: "我现在的位置",
-    sharingOn: "正在使用你的位置",
+    sharingOn: "定位已开启 — 仅在本机使用",
     viewOnMap: "在地图上查看",
     turnOff: "关闭",
     locationNeedsTyping: "📍 无法获取你的位置 — 请输入附近的地铁站或街区名（如“江南站”）。",
     aboutTitle: "关于本服务",
     aboutBody:
-      "Korea Trip Concierge 是面向访韩游客的实时对话式旅行指南。无需登录、无跟踪。位置仅在你允许时用于按你所在位置回答，且不会保存。",
+      "Korea Trip Concierge 是面向访韩游客的实时对话式旅行指南。无需登录、无跟踪。允许定位后，“附近”的查找在你的手机上完成 — 手机直接向Kakao地图查询，距离也在手机上计算。你的位置不会发送到我们的服务器。",
     aboutSources: "数据来源",
     close: "关闭",
     welcome:

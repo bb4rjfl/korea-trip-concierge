@@ -4,7 +4,6 @@ import { ok, fail } from "../lib/responses.js";
 import { search, confident } from "../lib/retrieval.js";
 import { searchForeignerPois, hasPoiProvider, type PoiPlace } from "../lib/sources/poi.js";
 import { resolvePlaceCoord } from "../lib/places.js";
-import { getHere, isHere, distanceLabel } from "../lib/hereContext.js";
 import type { Choice } from "../lib/footer.js";
 import type { ToolDef } from "./types.js";
 
@@ -35,7 +34,7 @@ const NEEDS = [
   "prayer",
   "post",
 ] as const;
-type Need = (typeof NEEDS)[number];
+export type Need = (typeof NEEDS)[number];
 
 interface Essential {
   label: string;
@@ -258,6 +257,19 @@ function resolveNeed(input?: string): Need | undefined {
   return hit ? NEED_BY_ALIAS[hit] : undefined;
 }
 
+/**
+ * A need, recognised in whatever words and language it was asked, with the
+ * advice that goes with it — for the phone, which answers "near me" itself and
+ * shows this under what it finds. The advice is the same whoever asks and from
+ * wherever, which is what lets it come from here.
+ */
+export function essentialFor(input?: string): { need: Need; emoji: string; label: string; tip: string } | undefined {
+  const need = resolveNeed(input);
+  if (!need) return undefined;
+  const e = ESSENTIALS[need];
+  return { need, emoji: e.emoji, label: e.label, tip: e.tip };
+}
+
 const CHOICES: Choice[] = [
   { emoji: "💳", cmdEn: "How do I pay here as a foreigner?", cmdKo: "결제 방법", descEn: "payment options guide" },
   { emoji: "🚇", cmdEn: "How do I get there?", descEn: "public-transit route" },
@@ -317,9 +329,7 @@ function renderNearby(places: PoiPlace[], query: string, need: Need): string[] {
   if (!clean.length) return [];
   const lines = clean.map((p, i) => {
     const tel = p.tel ? ` · ☎ ${p.tel}` : "";
-    // How far from the traveller — the number a map app puts first.
-    const far = p.metres != null ? ` · 🚶 **${distanceLabel(p.metres)}**` : "";
-    return `**${i + 1}. ${p.name}**\n   📍 ${p.address}${far}${tel}`;
+    return `**${i + 1}. ${p.name}**\n   📍 ${p.address}${tel}`;
   });
   return ["", "**Nearby:**", ...lines];
 }
@@ -437,11 +447,10 @@ export const findForeignerFriendlyStore: ToolDef = {
       return ok(renderOverview(area), OVERVIEW_CHOICES);
     }
 
-    // Where the traveller is standing, if the phone told us. Then this is a map
-    // app's "near me": around their exact point, measured from them.
-    const here = isHere(area) ? getHere() : undefined;
+    // "Near me" never reaches here: the phone answers it from its own GPS fix
+    // (src/lib/deviceTask.ts), and this server is never told where anyone is.
     const e = ESSENTIALS[need];
-    const head = [`${e.emoji} **${e.label} ${here ? "near you" : `in ${area}`}**`, "", e.tip];
+    const head = [`${e.emoji} **${e.label} in ${area}**`, "", e.tip];
     // A second stated need gets its own section rather than being dropped. Two
     // people at one table with different requirements is the common case, and
     // answering one of them reads as not having listened to the other.
@@ -457,7 +466,7 @@ export const findForeignerFriendlyStore: ToolDef = {
     let nearby: string[] = [];
     if (hasPoiProvider()) {
       try {
-        const coord = here ?? resolvePlaceCoord(area);
+        const coord = resolvePlaceCoord(area);
         const places = await searchForeignerPois({
           area,
           query: e.query,
@@ -465,9 +474,6 @@ export const findForeignerFriendlyStore: ToolDef = {
           limit: 5,
           // An essential is wanted close, not good — see PoiSearchOptions.
           nearestFirst: true,
-          ...(here ? { around: here } : {}),
-          // Even for a named area, how far each one is from the traveller.
-          ...(getHere() ? { from: getHere() } : {}),
         });
         nearby = renderNearby(places, e.query, need);
       } catch {

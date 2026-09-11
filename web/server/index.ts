@@ -6,7 +6,9 @@ import { ENV, hasKey } from "../../src/lib/env.js";
 import { warmUpSources, warmCoursePool, warmCorpus } from "../../src/lib/warmup.js";
 import { corpusSize, corpusEmbedded } from "../../src/lib/retrieval.js";
 import { trippedHosts } from "../../src/lib/http.js";
-import { parseHere } from "../../src/lib/hereContext.js";
+import { sightsFile, warmSightsIndex } from "../../src/lib/sources/sightsIndex.js";
+import { trainBoard } from "../../src/lib/sources/trainBoard.js";
+import { normalizeLang, getPlaceDetail } from "../../src/lib/sources/tourapi.js";
 import { warmCityList } from "../../src/lib/sources/tago.js";
 import { CATALOG } from "./catalog.js";
 import { handleChat, type ChatRequest } from "./orchestrator.js";
@@ -68,9 +70,9 @@ app.post("/api/chat", rateLimit, async (req: Request, res: Response) => {
   const messages = body.messages
     .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
     .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }));
-  // The phone's GPS fix, when the traveller allowed it. Used to answer this one
-  // request and dropped with it: never logged, never stored (see logMeta).
-  const here = parseHere((body as { here?: unknown }).here);
+  // Only the conversation and the language are read from the body. Where the
+  // traveller is never comes here — the phone answers "near me" on its own
+  // (src/lib/deviceTask.ts) — and anything else in the body is ignored, unread.
 
   const logMeta = (r: Awaited<ReturnType<typeof handleChat>>): void => {
     // Ops log: tool + timing + engine only — never message text (no PII).
@@ -90,7 +92,7 @@ app.post("/api/chat", rateLimit, async (req: Request, res: Response) => {
     };
     try {
       const response = await handleChat(
-        { messages, uiLang: body.uiLang, here },
+        { messages, uiLang: body.uiLang },
         (e) => send("status", e),
         (d) => send("draft", d),
       );
@@ -104,9 +106,79 @@ app.post("/api/chat", rateLimit, async (req: Request, res: Response) => {
     return;
   }
 
-  const response = await handleChat({ messages, uiLang: body.uiLang, here });
+  const response = await handleChat({ messages, uiLang: body.uiLang });
   logMeta(response);
   res.json(response);
+});
+
+/* ------------------------ the same copy for everyone ------------------------- */
+// What the phone needs to answer "near me" by itself. Each is one file that
+// every visitor gets, identical whoever asks and from wherever, so asking for
+// it says nothing about where anyone is.
+
+/** Gzip when the browser takes it — these are the two biggest things we send. */
+function sendJson(req: Request, res: Response, b: { json: Buffer; gzip: Buffer }, cache: string): void {
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", cache);
+  res.setHeader("Vary", "Accept-Encoding");
+  if (/\bgzip\b/.test(String(req.headers["accept-encoding"] ?? ""))) {
+    res.setHeader("Content-Encoding", "gzip");
+    res.end(b.gzip);
+  } else {
+    res.end(b.json);
+  }
+}
+
+// Every train approaching every Seoul station: the phone reads its own station off it.
+app.get("/api/trains", rateLimit, async (req: Request, res: Response) => {
+  const b = await trainBoard().catch(() => undefined);
+  if (!b) {
+    res.status(503).json({ error: "unavailable" });
+    return;
+  }
+  sendJson(req, res, b, "no-cache");
+});
+
+// The tourism board's sights for one language: the phone measures which are near it.
+app.get("/api/sights/:lang", rateLimit, async (req: Request, res: Response) => {
+  const lang = normalizeLang(String(req.params.lang ?? ""));
+  const b = await sightsFile(lang).catch(() => undefined);
+  if (!b) {
+    res.status(503).json({ error: "unavailable" });
+    return;
+  }
+  res.setHeader("ETag", b.etag);
+  if (req.headers["if-none-match"] === b.etag) {
+    res.status(304).end();
+    return;
+  }
+  sendJson(req, res, b, "public, max-age=1800");
+});
+
+// One sight in full — for the phone's "tell me about this one" on a sight it
+// listed. What is asked for is a place the traveller chose, by its id, the same
+// as typing its name; nothing about where they are comes with it.
+app.get("/api/sight/:lang/:id", rateLimit, async (req: Request, res: Response) => {
+  const id = String(req.params.id ?? "");
+  const type = String(req.query.type ?? "");
+  if (!/^\d{1,10}$/.test(id) || (type && !/^\d{1,3}$/.test(type))) {
+    res.status(400).json({ error: "bad_request" });
+    return;
+  }
+  const detail = await getPlaceDetail(id, normalizeLang(String(req.params.lang ?? "")), type || undefined).catch(() => undefined);
+  if (!detail) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  res.setHeader("Cache-Control", "public, max-age=1800");
+  res.json(detail);
+});
+
+// The Kakao Maps JavaScript key, for the phone's own nearby searches. Public by
+// design: Kakao only honours it from the domains registered for it.
+app.get("/api/client-config", (_req: Request, res: Response) => {
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.json({ kakaoJsKey: (process.env.KAKAO_JS_KEY ?? "").trim() });
 });
 
 app.get("/healthz", (_req: Request, res: Response) => {
@@ -196,6 +268,8 @@ app.listen(port, () => {
     warmUpSources();
     warmCorpus();
     warmCoursePool();
+    // After the rest has settled: a few dozen tourism-API pages, once a day.
+    setTimeout(() => void warmSightsIndex(), 20_000).unref();
   } catch {
     /* best-effort warmup */
   }

@@ -15,17 +15,15 @@ import { getStationArrivals } from "../lib/sources/seoulSubway.js";
 import { planDirectBus } from "../lib/sources/busRoute.js";
 import { directionsLinks } from "../lib/maplinks.js";
 import { WHERE_I_AM } from "../lib/here.js";
-import { getHere, isHere, distanceLabel, metresFromHere } from "../lib/hereContext.js";
-import { nearestPlace, nearestStation, stationName } from "../lib/nearest.js";
 import type { Choice } from "../lib/footer.js";
-import type { ToolDef, ToolResult } from "./types.js";
+import type { ToolDef } from "./types.js";
 
 // An origin that means "wherever I am" — shared with the web client, which
 // answers it on the device (src/lib/here.ts).
 export { WHERE_I_AM };
 
 /** Geocode a place: curated index first (instant + accurate), then TourAPI. */
-async function geocode(name: string): Promise<{ lng: number; lat: number } | undefined> {
+export async function geocode(name: string): Promise<{ lng: number; lat: number } | undefined> {
   const curated = resolvePlaceCoord(name);
   if (curated) return { lng: curated.lng, lat: curated.lat };
   const p = await searchTopPlace(name);
@@ -187,7 +185,7 @@ const LANDMARK_STATION: [RegExp, string][] = [
 ];
 
 /** Map a free-text endpoint to a station name the graph knows, if we can. */
-function toStationName(name: string): string {
+export function toStationName(name: string): string {
   for (const [re, station] of LANDMARK_STATION) if (re.test(name)) return station;
   return name;
 }
@@ -217,31 +215,6 @@ async function koreanEndpoint(name: string): Promise<string | undefined> {
   } catch {
     return undefined;
   }
-}
-
-/** City walking pace for a visitor with a bag: about 75 m a minute. */
-const WALK_M_PER_MIN = 75;
-
-/** Under about fifteen minutes on foot, walking beats any transit you would have to wait for. */
-const WALKABLE_M = 1200;
-
-/**
- * Put the walk from where the traveller is standing ahead of the ride.
- *
- * Inserted after the card's first line, the heading, so it reads in the order
- * the trip happens. If there is no walk worth mentioning (standing at the
- * station), the card is returned as it was.
- */
-function withWalkFirst(ride: ToolResult, boardAt: string, metres?: number): ToolResult {
-  const first = ride.content?.[0];
-  if (!first || first.type !== "text" || metres == null || metres < 60) return ride;
-  // A failure card ("⚠️ couldn't find a route") is not a trip to add a walk to.
-  if (first.text.trimStart().startsWith("⚠️")) return ride;
-  const minutes = Math.max(1, Math.round(metres / WALK_M_PER_MIN));
-  const line = `📍 **From where you are:** walk **${distanceLabel(metres)}** (about ${minutes} min) to **${boardAt}**, then:`;
-  const lines = first.text.split("\n");
-  lines.splice(1, 0, "", line);
-  return { ...ride, content: [{ ...first, text: lines.join("\n") }, ...ride.content.slice(1)] };
 }
 
 /** Plan a direct bus between two free-text endpoints, in whatever language. */
@@ -384,45 +357,13 @@ export const getTransitRoute: ToolDef = {
   },
   handler: async (args) => {
     // "From here", "from my area", "여기서" — the traveller's position, which
-    // this server never learns. Treated as no origin at all, so the answer is
-    // the question that gets them one, rather than an attempt to geocode the
-    // words "my area" into somewhere.
+    // this server is never told. Treated as no origin at all: on the web the
+    // phone plans that route itself (src/lib/deviceTask.ts), and anywhere else
+    // the answer is the question that gets an origin, rather than an attempt to
+    // geocode the words "my area" into somewhere.
     const said = String(args.from ?? "").trim();
     const from = WHERE_I_AM.test(said) ? "" : said;
     const to = String(args.to ?? "").trim();
-
-    // From the traveller's exact position, as a map app plans it: walk to the
-    // nearest station, then the ride. The planners work station to station, so
-    // they are handed the station, and the walk is said first — "690 m, about
-    // 9 minutes" is the part of the trip only the phone could have known.
-    if (isHere(from) && to) {
-      const here = getHere()!;
-      // Close enough to walk, and a map app says so rather than sending someone
-      // 840 m to a station to ride a bus back past where they started.
-      const dest = await geocode(to).catch(() => undefined);
-      const direct = dest ? metresFromHere(dest.lat, dest.lng) : undefined;
-      if (dest && direct != null && direct <= WALKABLE_M) {
-        const minutes = Math.max(1, Math.round(direct / WALK_M_PER_MIN));
-        const walkTo = `https://map.kakao.com/link/to/${encodeURIComponent(to)},${dest.lat},${dest.lng}`;
-        return ok(
-          [
-            `🚶 **Walk to ${to}** — **${distanceLabel(direct)}**, about ${minutes} min from where you are`,
-            "",
-            "That's quicker on foot than waiting for a bus or going down to a platform.",
-            "",
-            `🧭 Walking directions from your location: [Kakao Map](${walkTo})`,
-          ].join("\n"),
-          CHOICES,
-        );
-      }
-      const s = nearestStation(here.lat, here.lng);
-      const boardAt = s && s.metres <= 1500 ? stationName(s.station, "en") : nearestPlace(here.lat, here.lng, "en")?.name;
-      if (boardAt) {
-        const ride = await getTransitRoute.handler({ ...args, from: boardAt });
-        const walk = s && s.metres <= 1500 ? s.metres : nearestPlace(here.lat, here.lng, "en")?.metres;
-        return withWalkFirst(ride, boardAt, walk);
-      }
-    }
 
     // U3: a transit route needs a starting point. If the user only gave a
     // destination (common from chips), ask for the origin instead of failing.

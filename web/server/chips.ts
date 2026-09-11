@@ -13,6 +13,8 @@
  * host-LLM plumbing (D-033) — never shown to web users.
  */
 
+import type { DeviceTask } from "../../src/lib/deviceTask.js";
+
 export interface Chip {
   emoji: string;
   /** English tap-to-send command (self-contained question). */
@@ -20,19 +22,16 @@ export interface Chip {
   /** Korean phrasing, when the tool provided one. */
   cmdKo?: string;
   /**
-   * Not a sentence to send — an action for the client: find where the traveller
-   * is on their own device, put the nearest place's name into `ask` where it
-   * says `{place}`, and send that.
+   * Not a sentence to send — an action for the client: take a GPS fix on the
+   * traveller's own phone and run this task there (src/lib/deviceTask.ts).
    *
    * The button used to be the sentence "From my area to 뱅뱅사거리". The server
-   * cannot know anyone's area — by design, coordinates never leave the phone —
-   * so sending that sentence got the same "where are you starting from?" back,
-   * with the same button under it, forever. The one part of the system that
-   * knows where the traveller is has to be the part that answers. The template
-   * is written here, in the reader's language, so the client needs no idea
-   * what the question was about.
+   * is never told anyone's area, so sending that sentence got the same "where
+   * are you starting from?" back, with the same button under it, forever. The
+   * one part of the system that knows where the traveller is has to be the part
+   * that answers — and nothing it learns comes back here.
    */
-  locate?: { ask: string };
+  locate?: { task: DeviceTask };
 }
 
 export interface ParsedToolMarkdown {

@@ -158,15 +158,28 @@ export function parsePlaces(json: TourApiResponse, lang: Lang = "en"): Place[] {
   });
 }
 
+/** A raw item and page, for the listings the phone keeps a copy of (sightsIndex.ts). */
+export type { RawItem as TourRawItem, TourApiResponse };
+
+/** The request URL for one TourAPI operation. */
+export function tourUrl(operation: string, params: Record<string, string>, lang: Lang): string {
+  return buildUrl(operation, params, lang);
+}
+
 function buildUrl(operation: string, params: Record<string, string>, lang: Lang): string {
+  // Paging and ordering belong to the list operations. The *Service2 gateway
+  // rejects them on a detail lookup outright — "INVALID_REQUEST_PARAMETER_ERROR
+  // (arrange)" — which is how detailIntro2 came to return no opening hours for
+  // anything, silently, from the day the services moved to version 2.
+  const list: Record<string, string> = /^detail/.test(operation)
+    ? {}
+    : { numOfRows: "8", pageNo: "1", arrange: "O" }; // by title (the *Service2 GW rejects listYN — verified live)
   const sp = new URLSearchParams({
     serviceKey: ENV.TOUR_API_KEY,
     MobileOS: "ETC",
     MobileApp: MOBILE_APP,
     _type: "json",
-    numOfRows: "8",
-    pageNo: "1",
-    arrange: "O", // by title (the *Service2 GW rejects listYN — verified live)
+    ...list,
     ...params,
   });
   return `${API_HOST}/${SERVICE[lang]}/${operation}?${sp.toString()}`;
@@ -330,6 +343,77 @@ export async function getPlaceIntro(
       hours: firstField(raw, HOURS_FIELDS),
       closedDays: firstField(raw, CLOSED_FIELDS),
       contact: firstField(raw, CONTACT_FIELDS),
+    };
+  });
+}
+
+/** One listing in full: what it is, when it is open, where it is. */
+export interface PlaceDetail {
+  title: string;
+  overview?: string;
+  address?: string;
+  image?: string;
+  homepage?: string;
+  hours?: string;
+  closedDays?: string;
+  contact?: string;
+  lat?: number;
+  lng?: number;
+}
+
+const detailCache = new TtlCache<PlaceDetail | undefined>(30 * 60_000);
+
+/** TourAPI text carries HTML — line breaks, links, entities. */
+function plain(s?: string): string | undefined {
+  const t = (s ?? "")
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return t || undefined;
+}
+
+/** A few sentences, cut where a sentence ends rather than mid-word. */
+function firstSentences(text: string | undefined, max = 420): string | undefined {
+  if (!text || text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("다. "), cut.lastIndexOf("。"), cut.lastIndexOf("! "));
+  return end > max * 0.5 ? cut.slice(0, end + 1).trim() : `${cut.replace(/\s+\S*$/, "")}…`;
+}
+
+/**
+ * One listing, in detail — detailCommon2 for what it is, detailIntro2 for when
+ * it is open. For the phone's "tell me about this one" on a sight it listed:
+ * the id is exact, so there is no search to get wrong.
+ */
+export async function getPlaceDetail(contentId: string, language: Lang, contentTypeId?: string): Promise<PlaceDetail | undefined> {
+  return detailCache.getOrLoad(`detail:${language}:${contentId}`, async () => {
+    const json = await fetchJson<{ response?: { body?: { items?: { item?: unknown } | "" } } }>(
+      buildUrl("detailCommon2", { contentId }, language),
+    );
+    const node = json.response?.body?.items;
+    const item = node ? (node as { item?: unknown }).item : undefined;
+    const raw = (Array.isArray(item) ? item[0] : item) as Record<string, string> | undefined;
+    if (!raw?.title) return undefined;
+    const type = contentTypeId || raw.contenttypeid;
+    const intro = type ? await getPlaceIntro(contentId, type, language).catch(() => ({}) as PlaceIntro) : ({} as PlaceIntro);
+    const homepage = /href="([^"]+)"/.exec(raw.homepage ?? "")?.[1] ?? plain(raw.homepage);
+    return {
+      title: cleanTitle(raw.title, "ko"),
+      overview: firstSentences(plain(raw.overview)),
+      address: plain([raw.addr1, raw.addr2].filter(Boolean).join(" ")),
+      // The image host serves https too; an http image on an https page is blocked or warned about.
+      image: (raw.firstimage?.trim() || raw.firstimage2?.trim() || "").replace(/^http:\/\//, "https://") || undefined,
+      homepage: homepage && /^(https?:\/\/|www\.|[a-z0-9-]+\.[a-z]{2,})/i.test(homepage) ? homepage : undefined,
+      hours: plain(intro.hours),
+      closedDays: plain(intro.closedDays),
+      contact: plain(intro.contact),
+      lat: raw.mapy ? Number(raw.mapy) : undefined,
+      lng: raw.mapx ? Number(raw.mapx) : undefined,
     };
   });
 }

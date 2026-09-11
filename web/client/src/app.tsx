@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { sendChat, type ChatTurn, type Chip, type Here, type Lang, type PlaceImage, type StatusEvent } from "./api.js";
+import { sendChat, type ChatTurn, type Chip, type Lang, type PlaceImage, type StatusEvent } from "./api.js";
 import { STRINGS, SCENARIOS, SOURCE_CREDITS, TOOL_EMOJI, detectDefaultLang, type Scenario } from "./i18n.js";
 import { renderMarkdown } from "./markdown.js";
 import { asksNearMe, asksFromHere } from "../../../src/lib/here.js";
+import type { DeviceTask } from "../../../src/lib/deviceTask.js";
 import { Mascot, mascotEnabled, MASCOT_CREDIT } from "./mascot.js";
 import { Haru, HARU_CREDIT } from "./haru.js";
 
@@ -14,6 +15,21 @@ interface Msg {
   images?: PlaceImage[];
   isMarkdown?: boolean;
   isError?: boolean;
+  /**
+   * Set on anything worked out from where the traveller is — a card the phone
+   * drew, a button that asked it to. What the server's copy of the conversation
+   * reads instead, because the card itself says where they are.
+   */
+  local?: string;
+  /** The places a phone-drawn list showed, so "the second one" can be read back here. */
+  places?: import("./device/card.js").Listed[];
+}
+
+/** The phone's own GPS fix. It is used on this device and never sent to our server. */
+interface Fix {
+  lat: number;
+  lng: number;
+  accuracy?: number;
 }
 
 const STORE_KEY = "ktc.msgs.v1";
@@ -26,9 +42,15 @@ function formatMetres(m: number): string {
 }
 
 /** A pin at the exact spot, opened in Kakao Map — "where does it think I am?" answered at a glance. */
-function pinLink(h: Here): string {
+function pinLink(h: Fix): string {
   return `https://map.kakao.com/link/map/${encodeURIComponent("📍")},${h.lat},${h.lng}`;
 }
+
+/** The work for "here", loaded the first time it is needed. */
+const device = () => import("./device/run.js");
+
+/** What a tapped location button leaves in the server's copy — nothing about where. */
+const TAPPED_ON_DEVICE = "(Tapped a button that is answered on the phone itself.)";
 const LANGS: { value: Lang; label: string }[] = [
   { value: "en", label: "EN" },
   { value: "ko", label: "한국어" },
@@ -70,7 +92,7 @@ export function App() {
       return false;
     }
   });
-  const [fix, setFix] = useState<(Here & { at: number }) | null>(null);
+  const [fix, setFix] = useState<(Fix & { at: number }) | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const t = STRINGS[lang];
 
@@ -100,8 +122,10 @@ export function App() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [msgs, busy, statusText]);
 
+  // What the server sees of the conversation: every turn, except that anything
+  // worked out from where the traveller is reads as a note that it happened.
   const history: ChatTurn[] = useMemo(
-    () => msgs.map((m) => ({ role: m.role, content: m.content })),
+    () => msgs.map((m) => ({ role: m.role, content: m.local ?? m.content })),
     [msgs],
   );
 
@@ -124,7 +148,7 @@ export function App() {
    * and the network-only estimate a phone gives by default can be off by a
    * kilometre — enough to put the traveller in the next neighbourhood.
    */
-  async function getFix(): Promise<(Here & { at: number }) | null> {
+  async function getFix(): Promise<(Fix & { at: number }) | null> {
     if (!("geolocation" in navigator)) return null;
     if (fix && Date.now() - fix.at < FIX_FRESH_MS) return fix;
     const pos = await new Promise<GeolocationPosition | null>((resolve) =>
@@ -156,17 +180,17 @@ export function App() {
   }
 
   /** A fix good enough to answer "near me" from, or nothing. */
-  const usable = (f: Here | null): Here | undefined =>
+  const usable = (f: Fix | null): Fix | undefined =>
     f && (f.accuracy ?? 0) <= USABLE_ACCURACY_M ? { lat: f.lat, lng: f.lng, accuracy: f.accuracy } : undefined;
 
   /** Why we could not use the position, when we could not. */
-  function whyNot(f: Here | null): string {
+  function whyNot(f: Fix | null): string {
     if (!f) return t.locationNeedsTyping;
     return t.locationImprecise.replace("{accuracy}", formatMetres(f.accuracy ?? 0));
   }
 
   /** Get the position, showing that we are doing so. */
-  async function lookUp(): Promise<(Here & { at: number }) | null> {
+  async function lookUp(): Promise<(Fix & { at: number }) | null> {
     setBusy(true);
     setStatusText(t.findingYou);
     try {
@@ -188,29 +212,88 @@ export function App() {
   }
 
   /**
-   * Send what the traveller typed, from where they are when that matters.
+   * Work out the answer from where the traveller is — on this phone, from its
+   * own fix (src/lib/deviceTask.ts). Undefined when it cannot: no usable fix,
+   * or the work failed; the caller then shows what the server sent instead.
+   */
+  async function onThisPhone(task: DeviceTask, f: Fix | null): Promise<Msg | undefined> {
+    const at = usable(f);
+    if (!at) return undefined;
+    try {
+      const { runTask } = await device();
+      const card = await runTask(task, at, lang);
+      return {
+        role: "assistant",
+        content: card.markdown,
+        chips: card.chips,
+        images: card.images,
+        isMarkdown: true,
+        local: card.local,
+        places: card.places,
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** The places the last phone-drawn list showed, for "the second one". */
+  function lastPlaces(): Msg["places"] {
+    const last = [...msgs].reverse().find((m) => m.role === "assistant");
+    return last?.places;
+  }
+
+  /**
+   * Send what the traveller typed.
    *
-   * With location on, every question carries the position — so "how do I get
-   * to Myeongdong" starts from them without asking. With it off, a question that
-   * is about "here" ("where is the nearest pharmacy", "내 주변 맛집") asks the
-   * phone first, which is the moment the browser asks permission.
+   * A question about "here" ("where is the nearest pharmacy", "내 주변 맛집")
+   * starts the phone's GPS as it is sent — the moment the browser asks
+   * permission, if it has not — and the server, which is never told where they
+   * are, answers with the work for the phone to do. With location on, a route
+   * with no start ("how do I get to Myeongdong") starts from them the same way.
    */
   async function ask(text: string) {
     const trimmed = text.trim();
     if (!trimmed || busy) return;
     const aboutHere = asksNearMe(trimmed) || asksFromHere(trimmed);
-    if (!sharing && !aboutHere) return send(trimmed);
-    setInput("");
-    const f = aboutHere ? await lookUp() : await getFix();
-    const here = usable(f);
-    await send(trimmed, aboutHere && !here ? whyNot(f) : undefined, here);
+    // "The second one" after a list the phone drew: the phone answers it when
+    // it can (the way there, or the sight in full), and names it when it cannot.
+    const places = lastPlaces();
+    if (places) {
+      const d = await device();
+      const task = d.pickedTask(trimmed, places);
+      if (task) return void onPhone(trimmed, task);
+      return void send(d.pickedPlace(trimmed, places), aboutHere || sharing ? getFix() : undefined, aboutHere);
+    }
+    await send(trimmed, aboutHere || sharing ? getFix() : undefined, aboutHere);
   }
 
-  async function send(text: string, note?: string, here?: Here) {
+  /**
+   * An exchange that happens on the phone alone: their words (or the button's)
+   * as a bubble, the fix, the card. `local` is what the server's copy of the
+   * conversation reads for their side of it.
+   */
+  async function onPhone(said: string, task: DeviceTask, local?: string) {
+    setInput("");
+    const f = await lookUp();
+    if (!usable(f)) return setNotice(whyNot(f));
+    const mine: Msg = { role: "user", content: said, ...(local ? { local } : {}) };
+    setMsgs((prev) => [...prev, mine]);
+    setBusy(true);
+    setStatusText(t.findingYou);
+    try {
+      const drawn = await onThisPhone(task, f);
+      setMsgs((prev) => [...prev, drawn ?? { role: "assistant", content: t.networkError, isError: true, chips: [] }]);
+    } finally {
+      setBusy(false);
+      setStatusText(null);
+    }
+  }
+
+  async function send(text: string, fixing?: Promise<(Fix & { at: number }) | null>, aboutHere = false) {
     const trimmed = text.trim();
     if (!trimmed || busy) return;
     setInput("");
-    setNotice(note ?? null);
+    setNotice(null);
     const nextMsgs: Msg[] = [...msgs, { role: "user" as const, content: trimmed }];
     setMsgs(nextMsgs);
     setBusy(true);
@@ -222,8 +305,18 @@ export function App() {
         lang,
         (e) => setStatusText(statusLabel(e)),
         (d) => setDraft(d),
-        here,
       );
+      if (res.device && fixing) {
+        setDraft(null);
+        setStatusText(t.findingYou);
+        const f = await fixing;
+        const drawn = await onThisPhone(res.device, f);
+        if (drawn) {
+          setMsgs([...nextMsgs, drawn]);
+          return;
+        }
+        if (aboutHere) setNotice(whyNot(f));
+      }
       const content = res.toolMarkdown ?? res.reply ?? "";
       setMsgs([
         ...nextMsgs,
@@ -266,29 +359,24 @@ export function App() {
    * A button that needs to know where the traveller is.
    *
    * Runs inside the tap, so the browser's location prompt follows a gesture the
-   * person actually made. The server wrote the question, in their language, with
-   * a hole where the place goes; the phone fills it with the nearest station and
-   * sends it. Nothing precise enough to call "here", and it asks them to type,
-   * rather than repeating the question they just tapped past.
+   * person actually made. The task came from the server, which never knew where
+   * they are; the phone runs it from its own fix and draws the answer, and
+   * nothing it finds goes back. Without a fix precise enough to call "here", it
+   * asks them to type, rather than repeating the question they just tapped past.
    */
   async function tapChip(c: Chip) {
     if (busy) return;
-    if (!c.locate?.ask) return void send(chipText(c), undefined, sharing ? usable(fix) : undefined);
-    const f = await lookUp();
-    const here = usable(f);
-    if (!here) return setNotice(whyNot(f));
-    // The question the server wrote, with "my current location" where the place
-    // goes; the position itself travels alongside it.
-    await send(c.locate.ask.replace("{place}", t.myLocation), undefined, here);
+    const task = c.locate?.task;
+    if (!task) return void ask(chipText(c));
+    // The button's words can name a station near them ("Next trains at
+    // Yangjae"), so the server's copy reads only that a button was tapped.
+    await onPhone(`${c.emoji} ${chipText(c)}`, task, TAPPED_ON_DEVICE);
   }
 
   /** The 📍 button: what is around the traveller, from exactly where they are. */
   async function nearMe() {
     if (busy) return;
-    const f = await lookUp();
-    const here = usable(f);
-    if (!here) return setNotice(whyNot(f));
-    await send(t.nearMeQuery, undefined, here);
+    await ask(t.nearMeQuery);
   }
 
   const lastAssistantIdx = (() => {

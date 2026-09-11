@@ -16,7 +16,6 @@ import { fetchJson } from "../http.js";
 import { TtlCache } from "../cache.js";
 import { romanizeHangul } from "../romanize.js";
 import { resolvePlaceCoord } from "../places.js";
-import { nearestStation } from "../nearest.js";
 
 export interface PoiPlace {
   name: string;
@@ -24,11 +23,9 @@ export interface PoiPlace {
   category?: string;
   tel?: string;
   source: "naver" | "foursquare";
-  /** WGS84, when the provider gave it — what makes "250 m from you" possible. */
+  /** WGS84, when the provider gave it. */
   lat?: number;
   lng?: number;
-  /** From the traveller, when the request knows where they are. */
-  metres?: number;
 }
 
 /** A coordinate inside Korea, or nothing — providers occasionally return 0,0. */
@@ -216,27 +213,6 @@ export interface PoiSearchOptions {
    * the caller's choice.
    */
   nearestFirst?: boolean;
-  /**
-   * Search around this exact point — the traveller's GPS fix — the way a map app
-   * does: results within walking distance of *them*, each with its distance,
-   * nearest first. Without it, "near me" meant "near the nearest station", and
-   * someone 690 m from Yangjae Station got Yangjae Station's surroundings.
-   */
-  around?: { lat: number; lng: number };
-  /** Measure each result's distance from here (the traveller), even for a named area. */
-  from?: { lat: number; lng: number };
-}
-
-/** A walk, not a trip: beyond this, "near you" has stopped being true. */
-const AROUND_RADIUS_M = 1500;
-
-function metresBetween(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
-  const R = 6371000;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
-  const h =
-    Math.sin(dLat / 2) ** 2 + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-  return Math.round(2 * R * Math.asin(Math.sqrt(h)));
 }
 
 /** The Korean name of a place we can locate — what a Korean search engine understands. */
@@ -252,7 +228,6 @@ function koreanPlaceName(area?: string): string | undefined {
  * Returns [] if no provider key is configured (caller falls back to TourAPI).
  */
 export async function searchForeignerPois(opts: PoiSearchOptions): Promise<PoiPlace[]> {
-  if (opts.around) return searchAround(opts, opts.around);
   const what = (opts.query ?? "restaurant").trim();
   const limit = opts.limit ?? 5;
   const key = `poi:${opts.area}:${what}:${opts.nativeQuery ?? ""}:${opts.nearestFirst ? "near" : "best"}`;
@@ -288,59 +263,7 @@ export async function searchForeignerPois(opts: PoiSearchOptions): Promise<PoiPl
     // TODO(visitseoul): when VISITSEOUL_API_KEY is live, merge its (natively
     // multilingual) results here and dedupe for richer combined output (D-010).
   });
-  const out = demoteFranchises(denoise(places), what).slice(0, limit);
-  // Copies, so a distance measured for one traveller never sits in the cache.
-  return opts.from ? out.map((p) => (p.lat != null && p.lng != null ? { ...p, metres: metresBetween(opts.from!, { lat: p.lat, lng: p.lng }) } : p)) : out;
-}
-
-/**
- * What is near this exact point, the way a map app lists it.
- *
- * Both providers, because each is good at half of it: Foursquare searches by
- * coordinate and sorts by distance, and has English names; Naver has the deep
- * Korean coverage but searches text, so it is asked about the nearest station
- * by name and its results are then measured and held to walking distance —
- * text search alone will happily return a branch across the river. Merged,
- * measured from the traveller, anything beyond a walk dropped, nearest first.
- */
-async function searchAround(opts: PoiSearchOptions, at: { lat: number; lng: number }): Promise<PoiPlace[]> {
-  const what = (opts.query ?? "restaurant").trim();
-  const limit = opts.limit ?? 5;
-  // Three decimals is about a hundred metres: close enough to share a cached
-  // answer, far enough apart that two people across town never do.
-  const key = `poi-around:${at.lat.toFixed(3)},${at.lng.toFixed(3)}:${what}:${opts.nativeQuery ?? ""}`;
-  const naverOk = hasKey("NAVER_CLIENT_ID") && hasKey("NAVER_CLIENT_SECRET");
-  const fsqOk = hasKey("FOURSQUARE_API_KEY");
-
-  const found = await cache.getOrLoad(key, async () => {
-    const station = nearestStation(at.lat, at.lng);
-    const stationKo = station ? `${station.station.k}역` : undefined;
-    const nativeKo = (opts.nativeQuery ?? "").trim();
-    const naverWhat = /[가-힣]/.test(nativeKo) ? nativeKo : what;
-    const runs = await Promise.allSettled([
-      fsqOk ? foursquareSearch(at.lat, at.lng, what, true) : Promise.resolve([]),
-      naverOk && stationKo ? naverSearch(`${stationKo} ${naverWhat}`) : Promise.resolve([]),
-    ]);
-    return runs.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
-  });
-
-  const measured = denoise(found)
-    .filter((p): p is PoiPlace & { lat: number; lng: number } => p.lat != null && p.lng != null)
-    .map((p) => ({ ...p, metres: metresBetween(at, { lat: p.lat, lng: p.lng }) }))
-    .filter((p) => p.metres <= AROUND_RADIUS_M);
-  // Nearest first is what "near me" means. For food the chains still go last,
-  // among the places within the same walk.
-  const sorted = measured.sort((a, b) => a.metres - b.metres);
-  // The same shop, reported by both providers: same Korean name, a few dozen
-  // metres apart. Keep the first — the nearer report.
-  const seen: { name: string; lat: number; lng: number }[] = [];
-  const unique = sorted.filter((p) => {
-    const name = (/\(([^)]*[가-힣][^)]*)\)\s*$/.exec(p.name)?.[1] ?? p.name).replace(/\s+/g, "");
-    if (seen.some((s) => s.name === name && metresBetween(s, p) < 60)) return false;
-    seen.push({ name, lat: p.lat, lng: p.lng });
-    return true;
-  });
-  return demoteFranchises(unique, what).slice(0, limit);
+  return demoteFranchises(denoise(places), what).slice(0, limit);
 }
 
 /**

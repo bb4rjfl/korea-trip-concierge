@@ -1,10 +1,9 @@
 /**
- * "Where am I" on the phone — loaded only the first time location is used.
+ * "Where am I" on the phone, in words — the nearest station or landmark.
  *
- * The station table is most of this chunk (26 KB compressed), and a visitor on
- * roaming data who never asks "near me" should not pay for it. The phone uses
- * it to say, in words, roughly where the fix is ("near Yangjae Station"); the
- * answer itself is built on the server from the exact coordinates.
+ * The phone's answers to "near me" are worked out on the phone itself
+ * (device/), from the same station table; this names the nearest place for
+ * anything that wants to say roughly where the fix is.
  */
 
 import { findPlaceInText } from "../../../src/lib/places.js";

@@ -9,10 +9,10 @@
  *   "is there a convenience store near me"   → "🏪 Convenience store in me"
  *   "내 주변 맛집"                              → the welcome message
  *
- * The phone now answers "where" itself, from GPS, against a table of every
- * station it carries — and sends only the nearest name. These tests hold both
- * halves: that the phone's answer is close to where a person is actually
- * standing, and that the server never has to guess.
+ * The phone now answers these itself, from its own GPS fix: the server reads
+ * what they are after and hands back the search to run (src/lib/deviceTask.ts),
+ * and is never told where they are. These tests hold the server's half; the
+ * phone's half is in on_device.test.ts.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -129,28 +129,30 @@ describe("the phone's answer to 'where am I'", () => {
   });
 });
 
-describe("the server, when the phone could not say where", () => {
+describe("the server, asked about 'near me'", () => {
   beforeAll(() => {
     delete process.env.GEMINI_API_KEY;
   });
 
-  const asked = [
-    "where is the nearest pharmacy",
-    "what is around me",
-    "is there a convenience store near me",
-    "내 주변 맛집",
+  // What each question is after — the part the server can know without being told where.
+  const asked: [string, string, string?][] = [
+    ["where is the nearest pharmacy", "nearby", "pharmacy"],
+    ["what is around me", "sights"],
+    ["is there a convenience store near me", "nearby", "convenience"],
+    ["내 주변 맛집", "nearby", "food"],
   ];
-  for (const q of asked) {
-    it(`asks where they are for "${q}", with a button that finds out`, async () => {
+  for (const [q, kind, need] of asked) {
+    it(`hands "${q}" to the phone as a ${need ?? kind} search, and asks only if the phone cannot`, async () => {
       const res = await handleChat({ messages: [{ role: "user", content: q }], uiLang: /[가-힣]/.test(q) ? "ko" : "en" });
+      expect(res.device?.kind).toBe(kind);
+      if (need) expect(res.device?.kind === "nearby" && res.device.need).toBe(need);
       const text = res.reply ?? res.toolMarkdown ?? "";
       // Neither of the two old failures.
       expect(text).not.toMatch(/in me\b/i);
       expect(text).not.toMatch(/Korea trip concierge|컨시어지입니다/i);
-      // The phone re-asks the traveller's own question, with its position
-      // travelling alongside it.
+      // The fallback question's 📍 button runs the same search on the phone.
       const here = res.chips.find((c) => c.locate);
-      expect(here?.locate?.ask).toBe(q);
+      expect(here?.locate?.task).toEqual(res.device);
     });
   }
 
@@ -158,6 +160,7 @@ describe("the server, when the phone could not say where", () => {
     const q = withPlace("where is the nearest pharmacy", "Mangwon Station", "en");
     const res = await handleChat({ messages: [{ role: "user", content: q }], uiLang: "en" });
     expect(res.reply ?? "").not.toMatch(/Where are you right now/);
+    expect(res.device).toBeUndefined();
   });
 
   it("offers a neighbourhood already talked about, without assuming they are in it", async () => {

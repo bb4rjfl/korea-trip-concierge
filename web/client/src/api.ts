@@ -1,13 +1,15 @@
 /** Thin client for the stateless chat API. */
 
+import type { DeviceTask } from "../../../src/lib/deviceTask.js";
+
 export type Lang = "en" | "ja" | "zh" | "ko";
 
 export interface Chip {
   emoji: string;
   cmdEn: string;
   cmdKo?: string;
-  /** Find the traveller on this device, put the nearest place into `ask` at `{place}`, send that. */
-  locate?: { ask: string };
+  /** Not a question to send: take a GPS fix on this phone and run this task here (src/lib/deviceTask.ts). */
+  locate?: { task: DeviceTask };
 }
 
 export interface ChatTurn {
@@ -25,6 +27,8 @@ export interface ChatApiResponse {
   toolMarkdown?: string;
   images?: PlaceImage[];
   chips: Chip[];
+  /** Work for this phone when the answer depends on where the traveller is; the rest is the fallback. */
+  device?: DeviceTask;
   meta: { tool?: string; lang: Lang; engine: string; ms: number };
 }
 
@@ -35,20 +39,12 @@ export type StatusEvent = { stage: "routing" } | { stage: "tool"; tool: string }
  * `result` frame carries the same payload as the plain JSON API. Falls back
  * transparently to JSON when the server doesn't stream.
  */
-/** The phone's GPS fix, sent with a question when the traveller has allowed it. */
-export interface Here {
-  lat: number;
-  lng: number;
-  accuracy?: number;
-}
-
 export async function sendChat(
   messages: ChatTurn[],
   uiLang: Lang,
   onStatus?: (e: StatusEvent) => void,
   /** Fires with a readable card before its translation lands. */
   onDraft?: (d: { toolMarkdown: string; chips: Chip[] }) => void,
-  here?: Here,
 ): Promise<ChatApiResponse> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 40_000);
@@ -56,7 +52,8 @@ export async function sendChat(
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-      body: JSON.stringify({ messages: messages.slice(-12), uiLang, ...(here ? { here } : {}) }),
+      // The conversation and the language — never where the traveller is.
+      body: JSON.stringify({ messages: messages.slice(-12), uiLang }),
       signal: controller.signal,
     });
     if (res.status === 429) throw new Error("rate_limited");
