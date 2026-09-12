@@ -108,7 +108,7 @@ const ACCESS: Access[] = [
     note: "**Seokguram is up the mountain above Bulguksa.** Bus **12** runs from Bulguksa in about 15 min; from the car park it is a 15 min walk.",
   },
   {
-    keys: /bulguksa|불국사|佛国寺|佛國寺/i,
+    keys: /bulguksa|불국사|仏国寺|佛国寺|佛國寺/i,
     note: "**Bulguksa is outside central Gyeongju.** From Gyeongju Station or the bus terminal, bus **10** or **11** takes about 40 min.",
   },
   // Gangwon. The national bus feed has no stops at all east of the mountains, so

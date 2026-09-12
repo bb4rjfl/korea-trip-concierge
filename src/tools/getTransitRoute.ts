@@ -15,7 +15,7 @@ import { planRegional } from "../lib/regionalSubway.js";
 import { getGraph, lineLabel, planRoute, findStationCodes } from "../lib/sources/subwayGraph.js";
 import { getStationArrivals } from "../lib/sources/seoulSubway.js";
 import { planDirectBus } from "../lib/sources/busRoute.js";
-import { planDirectBusNear } from "../lib/sources/busNational.js";
+import { planDirectBusNear, type NationalBusAttempt, type NationalBusPlan } from "../lib/sources/busNational.js";
 import { directionsLinks } from "../lib/maplinks.js";
 import { WHERE_I_AM } from "../lib/here.js";
 import type { Choice } from "../lib/footer.js";
@@ -278,10 +278,10 @@ async function busBetween(from: string, to: string) {
  * Both ends are geocoded first, because outside the capital a trip is usually
  * named by its landmark and not by a stop.
  */
-async function nationalBusBetween(from: string, to: string) {
+async function nationalBusBetween(from: string, to: string): Promise<NationalBusAttempt> {
   const [a, b] = await Promise.all([geocode(from), geocode(to)]);
-  if (!a || !b) return undefined;
-  return planDirectBusNear({ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng }).catch(() => undefined);
+  if (!a || !b) return { timedOut: false };
+  return planDirectBusNear({ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng }).catch((): NationalBusAttempt => ({ timedOut: false }));
 }
 
 /**
@@ -550,8 +550,8 @@ export const getTransitRoute: ToolDef = {
     // Outside Seoul the same one-bus question is answered from the national feed
     // — the airport bus across Jeju, the kerbside stop at Suwon station. This
     // used to be the one thing only the metered service could do.
-    const country = await nationalBusBetween(from, to).catch(() => undefined);
-    const countryCard = (country: NonNullable<Awaited<ReturnType<typeof nationalBusBetween>>>) => {
+    const country = await nationalBusBetween(from, to).catch((): NationalBusAttempt => ({ timedOut: false }));
+    const countryCard = (country: NationalBusPlan) => {
       // A walk worth mentioning is worth putting in minutes: "1,245 m" is a
       // number, "about 17 min on foot" is a decision. Odongdo really is a walk
       // across the causeway from its stop, and saying so is the answer.
@@ -575,7 +575,7 @@ export const getTransitRoute: ToolDef = {
         CHOICES,
       );
     };
-    if (country) return countryCard(country);
+    if (country.plan) return countryCard(country.plan);
 
     // Where we know how the trip ends — the express bus to Seongsan, the circular
     // bus up Namsan — that is an answer in itself when the routing service has
@@ -592,9 +592,18 @@ export const getTransitRoute: ToolDef = {
      * a map link.
      */
     const secondLook = async () => {
-      const again = country ? undefined : await nationalBusBetween(from, to).catch(() => undefined);
+      const again = country.plan ? undefined : (await nationalBusBetween(from, to).catch((): NationalBusAttempt => ({ timedOut: false }))).plan;
       return again ? countryCard(again) : undefined;
     };
+
+    // Our own planner ran out of time rather than out of buses, and this is a trip
+    // outside Seoul — which is where the metered service is weakest and slowest.
+    // Waiting another four seconds for it turned a five-second answer into an
+    // eleven-second apology. Ask ours again instead; by now it is usually warm.
+    if (country.timedOut) {
+      const again = await secondLook();
+      if (again) return again;
+    }
 
     // The metered routing service is now the last resort, not a requirement:
     // everything above answers without it. Without it and without an answer, say

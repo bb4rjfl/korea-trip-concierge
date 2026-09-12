@@ -88,7 +88,7 @@ export const PLACES: GeoPlace[] = [
   { label: "Yongsan Station", lng: 126.9648, lat: 37.5299, aliases: ["yongsan station", "용산역"] },
   { label: "Suseo Station (SRT)", lng: 127.1043, lat: 37.4874, aliases: ["suseo station", "srt", "수서역"] },
   { label: "Express Bus Terminal (Seoul)", lng: 127.0047, lat: 37.5049, aliases: ["express bus terminal", "고속터미널", "센트럴시티"] },
-  { label: "Busan Station", lng: 129.0417, lat: 35.1151, aliases: ["busan station", "부산역"] },
+  { label: "Busan Station", lng: 129.0417, lat: 35.1151, aliases: ["busan station", "부산역", "釜山駅", "釜山站"] },
   { label: "Singyeongju Station (KTX)", lng: 129.1355, lat: 35.7955, aliases: ["singyeongju", "singyeongju station", "신경주역"] },
   { label: "Jeju Ferry Terminal", lng: 126.5251, lat: 33.5253, aliases: ["jeju ferry", "jeju port", "제주항", "제주여객터미널"] },
   // Jeju's headline sights — the island has no rail, so these are route endpoints.
@@ -122,11 +122,11 @@ export const PLACES: GeoPlace[] = [
   // and land on the hanok village — the destination of the very trip being
   // planned, which then came back as a one-stop bus ride. Coordinates checked
   // against Kakao Local, one by one.
-  { label: "Suwon Station", lng: 127.0001, lat: 37.2658, aliases: ["suwon station", "수원역"] },
-  { label: "Jeonju Station", lng: 127.1618, lat: 35.8499, aliases: ["jeonju station", "전주역"] },
-  { label: "Gyeongju Station (KTX)", lng: 129.139, lat: 35.7984, aliases: ["gyeongju station", "경주역"] },
+  { label: "Suwon Station", lng: 127.0001, lat: 37.2658, aliases: ["suwon station", "수원역", "水原駅", "水原站"] },
+  { label: "Jeonju Station", lng: 127.1618, lat: 35.8499, aliases: ["jeonju station", "전주역", "全州駅", "全州站"] },
+  { label: "Gyeongju Station (KTX)", lng: 129.139, lat: 35.7984, aliases: ["gyeongju station", "경주역", "慶州駅", "庆州站"] },
   { label: "Gangneung Station", lng: 128.8996, lat: 37.7645, aliases: ["gangneung station", "강릉역"] },
-  { label: "Jeongdongjin Station", lng: 129.0327, lat: 37.6914, aliases: ["jeongdongjin", "jeongdongjin station", "정동진", "정동진역"] },
+  { label: "Jeongdongjin Station", lng: 129.0327, lat: 37.6914, aliases: ["jeongdongjin", "jeongdongjin station", "정동진", "정동진역", "正東津", "正东津"] },
   { label: "Yeosu Expo Station", lng: 127.7486, lat: 34.7531, aliases: ["yeosu expo station", "yeosu station", "여수엑스포역", "여수역"] },
   { label: "Andong Station", lng: 128.6749, lat: 36.5745, aliases: ["andong station", "안동역"] },
   { label: "Dongdaegu Station", lng: 128.6284, lat: 35.8793, aliases: ["dongdaegu station", "동대구역"] },
@@ -145,7 +145,6 @@ export const PLACES: GeoPlace[] = [
   { label: "Gongju Station", lng: 127.0968, lat: 36.3325, aliases: ["gongju station", "공주역"] },
   { label: "Namwon Station", lng: 127.3614, lat: 35.4112, aliases: ["namwon station", "남원역"] },
   { label: "Gimcheon(Gumi) Station", lng: 128.181, lat: 36.1135, aliases: ["gimcheon station", "gimcheon-gumi station", "김천구미역", "김천(구미)역"] },
-  { label: "Busan Station", lng: 129.0415, lat: 35.1152, aliases: ["busan station", "부산역"] },
   { label: "Daejeon Station", lng: 127.4346, lat: 36.3323, aliases: ["daejeon station", "대전역"] },
   { label: "Donghae Station", lng: 129.1238, lat: 37.4982, aliases: ["donghae station", "동해역"] },
   // Where an intercity coach actually sets you down, which is rarely the station.
@@ -155,14 +154,14 @@ export const PLACES: GeoPlace[] = [
   // And the places those trips are for. Without a coordinate, a destination can
   // only be searched for by name — which is how "Dongpirang" came back as no
   // answer at all while a bus to it was sitting two streets away.
-  { label: "Bulguksa Temple", lng: 129.3318, lat: 35.7899, aliases: ["bulguksa", "bulguksa temple", "불국사"] },
-  { label: "Andong Hahoe Folk Village", lng: 128.5181, lat: 36.539, aliases: ["hahoe", "hahoe village", "hahoe folk village", "하회마을", "안동하회마을"] },
+  { label: "Bulguksa Temple", lng: 129.3318, lat: 35.7899, aliases: ["bulguksa", "bulguksa temple", "불국사", "仏国寺", "佛国寺", "佛國寺"] },
+  { label: "Andong Hahoe Folk Village", lng: 128.5181, lat: 36.539, aliases: ["hahoe", "hahoe village", "hahoe folk village", "하회마을", "안동하회마을", "河回村", "河回마을"] },
   { label: "Dongpirang Mural Village", lng: 128.4276, lat: 34.8453, aliases: ["dongpirang", "동피랑", "동피랑벽화마을"] },
-  { label: "Odongdo Island", lng: 127.7663, lat: 34.7446, aliases: ["odongdo", "오동도"] },
+  { label: "Odongdo Island", lng: 127.7663, lat: 34.7446, aliases: ["odongdo", "오동도", "梧桐島", "梧桐岛"] },
   { label: "Suncheonman Bay Wetland", lng: 127.5096, lat: 34.8856, aliases: ["suncheonman", "suncheon bay", "순천만", "순천만습지"] },
   { label: "Juknokwon Bamboo Forest", lng: 126.9859, lat: 35.3278, aliases: ["juknokwon", "죽녹원", "담양죽녹원"] },
   { label: "Boseong Green Tea Fields", lng: 127.0779, lat: 34.716, aliases: ["boseong", "boseong green tea", "보성녹차밭"] },
-  { label: "Cheomseongdae", lng: 129.219, lat: 35.8347, aliases: ["cheomseongdae", "첨성대"] },
+  { label: "Cheomseongdae", lng: 129.219, lat: 35.8347, aliases: ["cheomseongdae", "첨성대", "瞻星台", "瞻星臺"] },
   { label: "Donggung Palace and Wolji Pond", lng: 129.227, lat: 35.8348, aliases: ["donggung", "wolji", "anapji", "동궁과월지", "안압지"] },
   { label: "Anmok Beach (Coffee Street)", lng: 128.9483, lat: 37.7723, aliases: ["anmok", "anmok beach", "안목해변", "강릉커피거리"] },
   { label: "Sokcho Tourist & Fishery Market", lng: 128.5902, lat: 38.2045, aliases: ["sokcho market", "속초관광수산시장", "속초중앙시장"] },

@@ -199,22 +199,29 @@ function inSeoul(p: { lat: number; lng: number }): boolean {
 }
 
 /**
- * A trip has to come back while someone is still looking at the screen. The
- * lookups keep running past the deadline on purpose: they fill the cache, so the
- * same question a minute later is instant rather than late twice.
+ * A trip has to come back while someone is still looking at the screen. Cold, the
+ * lookups take one and a half to four and a half seconds; warm they take none, so
+ * the budget is set above the cold case rather than under it. Past it the lookups
+ * are left running on purpose: they fill the cache, so the same question a minute
+ * later is instant rather than late twice.
  */
-const BUDGET_MS = 3500;
+const BUDGET_MS = 5000;
 
-export async function planDirectBusNear(
-  from: { lat: number; lng: number },
-  to: { lat: number; lng: number },
-): Promise<NationalBusPlan | undefined> {
-  if (!ENV.BUS_API_KEY.trim()) return undefined;
-  if (inSeoul(from) && inSeoul(to)) return undefined;
-  return Promise.race([
+/** The plan, or the fact that we ran out of time — which is not the same as "no bus". */
+export interface NationalBusAttempt {
+  plan?: NationalBusPlan;
+  timedOut: boolean;
+}
+
+export async function planDirectBusNear(from: { lat: number; lng: number }, to: { lat: number; lng: number }): Promise<NationalBusAttempt> {
+  if (!ENV.BUS_API_KEY.trim()) return { timedOut: false };
+  if (inSeoul(from) && inSeoul(to)) return { timedOut: false };
+  const late = Symbol("late");
+  const result = await Promise.race([
     planDirectBusNow(from, to),
-    new Promise<undefined>((r) => setTimeout(() => r(undefined), BUDGET_MS).unref?.()),
+    new Promise<typeof late>((r) => setTimeout(() => r(late), BUDGET_MS).unref?.()),
   ]);
+  return result === late ? { timedOut: true } : { plan: result as NationalBusPlan | undefined, timedOut: false };
 }
 
 async function planDirectBusNow(
