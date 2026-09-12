@@ -193,11 +193,34 @@ export function ridesBetween(path: RawRouteStop[], boardId: string, alightId: st
  * One bus, no transfer, between two points — or nothing, which lets the caller
  * fall through to what it knows about the destination.
  */
+/** Seoul is not in the national feed — it has its own, and its own planner. */
+function inSeoul(p: { lat: number; lng: number }): boolean {
+  return p.lat > 37.42 && p.lat < 37.71 && p.lng > 126.76 && p.lng < 127.19;
+}
+
+/**
+ * A trip has to come back while someone is still looking at the screen. The
+ * lookups keep running past the deadline on purpose: they fill the cache, so the
+ * same question a minute later is instant rather than late twice.
+ */
+const BUDGET_MS = 3500;
+
 export async function planDirectBusNear(
   from: { lat: number; lng: number },
   to: { lat: number; lng: number },
 ): Promise<NationalBusPlan | undefined> {
   if (!ENV.BUS_API_KEY.trim()) return undefined;
+  if (inSeoul(from) && inSeoul(to)) return undefined;
+  return Promise.race([
+    planDirectBusNow(from, to),
+    new Promise<undefined>((r) => setTimeout(() => r(undefined), BUDGET_MS).unref?.()),
+  ]);
+}
+
+async function planDirectBusNow(
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number },
+): Promise<NationalBusPlan | undefined> {
   try {
     const [fromStops, toStops] = await Promise.all([stopsNear(from), stopsNear(to)]);
     const walkable = (stops: RawNearStop[], at: { lat: number; lng: number }) => {
