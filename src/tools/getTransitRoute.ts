@@ -654,9 +654,13 @@ export const getTransitRoute: ToolDef = {
       const again = await secondLook();
       if (again) return again;
       if (known) return fromKnowledge();
+      // Say what is true of the trip, not of a service the traveller never asked
+      // about: we found no single train or bus, and the transfer lookup was no
+      // help either. "Couldn't reach the routing service" told them nothing they
+      // could act on.
       return fail(
-        "Couldn't reach the routing service",
-        `The transit routing source didn't respond in time — you can still get there:\n\n${dir}\n\nOr tap Refresh to retry.`,
+        "No direct route found",
+        `I couldn't find one train or one bus that does **${from} → ${to}**, and the transfer lookup didn't answer. This trip probably needs a change — you can still get there:\n\n${dir}\n\nOr tap Refresh to retry.`,
         RETRY,
       );
     }
