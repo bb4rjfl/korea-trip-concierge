@@ -551,7 +551,7 @@ export const getTransitRoute: ToolDef = {
     // — the airport bus across Jeju, the kerbside stop at Suwon station. This
     // used to be the one thing only the metered service could do.
     const country = await nationalBusBetween(from, to).catch(() => undefined);
-    if (country) {
+    const countryCard = (country: NonNullable<Awaited<ReturnType<typeof nationalBusBetween>>>) => {
       // A walk worth mentioning is worth putting in minutes: "1,245 m" is a
       // number, "about 17 min on foot" is a decision. Odongdo really is a walk
       // across the causeway from its stop, and saying so is the answer.
@@ -574,7 +574,8 @@ export const getTransitRoute: ToolDef = {
         ].join("\n"),
         CHOICES,
       );
-    }
+    };
+    if (country) return countryCard(country);
 
     // Where we know how the trip ends — the express bus to Seongsan, the circular
     // bus up Namsan — that is an answer in itself when the routing service has
@@ -582,6 +583,18 @@ export const getTransitRoute: ToolDef = {
     const known = accessLine(to);
     const fromKnowledge = (): ReturnType<typeof ok> =>
       ok([`🚌 **${from} → ${to}**`, "", known, "", dir].join("\n"), CHOICES);
+
+    /**
+     * The bus planner above gives up after a few seconds but leaves its lookups
+     * running, so by the time the routing service has also failed the stops and
+     * routes are usually in hand. Ask it once more before saying we have nothing:
+     * on a freshly started server this is the difference between an answer and
+     * a map link.
+     */
+    const secondLook = async () => {
+      const again = country ? undefined : await nationalBusBetween(from, to).catch(() => undefined);
+      return again ? countryCard(again) : undefined;
+    };
 
     // The metered routing service is now the last resort, not a requirement:
     // everything above answers without it. Without it and without an answer, say
@@ -608,6 +621,8 @@ export const getTransitRoute: ToolDef = {
       }
       const routes = await routesBetween(a, b);
       if (routes.length === 0) {
+        const again = await secondLook();
+        if (again) return again;
         if (known) return fromKnowledge();
         return fail("No transit route found", `No public-transit path from **${from}** to **${to}** was returned.\n\n${dir}`, RETRY);
       }
@@ -627,6 +642,8 @@ export const getTransitRoute: ToolDef = {
       // Dynamic chips: tap a mode to jump into live tracking (journey UX, Phase 1).
       return ok(body, trackChips(options.map((o) => o.route)));
     } catch {
+      const again = await secondLook();
+      if (again) return again;
       if (known) return fromKnowledge();
       return fail(
         "Couldn't reach the routing service",
