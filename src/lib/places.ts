@@ -117,6 +117,55 @@ export const PLACES: GeoPlace[] = [
   { label: "Euljiro", lng: 126.9917, lat: 37.5661, aliases: ["euljiro", "을지로", "hipjiro", "힙지로"] },
   { label: "Seochon", lng: 126.9709, lat: 37.5793, aliases: ["seochon", "서촌"] },
   { label: "Gwangjang Market", lng: 126.9999, lat: 37.5701, aliases: ["gwangjang", "gwangjang market", "광장시장"] },
+  // The stations a trip outside the capital actually starts at. Only the Seoul
+  // network is in the station table above, so "전주역" used to be read as Jeonju
+  // and land on the hanok village — the destination of the very trip being
+  // planned, which then came back as a one-stop bus ride. Coordinates checked
+  // against Kakao Local, one by one.
+  { label: "Suwon Station", lng: 127.0001, lat: 37.2658, aliases: ["suwon station", "수원역"] },
+  { label: "Jeonju Station", lng: 127.1618, lat: 35.8499, aliases: ["jeonju station", "전주역"] },
+  { label: "Gyeongju Station (KTX)", lng: 129.139, lat: 35.7984, aliases: ["gyeongju station", "경주역"] },
+  { label: "Gangneung Station", lng: 128.8996, lat: 37.7645, aliases: ["gangneung station", "강릉역"] },
+  { label: "Jeongdongjin Station", lng: 129.0327, lat: 37.6914, aliases: ["jeongdongjin", "jeongdongjin station", "정동진", "정동진역"] },
+  { label: "Yeosu Expo Station", lng: 127.7486, lat: 34.7531, aliases: ["yeosu expo station", "yeosu station", "여수엑스포역", "여수역"] },
+  { label: "Andong Station", lng: 128.6749, lat: 36.5745, aliases: ["andong station", "안동역"] },
+  { label: "Dongdaegu Station", lng: 128.6284, lat: 35.8793, aliases: ["dongdaegu station", "동대구역"] },
+  { label: "Gwangju Songjeong Station", lng: 126.7908, lat: 35.1377, aliases: ["gwangju songjeong station", "광주송정역"] },
+  { label: "Mokpo Station", lng: 126.3866, lat: 34.7911, aliases: ["mokpo station", "목포역"] },
+  { label: "Suncheon Station", lng: 127.5031, lat: 34.9458, aliases: ["suncheon station", "순천역"] },
+  { label: "Pohang Station", lng: 129.3419, lat: 36.0716, aliases: ["pohang station", "포항역"] },
+  { label: "Ulsan Station (KTX)", lng: 129.1386, lat: 35.5514, aliases: ["ulsan station", "울산역"] },
+  { label: "Chuncheon Station", lng: 127.7167, lat: 37.8845, aliases: ["chuncheon station", "춘천역"] },
+  { label: "Wonju Station", lng: 127.9219, lat: 37.3159, aliases: ["wonju station", "원주역"] },
+  { label: "Jinju Station", lng: 128.1179, lat: 35.1507, aliases: ["jinju station", "진주역"] },
+  { label: "Changwon Jungang Station", lng: 128.7013, lat: 35.2424, aliases: ["changwon jungang station", "창원중앙역"] },
+  { label: "Cheonan-Asan Station", lng: 127.1044, lat: 36.7943, aliases: ["cheonan-asan station", "cheonan asan station", "천안아산역"] },
+  { label: "Osong Station", lng: 127.3276, lat: 36.6201, aliases: ["osong station", "오송역"] },
+  { label: "Iksan Station", lng: 126.9457, lat: 35.9405, aliases: ["iksan station", "익산역"] },
+  { label: "Gongju Station", lng: 127.0968, lat: 36.3325, aliases: ["gongju station", "공주역"] },
+  { label: "Namwon Station", lng: 127.3614, lat: 35.4112, aliases: ["namwon station", "남원역"] },
+  { label: "Gimcheon(Gumi) Station", lng: 128.181, lat: 36.1135, aliases: ["gimcheon station", "gimcheon-gumi station", "김천구미역", "김천(구미)역"] },
+  { label: "Busan Station", lng: 129.0415, lat: 35.1152, aliases: ["busan station", "부산역"] },
+  { label: "Daejeon Station", lng: 127.4346, lat: 36.3323, aliases: ["daejeon station", "대전역"] },
+  { label: "Donghae Station", lng: 129.1238, lat: 37.4982, aliases: ["donghae station", "동해역"] },
+  // Where an intercity coach actually sets you down, which is rarely the station.
+  { label: "Sokcho Intercity Bus Terminal", lng: 128.5908, lat: 38.2112, aliases: ["sokcho bus terminal", "sokcho intercity bus terminal", "속초시외버스터미널"] },
+  { label: "Tongyeong Bus Terminal", lng: 128.4169, lat: 34.8851, aliases: ["tongyeong bus terminal", "통영종합버스터미널"] },
+  { label: "Gyeongju Intercity Bus Terminal", lng: 129.2025, lat: 35.8398, aliases: ["gyeongju bus terminal", "경주시외버스터미널"] },
+  // And the places those trips are for. Without a coordinate, a destination can
+  // only be searched for by name — which is how "Dongpirang" came back as no
+  // answer at all while a bus to it was sitting two streets away.
+  { label: "Bulguksa Temple", lng: 129.3318, lat: 35.7899, aliases: ["bulguksa", "bulguksa temple", "불국사"] },
+  { label: "Andong Hahoe Folk Village", lng: 128.5181, lat: 36.539, aliases: ["hahoe", "hahoe village", "hahoe folk village", "하회마을", "안동하회마을"] },
+  { label: "Dongpirang Mural Village", lng: 128.4276, lat: 34.8453, aliases: ["dongpirang", "동피랑", "동피랑벽화마을"] },
+  { label: "Odongdo Island", lng: 127.7663, lat: 34.7446, aliases: ["odongdo", "오동도"] },
+  { label: "Suncheonman Bay Wetland", lng: 127.5096, lat: 34.8856, aliases: ["suncheonman", "suncheon bay", "순천만", "순천만습지"] },
+  { label: "Juknokwon Bamboo Forest", lng: 126.9859, lat: 35.3278, aliases: ["juknokwon", "죽녹원", "담양죽녹원"] },
+  { label: "Boseong Green Tea Fields", lng: 127.0779, lat: 34.716, aliases: ["boseong", "boseong green tea", "보성녹차밭"] },
+  { label: "Cheomseongdae", lng: 129.219, lat: 35.8347, aliases: ["cheomseongdae", "첨성대"] },
+  { label: "Donggung Palace and Wolji Pond", lng: 129.227, lat: 35.8348, aliases: ["donggung", "wolji", "anapji", "동궁과월지", "안압지"] },
+  { label: "Anmok Beach (Coffee Street)", lng: 128.9483, lat: 37.7723, aliases: ["anmok", "anmok beach", "안목해변", "강릉커피거리"] },
+  { label: "Sokcho Tourist & Fishery Market", lng: 128.5902, lat: 38.2045, aliases: ["sokcho market", "속초관광수산시장", "속초중앙시장"] },
 ];
 
 const INDEX = new Map<string, GeoPlace>();
@@ -258,11 +307,17 @@ export function findPlaceInText(text: string): GeoPlace | undefined {
 export function resolvePlaceCoord(input: string): GeoPlace | undefined {
   const raw = cjkToKorean(input ?? "").trim();
   if (!raw) return undefined;
-  const direct = INDEX.get(raw.toLowerCase()) ?? INDEX.get(normalize(raw));
-  if (direct) return direct;
+  const exact = INDEX.get(raw.toLowerCase());
+  if (exact) return exact;
   // Every station, by exact name in any of our four languages — before the fuzzy
   // pass, because an exact station is surer than a near-miss landmark.
   const station = STATION_INDEX.get(bareStation(raw)) ?? STATION_INDEX.get(bareStation(input ?? ""));
+  // Someone who says "역" or "Station" means the station. Stripping the suffix and
+  // matching what is left sent 수원역 to Hwaseong Haenggung, 1.7 km away and on the
+  // far side of the trip we were being asked to plan.
+  if (station && /(?:\s*(?:station|stn)\.?|[역駅站驛])\s*$/i.test(raw)) return station;
+  const direct = INDEX.get(normalize(raw));
+  if (direct) return direct;
   if (station) return station;
   // Confident fuzzy match only (a wrong geocode would misroute) — else undefined
   // so the caller falls back to TourAPI geocoding.

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
-import { ok, fail, notConnected } from "../lib/responses.js";
+import { ok, fail } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
 import { searchTopPlace } from "../lib/sources/tourapi.js";
 import { geocodePoiName } from "../lib/sources/poi.js";
@@ -15,6 +15,7 @@ import { planRegional } from "../lib/regionalSubway.js";
 import { getGraph, lineLabel, planRoute, findStationCodes } from "../lib/sources/subwayGraph.js";
 import { getStationArrivals } from "../lib/sources/seoulSubway.js";
 import { planDirectBus } from "../lib/sources/busRoute.js";
+import { planDirectBusNear } from "../lib/sources/busNational.js";
 import { directionsLinks } from "../lib/maplinks.js";
 import { WHERE_I_AM } from "../lib/here.js";
 import type { Choice } from "../lib/footer.js";
@@ -233,7 +234,8 @@ export function toStationName(name: string): string {
 /** How the last leg goes, for a destination where it is a bus, a climb or a ferry. */
 function accessLine(to: string): string {
   const a = accessFor(to);
-  return a ? `🧗 ${a.note}` : "";
+  // A climb is worth flagging as one; a train to the coast is not a climb.
+  return a ? `${a.climb ? "🧗" : "🚏"} ${a.note}` : "";
 }
 
 /**
@@ -268,6 +270,18 @@ async function busBetween(from: string, to: string) {
   const [a, b] = await Promise.all([koreanEndpoint(from), koreanEndpoint(to)]);
   if (!a || !b || a === b) return undefined;
   return planDirectBus(a, b).catch(() => undefined);
+}
+
+/**
+ * The same question outside Seoul, on the national bus feed: Jeju's airport bus
+ * to Seongsan, Suwon station to the palace, Jeonju station to the hanok village.
+ * Both ends are geocoded first, because outside the capital a trip is usually
+ * named by its landmark and not by a stop.
+ */
+async function nationalBusBetween(from: string, to: string) {
+  const [a, b] = await Promise.all([geocode(from), geocode(to)]);
+  if (!a || !b) return undefined;
+  return planDirectBusNear({ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng }).catch(() => undefined);
 }
 
 /**
@@ -533,10 +547,31 @@ export const getTransitRoute: ToolDef = {
       );
     }
 
-    if (!hasKey("TRANSIT_API_KEY") || !hasKey("TOUR_API_KEY")) {
-      return notConnected(
-        "Get Public Transit Route",
-        `Source: **ODsay routing** + TourAPI geocoding. Route requested: **${from} → ${to}**.\n\n${dir}`,
+    // Outside Seoul the same one-bus question is answered from the national feed
+    // — the airport bus across Jeju, the kerbside stop at Suwon station. This
+    // used to be the one thing only the metered service could do.
+    const country = await nationalBusBetween(from, to).catch(() => undefined);
+    if (country) {
+      // A walk worth mentioning is worth putting in minutes: "1,245 m" is a
+      // number, "about 17 min on foot" is a decision. Odongdo really is a walk
+      // across the causeway from its stop, and saying so is the answer.
+      const walk = (m: number) => `**${Math.round((m / 1000) * 14)} min on foot** (${m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`})`;
+      return ok(
+        [
+          `🚌 **${from} → ${to}** — one bus, no transfer`,
+          "",
+          `⏱️ about **${country.minutes} min** on the bus · ${country.stops} stops`,
+          "",
+          `🚌 Take bus **${country.routeName}** at **${stationLabel(country.boardAt)}**, get off at **${stationLabel(country.alightAt)}**.`,
+          ...(country.walkToStopM >= 300 ? [`🚶 The stop is about ${walk(country.walkToStopM)} from ${from}.`] : []),
+          ...(country.walkFromStopM >= 300 ? [`🚶 From the stop it is about ${walk(country.walkFromStopM)} to ${to}.`] : []),
+          `Tap your card when you board **and again when you get off** — outside Seoul the fare is by distance, and missing the second tap costs extra.`,
+          ...(accessLine(to) ? [accessLine(to)] : []),
+          "",
+          dir,
+          "",
+          "_Route from national bus open data (ⓒ국토교통부); times are typical, not live._",
+        ].join("\n"),
         CHOICES,
       );
     }
@@ -547,6 +582,19 @@ export const getTransitRoute: ToolDef = {
     const known = accessLine(to);
     const fromKnowledge = (): ReturnType<typeof ok> =>
       ok([`🚌 **${from} → ${to}**`, "", known, "", dir].join("\n"), CHOICES);
+
+    // The metered routing service is now the last resort, not a requirement:
+    // everything above answers without it. Without it and without an answer, say
+    // plainly that we have no route for this pair — calling that a data outage
+    // would be a story about a service the traveller never asked for.
+    if (!hasKey("TRANSIT_API_KEY") || !hasKey("TOUR_API_KEY")) {
+      if (known) return fromKnowledge();
+      return fail(
+        "No single subway or bus for this trip",
+        `I couldn't find one train or one bus that does **${from} → ${to}** — it may need a change, or one of the two places may be spelled differently here. You can still get there:\n\n${dir}`,
+        RETRY,
+      );
+    }
 
     try {
       const [a, b] = await Promise.all([geocode(from), geocode(to)]);

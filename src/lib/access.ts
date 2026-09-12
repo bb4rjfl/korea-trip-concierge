@@ -111,6 +111,21 @@ const ACCESS: Access[] = [
     keys: /bulguksa|불국사|佛国寺|佛國寺/i,
     note: "**Bulguksa is outside central Gyeongju.** From Gyeongju Station or the bus terminal, bus **10** or **11** takes about 40 min.",
   },
+  // Gangwon. The national bus feed has no stops at all east of the mountains, so
+  // for these three places this note is the whole answer, not a footnote to one.
+  {
+    keys: /jeongdongjin|정동진|正東津|正东津/i,
+    note: "**Jeongdongjin is reached by train, not by subway.** From **Gangneung Station** it is about 20 min on the Donghae line — only a handful of trains a day, so check times in the **Korail Talk** app or at the station before you set out.",
+  },
+  {
+    keys: /seorak|설악|雪岳|sinheungsa|신흥사|gwongeumseong|권금성/i,
+    climb: true,
+    note: "**Seoraksan is a mountain park.** From **Sokcho Intercity Bus Terminal**, local bus **7** or **7-1** reaches **Sogongwon**, the park entrance, in about 30–40 min; the cable car to Gwongeumseong goes up from there.",
+  },
+  {
+    keys: /nami\s*island|남이섬|南怡岛|南怡島|ナミ島/i,
+    note: "**Nami Island is reached by ferry.** Take the ITX-Cheongchun or Gyeongchun line to **Gapyeong Station**, then a shuttle bus or taxi about 10 min to the wharf, and the ferry across takes 5 min.",
+  },
 ];
 
 /** How the last leg to a named destination goes, when it is one we know needs telling. */

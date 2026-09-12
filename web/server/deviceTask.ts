@@ -208,6 +208,6 @@ export async function routeTaskFor(to: string): Promise<DeviceTask> {
     ...(dest ? { dest: { lat: dest.lat, lng: dest.lng } } : {}),
     ...(/[가-힣]/.test(station) ? { destStation: station } : {}),
     ...(exit ? { exit } : {}),
-    ...(access ? { access: `🧗 ${access.note}`, ...(access.climb ? { climb: true } : {}) } : {}),
+    ...(access ? { access: `${access.climb ? "🧗" : "🚏"} ${access.note}`, ...(access.climb ? { climb: true } : {}) } : {}),
   };
 }
