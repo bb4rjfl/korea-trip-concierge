@@ -11,11 +11,24 @@ import { detectIntercity, renderIntercity } from "../lib/intercity.js";
 import { normalizeName } from "../lib/fuzzy.js";
 import { exitLine } from "../lib/exits.js";
 import { accessFor } from "../lib/access.js";
-import { planRegional } from "../lib/regionalSubway.js";
+import { planRegional, planRegionalNear, regionalStationsNear } from "../lib/regionalSubway.js";
 import { getGraph, lineLabel, planRoute, findStationCodes } from "../lib/sources/subwayGraph.js";
 import { getStationArrivals } from "../lib/sources/seoulSubway.js";
 import { planDirectBus } from "../lib/sources/busRoute.js";
-import { planDirectBusNear, type NationalBusAttempt, type NationalBusPlan } from "../lib/sources/busNational.js";
+import {
+  doorToDoor,
+  planDirectBusNear,
+  planTransferBusNear,
+  busDataNear,
+  type NationalBusAttempt,
+  type NationalBusPlan,
+} from "../lib/sources/busNational.js";
+import { kakaoKeyword } from "../lib/sources/kakaoLocal.js";
+import { TtlCache } from "../lib/cache.js";
+import { busStopLabel } from "../lib/stopLabel.js";
+import { STATION_WALK_M, metresBetween, planCapitalNear, walkMinutes } from "../lib/stationPlan.js";
+import { stationsNear } from "../lib/nearest.js";
+import type { SubwayRoute } from "../lib/subwayPlan.js";
 import { directionsLinks } from "../lib/maplinks.js";
 import { WHERE_I_AM } from "../lib/here.js";
 import type { Choice } from "../lib/footer.js";
@@ -25,16 +38,54 @@ import type { ToolDef } from "./types.js";
 // answers it on the device (src/lib/here.ts).
 export { WHERE_I_AM };
 
-/** Geocode a place: curated index first (instant + accurate), then TourAPI. */
-export async function geocode(name: string): Promise<{ lng: number; lat: number } | undefined> {
-  const curated = resolvePlaceCoord(name);
-  if (curated) return { lng: curated.lng, lat: curated.lat };
-  const p = await searchTopPlace(name);
-  if (p?.mapx != null && p?.mapy != null) return { lng: p.mapx, lat: p.mapy };
-  // The long tail — a café, a gallery, a shop someone just read off our own list.
-  // The tourism database only holds attractions; local search holds everything.
-  const poi = await geocodePoiName(name);
-  return poi ? { lng: poi.lng, lat: poi.lat } : undefined;
+export interface Located {
+  lat: number;
+  lng: number;
+  /** The place's Korean name, when a source gave one — bus stops are named after it. */
+  ko?: string;
+}
+
+// Only places that were found are kept; a miss is asked again next time.
+const geocodeCache = new TtlCache<Located>(30 * 60_000);
+
+/**
+ * Geocode a place: the curated index first (instant, and checked by hand), then
+ * the sources in the order that suits how the name was written. A Korean name
+ * goes to Kakao Local first — it knows every lane and terminal by the name
+ * Koreans use; a romanized one to the tourism database, which is indexed in
+ * English — and each falls through to the other, then to Naver's local search:
+ * the long tail of cafés and shops someone just read off our own list.
+ */
+export async function geocode(name: string): Promise<Located | undefined> {
+  const q = (name ?? "").trim();
+  if (!q) return undefined;
+  const curated = resolvePlaceCoord(q);
+  if (curated) {
+    const ko = curated.aliases.filter((a) => /[가-힣]/.test(a)).sort((x, y) => y.length - x.length)[0];
+    return { lng: curated.lng, lat: curated.lat, ko };
+  }
+  const hit = geocodeCache.get(q);
+  if (hit) return hit;
+  const kakao = async (): Promise<Located | undefined> => {
+    const k = await kakaoKeyword(q);
+    return k ? { lat: k.lat, lng: k.lng, ko: k.name } : undefined;
+  };
+  const tour = async (): Promise<Located | undefined> => {
+    const p = await searchTopPlace(q);
+    return p?.mapx != null && p?.mapy != null ? { lng: p.mapx, lat: p.mapy } : undefined;
+  };
+  const naver = async (): Promise<Located | undefined> => {
+    const poi = await geocodePoiName(q);
+    return poi ? { lng: poi.lng, lat: poi.lat, ko: /[가-힣]/.test(poi.name) ? poi.name : undefined } : undefined;
+  };
+  for (const source of /[가-힣]/.test(q) ? [kakao, tour, naver] : [tour, kakao, naver]) {
+    const found = await source().catch(() => undefined);
+    if (found) {
+      geocodeCache.set(q, found);
+      return found;
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -281,7 +332,12 @@ async function busBetween(from: string, to: string) {
 async function nationalBusBetween(from: string, to: string): Promise<NationalBusAttempt> {
   const [a, b] = await Promise.all([geocode(from), geocode(to)]);
   if (!a || !b) return { timedOut: false };
-  return planDirectBusNear({ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng }).catch((): NationalBusAttempt => ({ timedOut: false }));
+  return planDirectBusNear(a, b, { toName: koName(to, b) }).catch((): NationalBusAttempt => ({ timedOut: false }));
+}
+
+/** The destination's Korean name: as written, or as a geocoder gave it. */
+function koName(written: string, at?: Located): string | undefined {
+  return /[가-힣]/.test(written) ? written : at?.ko;
 }
 
 /**
@@ -289,18 +345,38 @@ async function nationalBusBetween(from: string, to: string): Promise<NationalBus
  * Returns undefined when the rails can't serve this pair, so the caller falls
  * through to the metered routing API.
  */
-async function trySubwayGraph(from: string, to: string, dir: string) {
+async function trySubwayGraph(from: string, to: string, dir: string, ends?: [Located | undefined, Located | undefined]) {
   try {
     const graph = await getGraph();
-    // The capital's network first, then Busan, Daegu, Gwangju and Daejeon —
-    // our own graphs, before the metered service whose daily allowance runs out.
+    // By name first — a station, or a landmark mapped to one — in the capital's
+    // network, then Busan, Daegu, Gwangju and Daejeon.
+    type RailChoice = { route: SubwayRoute; label?: (ko: string) => string; walkToM?: number; walkFromM?: number };
+    let choice: RailChoice | undefined;
     const seoul = planRoute(graph, toStationName(from), toStationName(to));
-    const elsewhere = seoul ? undefined : planRegional(toStationName(from), toStationName(to));
-    const route = seoul ?? elsewhere;
-    if (!route) return undefined;
-    const regional = !seoul;
+    if (seoul) choice = { route: seoul };
+    else {
+      const elsewhere = planRegional(toStationName(from), toStationName(to));
+      if (elsewhere) choice = { route: elsewhere, label: elsewhere.label };
+    }
+    // Then by where the places are, when the caller knows: the stations within a
+    // walk of each end (src/lib/stationPlan.ts). Not for a climb, which is
+    // reached through its gateway rather than whichever station is nearest.
+    const [a, b] = ends ?? [];
+    if (!choice && a && b && !accessFor(to)?.climb) {
+      const capital = planCapitalNear(graph, a, b);
+      const elsewhere = planRegionalNear(a, b);
+      if (capital && (!elsewhere || capital.minutes <= elsewhere.minutes)) {
+        choice = { route: capital.route, walkToM: capital.walkToM, walkFromM: capital.walkFromM };
+      } else if (elsewhere) {
+        choice = { route: elsewhere.route, label: elsewhere.label, walkToM: elsewhere.walkToM, walkFromM: elsewhere.walkFromM };
+      }
+    }
+    if (!choice) return undefined;
+    const picked = choice;
+    const route = picked.route;
+    const regional = Boolean(picked.label);
     // A city's stations by that city's own names.
-    const station = (ko: string): string => (elsewhere ? elsewhere.label(ko) : stationLabel(ko));
+    const station = (ko: string): string => (picked.label ? picked.label(ko) : stationLabel(ko));
 
     const first = route.legs[0];
     // The live board for the boarding station makes this a real-time answer, not a
@@ -339,13 +415,19 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
     // Arriving at the station is only half of it; the exit is what saves the walk
     // — and for a place up a hill or out along a coast, the bus or cable car from
     // the station is the rest of the trip.
-    const exit = exitLine(to);
+    const exit = exitLine(to, lastLeg.to);
     const access = accessLine(to);
 
-    const lines = route.legs.map((l, i) => {
-      const label = lineLabel(l.line);
-      return `${i === 0 ? "🚇" : "🔁"} **${label}** ${station(l.from)} → ${station(l.to)} _(${l.stops} stop${l.stops === 1 ? "" : "s"})_`;
-    });
+    const onFoot = (m: number) => `about **${walkMinutes(m)} min on foot** (${m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`})`;
+    const lines = [
+      // When the places are not the stations, the walks are part of the answer.
+      ...(picked.walkToM != null && picked.walkToM >= 300 ? [`🚶 Walk ${onFoot(picked.walkToM)} to ${station(first.from)}`] : []),
+      ...route.legs.map((l, i) => {
+        const label = lineLabel(l.line);
+        return `${i === 0 ? "🚇" : "🔁"} **${label}** ${station(l.from)} → ${station(l.to)} _(${l.stops} stop${l.stops === 1 ? "" : "s"})_`;
+      }),
+      ...(picked.walkFromM != null && picked.walkFromM >= 300 ? [`🚶 From ${station(lastLeg.to)}, ${onFoot(picked.walkFromM)} to ${to}`] : []),
+    ];
 
     // Quoting a 7-minute ride at 3am would be a lie: the trains are in the depot.
     const kstHour = new Date(Date.now() + 9 * 3600_000).getUTCHours();
@@ -377,7 +459,7 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
 
     const head =
       `🚇 **${from} → ${to}** — by subway\n\n` +
-      `⏱️ about **${route.minutes} min** · ${route.stops} stops · ` +
+      `⏱️ about **${route.minutes + walkMinutes(picked.walkToM ?? 0) + walkMinutes(picked.walkFromM ?? 0)} min** · ${route.stops} stops · ` +
       `${route.transfers === 0 ? "no transfers" : `${route.transfers} transfer${route.transfers === 1 ? "" : "s"}`} · ` +
       `💳 around **₩${fareWon.toLocaleString()}**${arexNote}${premiumNote}`;
 
@@ -405,6 +487,144 @@ async function trySubwayGraph(from: string, to: string, dir: string) {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * When nothing we hold can plan the trip: say why, and what does work.
+ *
+ * Some cities' buses are not in the national open data at all — Gangneung,
+ * Sokcho, Boseong — and there "no single bus" read as if there were no buses.
+ * Either way the traveller gets the distance, a taxi time and the map links.
+ */
+async function noRoute(from: string, to: string, dir: string, ends: [Located | undefined, Located | undefined]) {
+  const [a, b] = ends;
+  const km = a && b ? metresBetween(a, b) / 1000 : undefined;
+  const taxi =
+    km !== undefined
+      ? `\n\n🚕 It is about **${km < 10 ? km.toFixed(1) : Math.round(km)} km** as the crow flies — roughly **${Math.round(km * 2 + 4)} min by taxi**. Kakao T works with a foreign card.`
+      : "";
+  const [dataFrom, dataTo] = await Promise.all([a ? busDataNear(a) : undefined, b ? busDataNear(b) : undefined]);
+  if (dataFrom === false || dataTo === false) {
+    return fail(
+      "This area's buses aren't in our data",
+      `The local buses around **${dataTo === false ? to : from}** are not in the national bus open data, so I can't plan the bus there.${taxi}\n\nThe map apps carry the local routes:\n\n${dir}`,
+      RETRY,
+    );
+  }
+  return fail(
+    "No direct route found",
+    `I couldn't find a subway, a single bus, or two buses with one change that do **${from} → ${to}**.${taxi}\n\nYou can still get there:\n\n${dir}`,
+    RETRY,
+  );
+}
+
+/**
+ * Two vehicles, when one will not do.
+ *
+ * In the country-wide sweep, the trips nothing above could answer mostly needed
+ * a change: Seoul Station to the Suwon fortress is Line 1 and then a bus,
+ * Pohang Station to Homigot a city bus and then the coast bus. Both kinds are
+ * tried together, and the one that gets there sooner, door to door, is kept.
+ */
+async function tryTwoLegs(
+  from: string,
+  to: string,
+  dir: string,
+  ends: [Located | undefined, Located | undefined],
+): Promise<ReturnType<typeof ok> | undefined> {
+  const [a, b] = ends;
+  if (!a || !b) return undefined;
+  const toName = koName(to, b);
+  const graph = await getGraph();
+
+  // Subway, then a bus from one of the two stations nearest the destination
+  // that are not already within a walk of it.
+  const railThenBus = async () => {
+    const candidates = [
+      ...stationsNear(b.lat, b.lng, 15000, 3).map((s) => ({
+        k: s.station.k,
+        lat: s.station.lat,
+        lng: s.station.lng,
+        network: undefined as string | undefined,
+        metres: s.metres,
+      })),
+      ...regionalStationsNear(b, 15000, 3),
+    ]
+      .filter((c) => c.metres > STATION_WALK_M)
+      .sort((x, y) => x.metres - y.metres)
+      .slice(0, 2);
+    const tries = await Promise.all(
+      candidates.map(async (c) => {
+        const rail = c.network ? planRegionalNear(a, c, STATION_WALK_M, 50) : planCapitalNear(graph, a, c, STATION_WALK_M, 50);
+        if (!rail) return undefined;
+        const bus = await planDirectBusNear(c, b, { toName });
+        if (!bus.plan) return undefined;
+        const label: ((ko: string) => string) | undefined = c.network ? (rail as unknown as { label: (ko: string) => string }).label : undefined;
+        return { rail, label, bus: bus.plan, minutes: Math.round(rail.minutes + 5 + doorToDoor(bus.plan)) };
+      }),
+    );
+    return tries.filter((t): t is NonNullable<typeof t> => Boolean(t)).sort((x, y) => x.minutes - y.minutes)[0];
+  };
+
+  const busThenBus = async () => {
+    const t = await planTransferBusNear(a, b, { toName });
+    return t.plan ? { plan: t.plan, minutes: Math.round(doorToDoor(t.plan)) } : undefined;
+  };
+
+  const [rb, bb] = await Promise.all([railThenBus().catch(() => undefined), busThenBus().catch(() => undefined)]);
+  const onFoot = (m: number) => `about **${walkMinutes(m)} min on foot** (${m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`})`;
+  const source = "_Routes from subway and national bus open data (ⓒ국토교통부); times are typical, not live._";
+
+  if (rb && (!bb || rb.minutes <= bb.minutes)) {
+    const { rail, bus } = rb;
+    const station = (ko: string) => (rb.label ? rb.label(ko) : stationLabel(ko));
+    const first = rail.route.legs[0];
+    const last = rail.route.legs[rail.route.legs.length - 1];
+    return ok(
+      [
+        `🚇🚌 **${from} → ${to}** — subway, then one bus`,
+        "",
+        `⏱️ about **${rb.minutes} min** door to door`,
+        "",
+        ...(rail.walkToM >= 300 ? [`🚶 Walk ${onFoot(rail.walkToM)} to ${station(first.from)}`] : []),
+        ...rail.route.legs.map(
+          (l, i) => `${i === 0 ? "🚇" : "🔁"} **${lineLabel(l.line)}** ${station(l.from)} → ${station(l.to)} _(${l.stops} stop${l.stops === 1 ? "" : "s"})_`,
+        ),
+        `🚌 Then bus **${bus.routeName}** from **${busStopLabel(bus.boardAt)}**${bus.walkToStopM >= 300 ? ` (${onFoot(bus.walkToStopM)} from ${station(last.to)})` : ""} to **${busStopLabel(bus.alightAt)}** _(${bus.stops} stops, about ${bus.minutes} min)_`,
+        ...(bus.walkFromStopM >= 300 ? [`🚶 From the stop, ${onFoot(bus.walkFromStopM)} to ${to}`] : []),
+        `💳 About **₩${rail.route.fareWon.toLocaleString()}** for the subway, then the bus fare — the same transit card works for both. On the bus, tap when you board **and again when you get off**.`,
+        ...(accessLine(to) ? [accessLine(to)] : []),
+        "",
+        dir,
+        "",
+        source,
+      ].join("\n"),
+      CHOICES,
+    );
+  }
+  if (bb) {
+    const p = bb.plan;
+    return ok(
+      [
+        `🚌🚌 **${from} → ${to}** — two buses, one change`,
+        "",
+        `⏱️ about **${bb.minutes} min** door to door`,
+        "",
+        ...(p.walkToStopM >= 300 ? [`🚶 The first stop is ${onFoot(p.walkToStopM)} from ${from}`] : []),
+        `🚌 Bus **${p.first.routeName}** from **${busStopLabel(p.first.boardAt)}** to **${busStopLabel(p.first.alightAt)}** _(${p.first.stops} stops, about ${p.first.minutes} min)_`,
+        `🔁 Change to bus **${p.second.routeName}**${p.changeWalkM > 0 ? ` at **${busStopLabel(p.second.boardAt)}** (${p.changeWalkM} m walk)` : " at the same stop"} and ride to **${busStopLabel(p.second.alightAt)}** _(${p.second.stops} stops, about ${p.second.minutes} min)_`,
+        ...(p.walkFromStopM >= 300 ? [`🚶 From the stop, ${onFoot(p.walkFromStopM)} to ${to}`] : []),
+        "Tap your card when you board **and again when you get off** each bus — outside Seoul the fare is by distance, and missing the second tap costs extra.",
+        ...(accessLine(to) ? [accessLine(to)] : []),
+        "",
+        dir,
+        "",
+        source,
+      ].join("\n"),
+      CHOICES,
+    );
+  }
+  return undefined;
 }
 
 export const getTransitRoute: ToolDef = {
@@ -494,7 +714,10 @@ export const getTransitRoute: ToolDef = {
     }
 
     // Same origin & destination → no route needed; avoid a misleading "timeout" (Y9).
-    if (normalizeName(from) && normalizeName(from) === normalizeName(to)) {
+    // Compared as written: the normalized name drops words like "bus terminal"
+    // and "market", which told someone at Sokcho Bus Terminal they were already
+    // at Sokcho Market.
+    if (normalizeName(from) && from.trim().toLowerCase() === to.trim().toLowerCase()) {
       return ok(`📍 You're already at **${to}** — no transit route needed.`, [
         { emoji: "🗺️", cmdEn: `Guide me around ${to}`, descEn: "neighborhood overview" },
         { emoji: "🕒", cmdEn: `Is ${to} good to go now?`, descEn: "live hours + weather" },
@@ -518,11 +741,35 @@ export const getTransitRoute: ToolDef = {
     // the visitor can still navigate even if our live routing source is unavailable.
     const dir = directionsLinks(from, to);
 
-    // Subway first, from our own graph of Seoul Open Data. It has no quota, answers
-    // instantly, and covers the majority of visitor journeys — the metered routing
-    // API below is now only the fallback for anything the rails can't serve.
+    // A place inside the DMZ is a tour booking, not a bus ride.
+    const tour = accessFor(to);
+    if (tour?.tourOnly) return ok([`🎫 **${from} → ${to}**`, "", `🚏 ${tour.note}`, "", dir].join("\n"), CHOICES);
+
+    // Subway first, from our own graphs. By name it costs nothing and answers at once.
     const rail = await trySubwayGraph(from, to, dir);
     if (rail) return rail;
+
+    // Everything below needs to know where the two places are.
+    const ends: [Located | undefined, Located | undefined] = await Promise.all([geocode(from), geocode(to)]);
+    const [atFrom, atTo] = ends;
+
+    // Two places a few streets apart are a walk. "1913 Songjeong Market", 120 m
+    // from Gwangju Songjeong Station, came back as "no route" because no bus goes
+    // that short a way. (Two names landing on the very same point are more likely
+    // a geocoding mix-up than a walk, so those fall through.)
+    if (atFrom && atTo && !accessFor(to)?.climb) {
+      const metres = Math.round(metresBetween(atFrom, atTo));
+      if (metres >= 60 && metres < 900) {
+        return ok(
+          [`🚶 **${from} → ${to}** — it's a walk`, "", `⏱️ about **${walkMinutes(metres)} min** on foot (${metres} m)`, "", dir].join("\n"),
+          CHOICES,
+        );
+      }
+    }
+
+    // On the rails by position: the stations within a walk of each end.
+    const railNear = await trySubwayGraph(from, to, dir, ends);
+    if (railNear) return railNear;
 
     // Not on the rails — but a single bus may still do it. Bus stops sit at street
     // corners the subway never reaches, so this catches neighbourhood hops
@@ -535,7 +782,7 @@ export const getTransitRoute: ToolDef = {
           "",
           `⏱️ about **${onlyBus.minutes} min** · ${onlyBus.stops} stops · 💳 around **₩1,500**`,
           "",
-          `🚌 Take bus **${onlyBus.routeName}** at **${stationLabel(onlyBus.boardAt)}**, get off at **${stationLabel(onlyBus.alightAt)}**.`,
+          `🚌 Take bus **${onlyBus.routeName}** at **${busStopLabel(onlyBus.boardAt)}**, get off at **${busStopLabel(onlyBus.alightAt)}**.`,
           `Tap the stop name on the bus screen or count the stops — announcements are in English too.`,
           accessLine(to),
           "",
@@ -562,7 +809,7 @@ export const getTransitRoute: ToolDef = {
           "",
           `⏱️ about **${country.minutes} min** on the bus · ${country.stops} stops`,
           "",
-          `🚌 Take bus **${country.routeName}** at **${stationLabel(country.boardAt)}**, get off at **${stationLabel(country.alightAt)}**.`,
+          `🚌 Take bus **${country.routeName}** at **${busStopLabel(country.boardAt)}**, get off at **${busStopLabel(country.alightAt)}**.`,
           ...(country.walkToStopM >= 300 ? [`🚶 The stop is about ${walk(country.walkToStopM)} from ${from}.`] : []),
           ...(country.walkFromStopM >= 300 ? [`🚶 From the stop it is about ${walk(country.walkFromStopM)} to ${to}.`] : []),
           `Tap your card when you board **and again when you get off** — outside Seoul the fare is by distance, and missing the second tap costs extra.`,
@@ -576,6 +823,19 @@ export const getTransitRoute: ToolDef = {
       );
     };
     if (country.plan) return countryCard(country.plan);
+
+    // Out of time is not out of buses: the lookups kept running, and are usually
+    // in hand a moment later. Settling for two buses instead gave Jeju Airport →
+    // Seongsan a 104-minute change while express bus 111 does it in one.
+    if (country.timedOut) {
+      const again = (await nationalBusBetween(from, to).catch((): NationalBusAttempt => ({ timedOut: false }))).plan;
+      if (again) return countryCard(again);
+    }
+
+    // No single vehicle does it: a subway ride and then a bus, or two buses with
+    // a change — whichever gets there sooner, door to door.
+    const twoLegs = await tryTwoLegs(from, to, dir, ends);
+    if (twoLegs) return twoLegs;
 
     // Where we know how the trip ends — the express bus to Seongsan, the circular
     // bus up Namsan — that is an answer in itself when the routing service has
@@ -596,26 +856,13 @@ export const getTransitRoute: ToolDef = {
       return again ? countryCard(again) : undefined;
     };
 
-    // Our own planner ran out of time rather than out of buses, and this is a trip
-    // outside Seoul — which is where the metered service is weakest and slowest.
-    // Waiting another four seconds for it turned a five-second answer into an
-    // eleven-second apology. Ask ours again instead; by now it is usually warm.
-    if (country.timedOut) {
-      const again = await secondLook();
-      if (again) return again;
-    }
-
     // The metered routing service is now the last resort, not a requirement:
     // everything above answers without it. Without it and without an answer, say
     // plainly that we have no route for this pair — calling that a data outage
     // would be a story about a service the traveller never asked for.
     if (!hasKey("TRANSIT_API_KEY") || !hasKey("TOUR_API_KEY")) {
       if (known) return fromKnowledge();
-      return fail(
-        "No single subway or bus for this trip",
-        `I couldn't find one train or one bus that does **${from} → ${to}** — it may need a change, or one of the two places may be spelled differently here. You can still get there:\n\n${dir}`,
-        RETRY,
-      );
+      return noRoute(from, to, dir, ends);
     }
 
     try {
@@ -633,7 +880,7 @@ export const getTransitRoute: ToolDef = {
         const again = await secondLook();
         if (again) return again;
         if (known) return fromKnowledge();
-        return fail("No transit route found", `No public-transit path from **${from}** to **${to}** was returned.\n\n${dir}`, RETRY);
+        return noRoute(from, to, dir, ends);
       }
       const options = pickOptions(routes);
       const top = options.map((o) => renderRoute(o.route, o.label)).join("\n\n");
@@ -658,11 +905,7 @@ export const getTransitRoute: ToolDef = {
       // about: we found no single train or bus, and the transfer lookup was no
       // help either. "Couldn't reach the routing service" told them nothing they
       // could act on.
-      return fail(
-        "No direct route found",
-        `I couldn't find one train or one bus that does **${from} → ${to}**, and the transfer lookup didn't answer. This trip probably needs a change — you can still get there:\n\n${dir}\n\nOr tap Refresh to retry.`,
-        RETRY,
-      );
+      return noRoute(from, to, dir, ends);
     }
   },
 };

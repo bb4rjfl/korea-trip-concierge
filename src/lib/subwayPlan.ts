@@ -294,6 +294,40 @@ export function buildGraph(rows: StationRow[]): SubwayGraph {
           "초지", "시우", "원시",
         ],
       ],
+      // Line 1 is Seoul Metro's central stretch and four Korail lines, numbered by
+      // three operators over fifty years. The code rule left it in five pieces —
+      // 서동탄 wired to 광명, 온수 to 중동, 아산 and 신창 cut off from 천안 — so the
+      // whole of it is written out: the trunk north, Gyeongin west, the long run
+      // south, and the two short branches.
+      "01호선": [
+        [
+          "연천", "전곡", "청산", "소요산", "동두천", "보산", "동두천중앙", "지행", "덕정", "덕계",
+          "양주", "녹양", "가능", "의정부", "회룡", "망월사", "도봉산", "도봉", "방학", "창동",
+          "녹천", "월계", "광운대", "석계", "신이문", "외대앞", "회기", "청량리", "제기동", "신설동",
+          "동묘앞", "동대문", "종로5가", "종로3가", "종각", "시청", "서울역", "남영", "용산",
+          "노량진", "대방", "신길", "영등포", "신도림", "구로",
+        ],
+        [
+          "구로", "구일", "개봉", "오류동", "온수", "역곡", "소사", "부천", "중동", "송내", "부개",
+          "부평", "백운", "동암", "간석", "주안", "도화", "제물포", "도원", "동인천", "인천",
+        ],
+        [
+          "구로", "가산디지털단지", "독산", "금천구청", "석수", "관악", "안양", "명학", "금정",
+          "군포", "당정", "의왕", "성균관대", "화서", "수원", "세류", "병점", "세마", "오산대",
+          "오산", "진위", "송탄", "서정리", "평택지제", "평택", "성환", "직산", "두정", "천안",
+          "봉명", "쌍용", "아산", "탕정", "배방", "온양온천", "신창",
+        ],
+        ["금천구청", "광명"],
+        ["병점", "서동탄"],
+      ],
+      // The Everline's codes skip two numbers, which cut it in three and left
+      // 전대.에버랜드 — the station Everland is named after — joined to nothing.
+      용인경전철: [
+        [
+          "기흥", "강남대", "지석", "어정", "동백", "초당", "삼가", "시청.용인대", "명지대",
+          "김량장", "용인중앙시장", "고진", "보평", "둔전", "전대.에버랜드",
+        ],
+      ],
     };
     const rebuild = REBUILD[line];
     if (rebuild) {
@@ -309,6 +343,11 @@ export function buildGraph(rows: StationRow[]): SubwayGraph {
       chain(["금정", "산본"]);
       chain(["오남", "별내별가람"]);
     }
+
+    // The Bupyeong extension is numbered from 3700, so Line 7 stopped at 온수.
+    if (line === "07호선") chain(["온수", "까치울"]);
+    // GTX-A's northern stretch skips a number between 대곡 and 연신내.
+    if (line === "GTX-A") chain(["대곡", "연신내"]);
   }
 
   // Index Korean and English through the shared normalizer, but key Japanese and

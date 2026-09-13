@@ -21,6 +21,8 @@ export interface Access {
   gateway?: string;
   /** On a mountain, a hill or up long steps: never offered as a flat walk. */
   climb?: boolean;
+  /** Reachable only on an organised tour: no route is planned to it at all. */
+  tourOnly?: boolean;
   /** The last leg, in English — translated with the rest of the answer. */
   note: string;
 }
@@ -57,6 +59,19 @@ const ACCESS: Access[] = [
     gateway: "산성",
     climb: true,
     note: "**Namhansanseong is a mountain fortress.** From **Sanseong Station Exit 2**, bus **9** or **52** climbs to the fortress in about 15 min.",
+  },
+  {
+    // The subway gets within a kilometre; the last of it is a hill of steps.
+    keys: /haneul\s*park|하늘공원|天空公园|天空公園|ハヌル公園/i,
+    gateway: "월드컵경기장",
+    climb: true,
+    note: "**Haneul Park is on top of a hill.** From **World Cup Stadium Station Exit 1** it is about 15 min on foot to the foot of the hill, then the 291-step stairway (about 15 min) — or the small electric shuttle from the car park below.",
+  },
+  {
+    // A bus plan to the tunnel's coordinates would end at a checkpoint.
+    keys: /third\s*(?:infiltration\s*)?tunnel|3rd\s*tunnel|제3땅굴|dora\s*observatory|도라전망대|\bdmz\s*tour\b/i,
+    tourOnly: true,
+    note: "**The Third Tunnel and Dora Observatory are inside the DMZ's civilian control zone — you can't go on your own.** Book a DMZ tour (most leave from Seoul), or take the train or bus to **Imjingak** and join the DMZ tour there. Bring your passport.",
   },
   // Busan
   {

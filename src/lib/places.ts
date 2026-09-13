@@ -165,6 +165,16 @@ export const PLACES: GeoPlace[] = [
   { label: "Donggung Palace and Wolji Pond", lng: 129.227, lat: 35.8348, aliases: ["donggung", "wolji", "anapji", "동궁과월지", "안압지"] },
   { label: "Anmok Beach (Coffee Street)", lng: 128.9483, lat: 37.7723, aliases: ["anmok", "anmok beach", "안목해변", "강릉커피거리"] },
   { label: "Sokcho Tourist & Fishery Market", lng: 128.5902, lat: 38.2045, aliases: ["sokcho market", "속초관광수산시장", "속초중앙시장"] },
+  // Places no geocoder could find under their English names — measured over 117
+  // famous destinations; coordinates checked against Kakao Local.
+  { label: "The Third Infiltration Tunnel (DMZ)", lng: 126.6992, lat: 37.9165, aliases: ["third tunnel", "third infiltration tunnel", "3rd tunnel", "제3땅굴"] },
+  { label: "Iho Taewoo Beach", lng: 126.4527, lat: 33.4974, aliases: ["iho taewoo", "iho tewoo", "iho taewoo beach", "이호테우", "이호테우해변", "이호테우해수욕장"] },
+  { label: "Hwangnidan-gil", lng: 129.2096, lat: 35.8393, aliases: ["hwangnidan-gil", "hwangnidangil", "hwangridan-gil", "황리단길"] },
+  { label: "Soyang River Skywalk", lng: 127.7237, lat: 37.8933, aliases: ["soyang river skywalk", "soyanggang skywalk", "소양강스카이워크"] },
+  { label: "Gyeongpo Beach", lng: 128.9102, lat: 37.8034, aliases: ["gyeongpo", "gyeongpo beach", "경포해변", "경포해수욕장"] },
+  { label: "Ojukheon", lng: 128.8775, lat: 37.7792, aliases: ["ojukheon", "오죽헌"] },
+  { label: "Abai Village", lng: 128.5942, lat: 38.2022, aliases: ["abai village", "아바이마을"] },
+  { label: "Wahyeon Port (ferry to Oedo)", lng: 128.7048, lat: 34.8118, aliases: ["wahyeon", "wahyeon port", "wahyeon ferry terminal", "와현유람선매표소", "와현항"] },
 ];
 
 const INDEX = new Map<string, GeoPlace>();
@@ -321,5 +331,27 @@ export function resolvePlaceCoord(input: string): GeoPlace | undefined {
   // Confident fuzzy match only (a wrong geocode would misroute) — else undefined
   // so the caller falls back to TourAPI geocoding.
   const r = resolveName(raw, PLACES, placeKeys, { exact: 0.84, suggest: 0.84, maxSuggest: 1 });
-  return r.kind === "exact" ? r.item : undefined;
+  if (r.kind !== "exact") return undefined;
+  return keepsEveryWord(raw, r.item) ? r.item : undefined;
 }
+
+/**
+ * A near match that drops words is a different place. "Boseong Bus Terminal"
+ * had matched the Boseong tea fields, "Gongju Bus Terminal" the KTX station
+ * twenty kilometres out of town, and "Space Walk Pohang" Pohang Station — and a
+ * route between two of them became a route from a place to itself. So every
+ * word of a romanized name has to be in the match, by its first letters, which
+ * still lets a misspelt "Gyeongbokgoong" find the palace.
+ */
+function keepsEveryWord(asked: string, place: GeoPlace): boolean {
+  if (/[^\x00-\x7f]/.test(asked)) return true;
+  const words = (s: string) =>
+    s
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length >= 3 && !FILLER.has(w));
+  const known = words([place.label, ...place.aliases].join(" "));
+  return words(asked).every((w) => known.some((k) => k.startsWith(w.slice(0, 4)) || w.startsWith(k.slice(0, 4))));
+}
+
+const FILLER = new Set(["the", "and", "near", "korea"]);

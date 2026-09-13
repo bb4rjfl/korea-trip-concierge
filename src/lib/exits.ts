@@ -178,10 +178,17 @@ export function exitFor(place: string): ExitHint | undefined {
   return EXITS.find(({ match }) => match.test(raw) || match.test(n))?.hint;
 }
 
-/** One line ready to drop into any card. */
-export function exitLine(place: string): string | undefined {
+/**
+ * One line ready to drop into any card. Given the station the route actually
+ * ends at, a hint for a different station is withheld: a route to Starfield
+ * Library that ended at Bongeunsa told the traveller to take "Exit 5 at
+ * Samseong Station" — a station they never reached.
+ */
+export function exitLine(place: string, alightKo?: string): string | undefined {
   const h = exitFor(place);
   if (!h) return undefined;
+  const bare = (s: string) => s.replace(/역$/, "").trim();
+  if (alightKo && bare(alightKo) !== bare(h.station)) return undefined;
   // "Myeongdong Station (명동)" — the word Station belongs to the English name, not
   // wedged between it and the Hangul on the sign.
   const label = stationLabel(h.station).replace(/^([^(]+?)\s*\((.+)\)$/, "$1 Station ($2)");

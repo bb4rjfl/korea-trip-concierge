@@ -173,6 +173,21 @@ const STATIONS: StationPair[] = [
   { ko: "양원", en: "Yangwon" },
   { ko: "구리", en: "Guri" },
   { ko: "도농", en: "Donong" },
+  // The Everline, whose station names came out as "Jeondae.Ebeoraendeu" once the
+  // line was joined up and routes started using it (D-060). Signed names.
+  { ko: "전대.에버랜드", en: "Jeondae·Everland" },
+  { ko: "강남대", en: "Kangnam Univ." },
+  { ko: "지석", en: "Jiseok" },
+  { ko: "어정", en: "Eojeong" },
+  { ko: "동백", en: "Dongbaek" },
+  { ko: "삼가", en: "Samga" },
+  { ko: "시청.용인대", en: "Yongin City Hall·Yongin Univ." },
+  { ko: "명지대", en: "Myongji Univ." },
+  { ko: "김량장", en: "Gimnyangjang" },
+  { ko: "용인중앙시장", en: "Yongin Jungang Market" },
+  { ko: "고진", en: "Gojin" },
+  { ko: "보평", en: "Bopyeong" },
+  { ko: "둔전", en: "Dunjeon" },
 ];
 
 const KO_TO_EN = new Map<string, string>();
