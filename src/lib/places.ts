@@ -39,6 +39,9 @@ export const PLACES: GeoPlace[] = [
   { label: "Seongsu", lng: 127.0559, lat: 37.5445, aliases: ["seongsu", "성수", "성수동"] },
   { label: "Jamsil (Lotte World)", lng: 127.1001, lat: 37.5133, aliases: ["jamsil", "lotte world", "롯데월드", "잠실"] },
   { label: "COEX", lng: 127.0588, lat: 37.5126, aliases: ["coex", "삼성역", "코엑스"] },
+  // Inside the COEX mall, so the tourism database has no listing for it in any
+  // language — a Chinese question about it could not be placed (D-060).
+  { label: "Starfield Library", lng: 127.0602, lat: 37.5102, aliases: ["starfield library", "별마당도서관", "별마당 도서관", "星空图书馆", "星空圖書館", "スターフィールド図書館", "ピョルマダン図書館"] },
   { label: "Express Bus Terminal", lng: 127.0048, lat: 37.5046, aliases: ["express bus terminal", "고속터미널"] },
   { label: "Yeouido", lng: 126.9245, lat: 37.5217, aliases: ["yeouido", "여의도"] },
   { label: "Noryangjin", lng: 126.9425, lat: 37.5125, aliases: ["noryangjin", "노량진"] },

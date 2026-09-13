@@ -119,6 +119,13 @@ describe("a near match must not drop words", () => {
       expect(resolvePlaceCoord(n), n).toBeDefined();
     }
   });
+
+  it("knows Starfield Library in the languages visitors ask in", async () => {
+    const { resolvePlaceCoord } = await import("../src/lib/places.js");
+    for (const n of ["Starfield Library", "별마당도서관", "星空图书馆", "星空圖書館", "スターフィールド図書館"]) {
+      expect(resolvePlaceCoord(n)?.label, n).toBe("Starfield Library");
+    }
+  });
 });
 
 describe("exit hints only for the station the route ends at", () => {

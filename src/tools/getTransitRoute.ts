@@ -2,13 +2,13 @@ import { z } from "zod";
 import { SERVICE_NAME } from "../lib/constants.js";
 import { ok, fail } from "../lib/responses.js";
 import { hasKey } from "../lib/env.js";
-import { searchTopPlace } from "../lib/sources/tourapi.js";
+import { searchTopPlace, type Lang } from "../lib/sources/tourapi.js";
 import { geocodePoiName } from "../lib/sources/poi.js";
 import { routesBetween, type TransitRoute } from "../lib/sources/odsay.js";
 import { romanizeText, resolveStationKo, stationLabel, formatSubwayDirection } from "../lib/romanize.js";
 import { resolvePlaceCoord } from "../lib/places.js";
 import { detectIntercity, renderIntercity } from "../lib/intercity.js";
-import { normalizeName } from "../lib/fuzzy.js";
+import { cjkToKorean, normalizeName } from "../lib/fuzzy.js";
 import { exitLine } from "../lib/exits.js";
 import { accessFor } from "../lib/access.js";
 import { planRegional, planRegionalNear, regionalStationsNear } from "../lib/regionalSubway.js";
@@ -66,19 +66,32 @@ export async function geocode(name: string): Promise<Located | undefined> {
   }
   const hit = geocodeCache.get(q);
   if (hit) return hit;
-  const kakao = async (): Promise<Located | undefined> => {
-    const k = await kakaoKeyword(q);
+  const kakao = (text: string) => async (): Promise<Located | undefined> => {
+    if (!text) return undefined;
+    const k = await kakaoKeyword(text);
     return k ? { lat: k.lat, lng: k.lng, ko: k.name } : undefined;
   };
-  const tour = async (): Promise<Located | undefined> => {
-    const p = await searchTopPlace(q);
+  // The tourism database has a service per language; a Chinese name asked of
+  // the English one finds nothing — "星空图书馆" could not be placed at all.
+  const tour = (lang: Lang) => async (): Promise<Located | undefined> => {
+    const p = await searchTopPlace(q, lang);
     return p?.mapx != null && p?.mapy != null ? { lng: p.mapx, lat: p.mapy } : undefined;
   };
   const naver = async (): Promise<Located | undefined> => {
     const poi = await geocodePoiName(q);
     return poi ? { lng: poi.lng, lat: poi.lat, ko: /[가-힣]/.test(poi.name) ? poi.name : undefined } : undefined;
   };
-  for (const source of /[가-힣]/.test(q) ? [kakao, tour, naver] : [tour, kakao, naver]) {
+  // Japanese and Chinese names we already know in Korean go to Kakao in Korean.
+  const known = cjkToKorean(q);
+  const inKorean = known !== q ? known : "";
+  const order = /[가-힣]/.test(q)
+    ? [kakao(q), tour("ko"), naver]
+    : /[぀-ヿ]/.test(q)
+      ? [tour("ja"), kakao(inKorean), naver]
+      : /[一-鿿]/.test(q)
+        ? [tour("zh"), tour("ja"), kakao(inKorean), naver]
+        : [tour("en"), kakao(q), naver];
+  for (const source of order) {
     const found = await source().catch(() => undefined);
     if (found) {
       geocodeCache.set(q, found);
@@ -159,6 +172,9 @@ function pickOptions(routes: TransitRoute[]): { route: TransitRoute; label: stri
 function renderRoute(r: TransitRoute, label: string): string {
   const fare = r.fare ? ` · 💳 ₩${r.fare.toLocaleString()}` : "";
   const legs = r.legs
+    // A walk the routing service gives without its two ends printed as a bare
+    // "🚶" line between the rides — noise that reads like a missing instruction.
+    .filter((l) => l.mode !== "walk" || (l.from && l.to))
     .map((l) => {
       const icon = MODE_ICON[l.mode] ?? "•";
       // Romanize Korean line/station names from ODsay for English-first readers (U1).
