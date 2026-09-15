@@ -174,6 +174,11 @@ const reRouteWord =
   /how (?:do|can) i get|how to get|get to|get there|way to|directions?|route|itinerary from|가는 법|가는 길|어떻게 가|거기 어떻게|경로|길찾기|行き方|どうやって行|どう行|まで行|乗り換え|怎[么麼](?:去|走)|如何前往|怎[么麼]到|路线|路線/i;
 
 const ruleRoute: Rule = (text) => {
+  // "How do I get a taxi / a SIM / my refund" is getting hold of something, not
+  // going somewhere: the taxi button came back as "Where are you starting from?".
+  if (/\bget (?:a|an|my|the|some)\s+(?:taxi|cab|sim|e-?sim|card|refund|tax refund|ticket|visa|phone|number|wi-?fi|receipt|table)\b/i.test(text)) {
+    return null;
+  }
   const pair = extractFromTo(text);
   // "How do I get there?" / "そこまでどうやって行きますか" — the destination is in the
   // conversation, not in the sentence. Route anyway and let the slots fill it in;

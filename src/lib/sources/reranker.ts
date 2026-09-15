@@ -34,6 +34,7 @@
 
 import { fetchWithTimeout } from "../http.js";
 import { TtlCache } from "../cache.js";
+import { geminiGenerate } from "./gemini.js";
 
 /** The shortlist is small and the task is easy; a long wait is never worth it. */
 const TIMEOUT_MS = 1500;
@@ -135,17 +136,10 @@ export async function rerank(query: string, candidates: RerankCandidate[]): Prom
   };
 
   try {
-    const res = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(RERANK_MODEL)}:generateContent`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": (process.env.GEMINI_API_KEY ?? "").trim() },
-        body: JSON.stringify(body),
-      },
-      TIMEOUT_MS,
-    );
-    if (!res.ok) return give_up(`HTTP ${res.status}`);
-    const json = (await res.json()) as GeminiResponse;
+    // Through the shared client: the lite model first, and another Flash model
+    // when its daily allowance is spent, rather than no reranking at all.
+    const json = (await geminiGenerate(body, { timeoutMs: TIMEOUT_MS, prefer: RERANK_MODEL })) as GeminiResponse | null;
+    if (!json) return give_up("no model answered");
     const reply = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
     const parsed = JSON.parse(reply) as { order?: unknown };
     const order = Array.isArray(parsed.order) ? parsed.order : undefined;

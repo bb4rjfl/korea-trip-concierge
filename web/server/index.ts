@@ -6,6 +6,7 @@ import { ENV, hasKey } from "../../src/lib/env.js";
 import { warmUpSources, warmCoursePool, warmCorpus } from "../../src/lib/warmup.js";
 import { corpusSize, corpusEmbedded } from "../../src/lib/retrieval.js";
 import { trippedHosts } from "../../src/lib/http.js";
+import { geminiSkipped } from "../../src/lib/sources/gemini.js";
 import { sightsFile, warmSightsIndex } from "../../src/lib/sources/sightsIndex.js";
 import { trainBoard } from "../../src/lib/sources/trainBoard.js";
 import { pharmacyFile } from "../../src/lib/sources/pharmacyIndex.js";
@@ -209,6 +210,9 @@ app.get("/healthz", (_req: Request, res: Response) => {
     // Which upstreams we are currently skipping, so an outage is visible
     // here instead of being inferred from slow answers.
     ...(trippedHosts().length ? { degraded: trippedHosts() } : {}),
+    // Language models being skipped (spent allowance, overload) — when the
+    // preferred one is here, answers are coming from the next in the chain.
+    ...(Object.keys(geminiSkipped()).length ? { llmSkipped: geminiSkipped() } : {}),
     status: "ok",
     tools: CATALOG.length,
     llm: llmEnabled(),

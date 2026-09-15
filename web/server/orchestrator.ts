@@ -90,6 +90,17 @@ const WELCOME: Record<Lang, string> = {
   ko: "안녕하세요! 한국 여행 컨시어지입니다. 여행 중 생기는 일 — 날씨 급변, 버스·지하철 실시간 도착, 경로, 메뉴, 결제, 지금 영업 중인 곳 — 무엇이든 물어보세요.",
 };
 
+/** A greeting on its own, or a question about what this service is and does. */
+export function asksAboutUs(text: string): boolean {
+  const t = (text ?? "").trim();
+  return (
+    /^(?:hi|hello|hey|hiya|good (?:morning|afternoon|evening)|안녕(?:하세요)?|こんにちは|こんばんは|你好|您好|哈喽)[\s!.?！？。~]*$/i.test(t) ||
+    /what (?:can|do) you (?:do|help)|how can you help|what are you|who are you|what is this (?:app|service)|뭐\s*(?:를|을)?\s*할\s*수\s*있|무엇을\s*할\s*수|어떤\s*기능|넌\s*누구|何ができ|何をしてくれ|できることは|あなたは誰|你能做什么|你可以做什么|你会做什么|有什么功能|你是谁/i.test(
+      t,
+    )
+  );
+}
+
 const CLARIFY_PREFIX: Record<Lang, string> = {
   en: "Almost there — could you tell me",
   ja: "もう少しです — 教えてください：",
@@ -675,6 +686,13 @@ ${partial.reply ?? ""}`.trim(),
   // Answering this with a tourism-branded place list is a legal-exposure risk.
   if (isIllegalRequest(text)) {
     return done({ reply: ILLEGAL_REPLY[lang], chips: DEFAULT_CHIPS_BY_LANG[lang] });
+  }
+
+  // A greeting, or "what can you do?", is answered with what we do — never sent
+  // on to a tool. Without the model, "何ができますか" came back as a bar's opening
+  // hours and "뭐 할 수 있어?" as an English guide to Korean apps.
+  if (asksAboutUs(text)) {
+    return done({ reply: WELCOME[lang], chips: DEFAULT_CHIPS_BY_LANG[lang], meta: { engine: "rules" } });
   }
 
   // "Which exit?" is a one-line question with a one-line answer, and routing it

@@ -31,6 +31,7 @@
  */
 
 import { llmEnabled } from "./llm.js";
+import { geminiGenerate } from "../../src/lib/sources/gemini.js";
 
 /** What the traveller is standing in, as far as we can establish it. */
 export interface Situation {
@@ -353,21 +354,9 @@ export async function synthesize(input: SynthesisInput): Promise<string | undefi
     },
   };
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 6000);
   try {
-    const model = (process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim();
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      },
-    );
-    if (!res.ok) return undefined;
-    const json = (await res.json()) as GeminiResponse;
+    const json = (await geminiGenerate(body, { timeoutMs: 6000 })) as GeminiResponse | null;
+    if (!json) return undefined;
     const text = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     if (!text || text.length < 40) return undefined;
 
@@ -391,7 +380,5 @@ export async function synthesize(input: SynthesisInput): Promise<string | undefi
     return text;
   } catch {
     return undefined;
-  } finally {
-    clearTimeout(timer);
   }
 }

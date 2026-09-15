@@ -24,7 +24,8 @@
     "eval:rank": "tsx --env-file=.env scripts/rank-eval.ts",
     "eval:rank:lang": "tsx --env-file=.env scripts/rank-eval.ts --lang",
     "eval:route": "tsx --env-file=.env scripts/route-eval.ts",
-    "eval:trips": "tsx --env-file=.env scripts/sweep-trips.ts"
+    "eval:trips": "tsx --env-file=.env scripts/sweep-trips.ts",
+    "eval:service": "tsx --env-file=.env scripts/sweep-service.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

@@ -6,6 +6,7 @@
  */
 
 import { CATALOG, type FunctionDeclaration } from "./catalog.js";
+import { geminiGenerate as generateWithFallback } from "../../src/lib/sources/gemini.js";
 import type { Lang } from "./router.js";
 
 export interface LlmToolCall {
@@ -62,32 +63,9 @@ interface GeminiResponse {
   }[];
 }
 
+/** Through the shared client, which falls through to another Flash model when one is spent. */
 async function geminiGenerate(body: unknown, timeoutMs: number): Promise<GeminiResponse | null> {
-  const key = (process.env.GEMINI_API_KEY ?? "").trim();
-  if (!key) return null;
-  const model = (process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim();
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      },
-    );
-    if (!res.ok) {
-      console.warn(`[llm] gemini HTTP ${res.status}`);
-      return null;
-    }
-    return (await res.json()) as GeminiResponse;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+  return generateWithFallback(body, { timeoutMs });
 }
 
 /* ----------------------------- output translation ---------------------------- */
