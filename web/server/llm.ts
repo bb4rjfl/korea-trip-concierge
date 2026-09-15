@@ -108,25 +108,16 @@ export async function llmTranslate(
     masked,
   ].join("\n");
 
-  // One retry: a dropped translation used to surface as an English card inside a
-  // Korean session, so the same question looked translated on one turn and not on
-  // the next. Retrying costs a second only when the first attempt actually failed.
-  let json = await geminiGenerate(
-    {
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 3072, thinkingConfig: { thinkingBudget: 0 } },
-    },
-    timeoutMs,
-  );
-  if (!json?.candidates?.[0]?.content?.parts?.length) {
-    json = await geminiGenerate(
-      {
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 3072, thinkingConfig: { thinkingBudget: 0 } },
-      },
-      timeoutMs,
-    );
-  }
+  // A dropped translation used to surface as an English card inside a Korean
+  // session, so an empty reply gets one more try. A failed call does not: the
+  // shared client has already been through every model within the budget, and
+  // repeating all of that made a failing translation cost eighteen seconds.
+  const request = {
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.1, maxOutputTokens: 3072, thinkingConfig: { thinkingBudget: 0 } },
+  };
+  let json = await geminiGenerate(request, timeoutMs);
+  if (json && !json.candidates?.[0]?.content?.parts?.length) json = await geminiGenerate(request, timeoutMs);
   let raw = json?.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("").trim();
   if (!raw) return null;
   // Strip a chatty preamble ("Here is your translated Markdown:") — one leaked

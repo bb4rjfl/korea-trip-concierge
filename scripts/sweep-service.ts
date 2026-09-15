@@ -15,7 +15,7 @@
  */
 
 import "../src/lib/loadEnv.js";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 const args = process.argv.slice(2);
 const flag = (name: string) => args.find((a) => a === `--${name}` || a.startsWith(`--${name}=`));
@@ -415,7 +415,30 @@ async function worker(): Promise<void> {
   }
 }
 
-await Promise.all([worker(), worker(), worker()]);
+// --judge=rows.json grades a saved run again without asking the service: the
+// judge can be unavailable (its own quota) while the answers are already in hand.
+const JUDGE_FROM = flag("judge")?.split("=")[1];
+if (JUDGE_FROM) {
+  const saved = JSON.parse(readFileSync(JUDGE_FROM, "utf8")) as Row[];
+  let i = 0;
+  await Promise.all(
+    [0, 1, 2, 3].map(async () => {
+      while (i < saved.length) {
+        const r = saved[i++];
+        if (r.score >= 0 || r.device) continue;
+        const context =
+          r.kind === "tapped"
+            ? "The visitor tapped a suggestion button the service offered after its previous answer. A button that leads nowhere useful is a dead_end_button."
+            : undefined;
+        Object.assign(r, await judge(r.lang, r.intent, r.said, r.answer, context));
+        process.stdout.write(".");
+      }
+    }),
+  );
+  rows.push(...saved);
+} else {
+  await Promise.all([worker(), worker(), worker()]);
+}
 console.log("\n");
 
 /* --------------------------------- report ---------------------------------- */
