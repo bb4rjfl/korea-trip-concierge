@@ -95,7 +95,8 @@ describe("web rule router", () => {
     ["ja", "143番バスは今どこ？", "trackBusArrival"],
     ["zh", "143路公交现在在哪里？", "trackBusArrival"],
     ["ko", "홍대입구역 지하철 언제 와?", "trackSubwayArrival"],
-    ["en", "It's raining in Seoul — where can I go indoors?", "getWeatherAndAir"],
+    // Somewhere to go, not the forecast: it was a weather card with no places on it.
+    ["en", "It's raining in Seoul — where can I go indoors?", "searchPlaceForeigner"],
     ["ja", "景福宮は今開いてる？", "getNowInfo"],
     ["zh", "景福宫现在开门吗？", "getNowInfo"],
     ["en", "Plan a 1-day Seoul course for a foodie couple", "recommendTripCourse"],

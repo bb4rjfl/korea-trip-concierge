@@ -13,6 +13,7 @@ import { asksHowToGetAround } from "../../src/lib/gettingAround.js";
 import { asksAboutEtiquette, asksAboutAccess } from "../../src/lib/culture.js";
 import { asksAboutSeason } from "../../src/lib/seasons.js";
 import { asksAboutEvents } from "../../src/tools/searchPlaceForeigner.js";
+import { mentionsKnownDish } from "../../src/tools/translateMenuContext.js";
 import { asksAboutMalls } from "../../src/lib/malls.js";
 
 export type Lang = "en" | "ja" | "zh" | "ko";
@@ -99,6 +100,15 @@ export function extractFromTo(text: string): { from?: string; to?: string } | nu
     const swapped = /how|way/i.test(m[0]) && /\sto\s.+\sfrom\s/i.test(m[0]);
     return swapped ? { from: clean(m[2]), to: clean(m[1]) } : { from: clean(m[1]), to: clean(m[2]) };
   }
+  // "Gangnam to Everland", "Busan Station to Haedong Yonggungsa by subway" — two
+  // names and a "to", nothing else. With no model to read it, this was answered
+  // with the welcome message.
+  m = /^\s*(?:welcome|go|going|how|what|want|need|back|up|next|close|near|thanks|thank|hello|hi|nice|similar|due|compared|listen|talk|say|nice)\b/i.test(text)
+    ? null
+    : /^\s*([A-Z0-9][\w'.-]*(?:\s+[A-Z0-9][\w'.()-]*){0,4})\s+to\s+([A-Z0-9][\w'.-]*(?:\s+[A-Za-z0-9][\w'.()-]*){0,5}?)(?:\s+by\s+(?:subway|metro|bus|train|taxi|car|foot))?\s*[?.!]?\s*$/.exec(
+        text,
+      );
+  if (m) return { from: clean(m[1]), to: clean(m[2]) };
   m = /(.+?)(?:에서|서부터|부터)\s*(.+?)(?:까지|으로|로)?\s*(?:가는|갈|어떻게|경로|길|가)/.exec(text);
   if (m) return { from: clean(m[1]), to: clean(m[2]) };
   m = /(.+?)から(.+?)(?:まで|へ|に)/.exec(text);
@@ -151,6 +161,12 @@ const reSubway = /subway|metro|\btrain\b|지하철|전철|호선|막차|첫차|�
 
 const ruleSubway: Rule = (text) => {
   if (!reSubway.test(text)) return null;
+  // "Myeongdong to Gyeongbokgung by subway" is a journey that names its mode, not
+  // a question about the next train — it was sent to the phone's station board.
+  const journey = extractFromTo(text);
+  if (journey?.from && journey?.to && !/\b(?:next|last|first)\s+(?:train|subway|metro)|다음\s*열차|막차|次の電車|下一班/i.test(text)) {
+    return null;
+  }
   const args: Record<string, unknown> = {};
   const line = firstMatch(text, [/\bline\s*([0-9]+|[a-z가-힣]+)\b/i, /([0-9]+|[가-힣]+)\s*호선/, /([0-9]+)号线/]);
   if (line) args.line = line;
@@ -159,7 +175,8 @@ const ruleSubway: Rule = (text) => {
   if (pair?.to) args.to = pair.to;
   if (!args.station) {
     const st = firstMatch(text, [
-      /\b(?:at|from|near)\s+(.+?)(?:\s+station)?\s*(?:\?|$)/i,
+      // Stops before "toward Jamsil": the station was read as "Gangnam station toward Jamsil".
+      /\b(?:at|from|near)\s+(.+?)(?:\s+station)?(?=\s+(?:toward|towards|to|for|going)\b|\s*\?|\s*$)/i,
       /(.+?)\s*역(?:에서|의|은|는)?\s/,
       /(.+?)역/,
       /(.+?)駅/,
@@ -167,6 +184,8 @@ const ruleSubway: Rule = (text) => {
     ]);
     if (st && !reSubway.test(st)) args.station = st;
   }
+  const toward = firstMatch(text, [/\btowards?\s+(.+?)(?:\s+station)?\s*(?:\?|$)/i]);
+  if (toward && !args.to) args.to = toward;
   return { tool: "trackSubwayArrival", args };
 };
 
@@ -178,6 +197,11 @@ const ruleRoute: Rule = (text) => {
   // going somewhere: the taxi button came back as "Where are you starting from?".
   if (/\bget (?:a|an|my|the|some)\s+(?:taxi|cab|sim|e-?sim|card|refund|tax refund|ticket|visa|phone|number|wi-?fi|receipt|table)\b/i.test(text)) {
     return null;
+  }
+  // "How much is a taxi from Gimpo to Gangnam?" asks the fare, and was answered
+  // with the subway. The payment card knows how taxis charge; a route does not.
+  if ((/\b(?:taxi|cab)\b/i.test(text) && /how much|cost|fare|price|expensive/i.test(text)) || /택시비|택시\s*요금|タクシー代|タクシー料金|出租车费|打车.*多少/.test(text)) {
+    return { tool: "explainPayment", args: { situation: `taxi fare: ${text.slice(0, 160)}` } };
   }
   const pair = extractFromTo(text);
   // "How do I get there?" / "そこまでどうやって行きますか" — the destination is in the
@@ -191,10 +215,19 @@ const ruleRoute: Rule = (text) => {
   return { tool: "getTransitRoute", args };
 };
 
-const reWeather = /weather|air quality|fine ?dust|pm2\.?5|rain(?:ing|y)?|umbrella|typhoon|heat ?wave|forecast|날씨|미세먼지|비\s*(?:와|오|올)|우산|폭염|한파|태풍|天気|雨|空気|天气|下雨|空气|雾霾|气温/i;
+const reWeather = /weather|what (?:should|do|can) i wear|뭘\s*입|뭐\s*입|何を着|穿什么|air quality|fine ?dust|pm2\.?5|rain(?:ing|y)?|umbrella|typhoon|heat ?wave|forecast|날씨|미세먼지|비\s*(?:와|오|올)|우산|폭염|한파|태풍|天気|雨|空気|天气|下雨|空气|雾霾|气温/i;
 
 const ruleWeather: Rule = (text) => {
   if (!reWeather.test(text)) return null;
+  // "Indoor places for a rainy day" and "rainy day itinerary" want somewhere to
+  // go, not the forecast — both came back as a weather card.
+  if (
+    /indoor|rainy|raining|\brain\b|실내|비\s*(?:올|오|와)|우천|屋内|雨の日|雨天|室内|下雨/i.test(text) &&
+    /place|spot|where|\bgo\b|itinerar|plan|date|visit|course|실내|데이트|코스|갈\s*만한|어디|スポット|屋内|どこ|室内|去哪|景点|行程/i.test(text) &&
+    !/weather|forecast|날씨|天気|天气/i.test(text)
+  ) {
+    return null;
+  }
   const args: Record<string, unknown> = {};
   const city = findCity(text);
   if (city) args.city = city;
@@ -238,8 +271,12 @@ const ALLERGEN_WORDS: Record<string, string[]> = {
   fish: ["fish", "생선", "魚", "鱼"],
 };
 
+/** "What is budae jjigae?", "떡볶이 매워?" — a question about a dish we know by name. */
+const ASKS_ABOUT_DISH =
+  /what(?:'s| is| are| does)|taste|spicy\?|뭐야|무슨\s*음식|어떤\s*맛|맵(?:나|니|냐|지|습)|매워|매운|매울|とは|って何|何ですか|辛い|是什么|什么是|辣吗|好吃吗/i;
+
 const ruleMenu: Rule = (text) => {
-  if (!reMenu.test(text)) return null;
+  if (!reMenu.test(text) && !(ASKS_ABOUT_DISH.test(text) && mentionsKnownDish(text))) return null;
   const quoted = firstMatch(text, [/["'“”‘’「」『』](.+?)["'“”‘’「」『』]/u]);
   const menuText = quoted ?? text;
   const allergyConcerns = Object.entries(ALLERGEN_WORDS)
@@ -251,7 +288,9 @@ const ruleMenu: Rule = (text) => {
 };
 
 const rePayment =
-  /card (?:was |got )?(?:declined|rejected|refused)|declined|t-?money|payment|pay(?:ing)? (?:with|by|for)|cash only|foreign card|credit card|카드.*(?:거절|안 ?되|안 ?돼|막혀)|결제|티머니|현금|계산|支払い?|決済|カード.*(?:使え|拒否)|刷卡|支付|付款|银联|信用卡/i;
+  // Train tickets first: "Can I book KTX tickets online?" was answered with a
+  // guide to booking restaurant tables.
+  /\bktx\b|\bsrt\b|korail|train tickets?|기차표|승차권|card (?:was |got )?(?:declined|rejected|refused)|declined|t-?money|payment|pay(?:ing)? (?:with|by|for)|cash only|foreign card|credit card|카드.*(?:거절|안 ?되|안 ?돼|막혀)|결제|티머니|현금|계산|支払い?|決済|カード.*(?:使え|拒否)|刷卡|支付|付款|银联|信用卡/i;
 
 const ruleAtmSpecific = /\batm\b|현금인출|현금 인출|출금|ATM|お金.*おろ|取钱|取款/i;
 
@@ -277,7 +316,6 @@ const KOREAN_SERVICE_KEYWORDS: [RegExp, string][] = [
   [/kiosk|키오스크|券売機|自助点餐|自助机/i, "kiosk"],
   [/ticket(?:ing)?|콘서트 티켓|티켓팅|チケット|抢票|购票/i, "ticketing"],
   [/bank|remit|transfer money|송금|은행 계좌|口座|汇款|银行/i, "banking / remittance"],
-  [/temple ?stay|템플스테이/i, "temple stay"],
 ];
 
 const ruleKoreanService: Rule = (text) => {
@@ -326,7 +364,7 @@ const ruleStore: Rule = (text) => {
 };
 
 const reCourse =
-  /itinerar|course|trip plan|plan (?:my|a|the)? ?(?:trip|day)|day plan|schedule for|(?:여행)?\s*코스|일정\s*(?:짜|추천|만들)|당일치기 코스|旅程|プラン|コース(?:を|推薦)?|行程|路线规划/i;
+  /itinerar|course|trip plan|plan (?:my|a|the)?\s*(?:\d+[- ]?days?\s+|one[- ]day\s+|weekend\s+)?(?:trip|day|itinerary)|day plan|schedule for|\b(?:one|two|three|[123])[- ]?days? in\b|\bin (?:one|a|1) day\b|day trip|(?:여행)?\s*코스|일정\s*(?:짜|추천|만들)|당일치기|1박\s*2일|2박\s*3일|旅程|プラン|コース(?:を|推薦)?|日帰り観光|1日観光|[1-3一二三两]日游|行程|路线规划/i;
 
 const DURATION_WORDS: [RegExp, string][] = [
   [/half[- ]?day|반나절|半日|半天/i, "half-day"],
@@ -394,13 +432,15 @@ const ruleAreaGuide: Rule = (text) => {
 };
 
 const rePlaceSearch =
-  /find|where (?:can|do|is|are)|what'?s near|nearby|recommend|suggest|looking for|any good|best|cafe|coffee|restaurant|food|eat|bar|museum|palace|park|market|shopping|hotel|맛집|카페|식당|추천|어디|찾|박물관|궁|시장|쇼핑|먹을|먹으면|먹을까|음식|밥집|맛있|근처|주변|カフェ|レストラン|おすすめ|どこ|美術館|食べ|グルメ|近く|咖啡|餐厅|推荐|哪里|博物馆|好吃|吃什么|附近/i;
+  /things to do|what to (?:see|do)|where (?:should|to)\b|what should i (?:see|do|visit)|\bbuy\b|places? to (?:go|visit|see|eat)|\bspots?\b|\bsights?\b|attractions?|가볼\s*만한|볼거리|관광지|실내|데이트|観光|見どころ|スポット|屋内|場所|行ける|好玩|景点|去哪|find|where (?:can|do|is|are)|what'?s near|nearby|recommend|suggest|looking for|any good|best|cafe|coffee|restaurant|food|eat|bar|museum|palace|park|market|shopping|hotel|맛집|카페|식당|추천|어디|찾|박물관|궁|시장|쇼핑|먹을|먹으면|먹을까|음식|밥집|맛있|근처|주변|カフェ|レストラン|おすすめ|どこ|美術館|食べ|グルメ|近く|咖啡|餐厅|推荐|哪里|博物馆|好吃|吃什么|附近/i;
 
 const rulePlaceSearch: Rule = (text, lang) => {
   if (!rePlaceSearch.test(text)) return null;
   const args: Record<string, unknown> = { query: text, language: lang };
   const area = firstMatch(text, [
-    /\b(?:in|near|around|at)\s+(.+?)(?:\?|$)/i,
+    // Stops before "on a rainy day": the area was read as "Seoul on a rainy day",
+    // which matched nothing, so the answer was "Nothing matched".
+    /\b(?:in|near|around|at)\s+(.+?)(?=\s+(?:on|for|with|during|when|if|this|tonight|today|tomorrow)\b|\?|$)/i,
     /(.+?)(?:에서|근처|주변)/,
     /(.+?)(?:の近く|周辺|辺り)/,
     /(.+?)(?:附近|周边)/,
@@ -492,7 +532,9 @@ export function criticalRoute(text: string): RouteHit | null {
   }
   if (LAST_TRAIN.test(t)) {
     const station = firstMatch(t, [
-      /(?:from|at)\s+(.+?)(?:\s+station)?\s*(?:\?|$)/i,
+      // "\b": the "at" inside "What time…" is not a station — it made the title
+      // "Last train from time is the last train from Hongdae to Jamsil tonight".
+      /\b(?:from|at)\s+(.+?)(?:\s+station)?(?=\s+(?:to|toward|towards|tonight|today|now)\b|\s*\?|\s*$)/i,
       /(.+?)\s*역(?:에서|의|은|는)?/,
     ]);
     return { tool: "trackSubwayArrival", args: { station: station ?? "", to: "last train" } };

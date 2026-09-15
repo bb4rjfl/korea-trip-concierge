@@ -148,6 +148,10 @@ export function backfillArgs(
     case "trackSubwayArrival":
       put("station", ctx.station);
       break;
+    case "getWeatherAndAir":
+      // "What should I wear today?" under Busan's forecast means Busan's.
+      put("city", ctx.city ?? ctx.area);
+      break;
     case "getTransitRoute": {
       put("to", ctx.places[0]);
       // "from here" — the station we were just at, else the area in focus.

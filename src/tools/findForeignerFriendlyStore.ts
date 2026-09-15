@@ -274,7 +274,7 @@ export function essentialFor(input?: string): { need: Need; emoji: string; label
 }
 
 const CHOICES: Choice[] = [
-  { emoji: "💳", cmdEn: "How do I pay here as a foreigner?", cmdKo: "결제 방법", descEn: "payment options guide" },
+  { emoji: "💳", cmdEn: "How do I pay as a foreigner in Korea?", cmdKo: "외국인 결제 방법", descEn: "payment options guide" },
   { emoji: "🚇", cmdEn: "How do I get there?", descEn: "public-transit route" },
   { emoji: "🧭", cmdEn: "What other essentials are nearby?", descEn: "exchange, ATM, pharmacy, info" },
 ];

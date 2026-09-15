@@ -288,7 +288,7 @@ function render(g: PaymentGuide, matched: boolean, cardType?: string): string {
 // answer flows into the next step instead of a dead-end (P2, mirrors N4).
 const P = {
   transit: { emoji: "🚌", cmdEn: "How do I pay on the bus or subway?", cmdKo: "교통 결제", descEn: "T-money, tap-out, transfers" },
-  taxi: { emoji: "🚕", cmdEn: "How do I avoid getting overcharged by taxis?", descEn: "meter, fair fare, 1330" },
+  taxi: { emoji: "🚕", cmdEn: "How do I pay for a taxi without being overcharged?", descEn: "meter, fair fare, 1330" },
   refund: { emoji: "🧾", cmdEn: "How does the tourist tax refund work?", descEn: "VAT refund steps" },
   atm: { emoji: "🏧", cmdEn: "Find a Global ATM near me", descEn: "foreign-card ATMs nearby" },
   pharmacy: { emoji: "💊", cmdEn: "Find a pharmacy near me", descEn: "약국 + after-hours" },

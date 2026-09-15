@@ -327,6 +327,18 @@ function render(menuText: string, rawConcerns: string[]): string {
   return lines.join("\n");
 }
 
+/**
+ * "Find a place that serves this" was sent as exactly those words, and the place
+ * search could not know what "this" was — it came back with fried chicken,
+ * "anywhere". The button now names the dish the card just explained, and is left
+ * out when no dish was recognised.
+ */
+function chipsFor(card: string): Choice[] {
+  const dish = /^(?:-\s*)?\*\*([^*\n]{2,40})\*\*\s+—/m.exec(card)?.[1]?.trim();
+  if (!dish) return CHOICES.slice(1);
+  return [{ emoji: "🍜", cmdEn: `Where can I eat ${dish.toLowerCase()} nearby?`, descEn: "places that serve it" }, ...CHOICES.slice(1)];
+}
+
 const CHOICES: Choice[] = [
   { emoji: "🍜", cmdEn: "Find a place that serves this", descEn: "foreigner-friendly restaurants" },
   { emoji: "💳", cmdEn: "How do I pay at restaurants?", descEn: "card, cash, and tipping" },
@@ -394,6 +406,11 @@ export function normalizeDishText(text: string): string {
   for (const [re, roman] of HANZI_DISHES) out = out.replace(re, roman);
   return out;
 }
+
+/** Does the text name a dish we can explain? For a router that has no model to ask. */
+export function mentionsKnownDish(text: string): boolean {
+  return !render(normalizeDishText(text ?? ""), []).includes(NO_MATCH_MARKER);
+}
 export const translateMenuContext: ToolDef = {
   name: "translateMenuContext",
   description:
@@ -422,8 +439,9 @@ export const translateMenuContext: ToolDef = {
     const card = render(menuText, concerns);
     if (card.includes(NO_MATCH_MARKER)) {
       const rescued = await rescueDishes(`${menuText} ${concerns.join(" ")}`.trim());
-      if (rescued) return ok(rescued, CHOICES);
+      if (rescued) return ok(rescued, chipsFor(rescued));
+      return ok(card, CHOICES.slice(1));
     }
-    return ok(card, CHOICES);
+    return ok(card, chipsFor(card));
   },
 };

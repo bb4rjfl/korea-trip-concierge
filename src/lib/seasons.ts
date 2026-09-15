@@ -118,6 +118,11 @@ export const BY_MONTH: Record<number, Season> = {
 
 /** Is this about seasons and timing rather than today's forecast? */
 export function asksAboutSeason(text: string): boolean {
+  // "What should I wear today?" is about today's weather, not the season — our
+  // own weather button sent exactly that and got an essay on autumn.
+  if (/wear|입|着る|着れ|穿/i.test(text ?? "") && /\b(?:today|tonight|tomorrow|now)\b|오늘|내일|지금|今日|明日|今天|明天/i.test(text ?? "")) {
+    return false;
+  }
   return /good time to (?:visit|come|travel|go)|best (?:time|season|month) to|what(?:'s| is) it like in (?:spring|summer|autumn|fall|winter)|which season|what season|what should i (?:pack|wear|bring)|cherry blossom|autumn (?:leaves|foliage)|fall (?:leaves|foliage)|monsoon|rainy season|여행하기 좋은|언제 가는 게|무엇을 챙|뭘 입|벚꽃|단풍|장마|旅行(?:に)?(?:いい|良い)(?:時期|季節)|桜|紅葉|梅雨|什[么麼]?[时時]候去|最佳[时時][间間]|[樱櫻]花|[红紅][叶葉]|雨季/i.test(
     text ?? "",
   );

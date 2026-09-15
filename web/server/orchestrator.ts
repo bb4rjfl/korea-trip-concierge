@@ -90,6 +90,28 @@ const WELCOME: Record<Lang, string> = {
   ko: "안녕하세요! 한국 여행 컨시어지입니다. 여행 중 생기는 일 — 날씨 급변, 버스·지하철 실시간 도착, 경로, 메뉴, 결제, 지금 영업 중인 곳 — 무엇이든 물어보세요.",
 };
 
+/**
+ * "Refresh" and "Try again" are our own buttons, and they mean the question
+ * before them, asked again. Sent on as themselves they went wherever the words
+ * led: under a bus arrival "Refresh" came back as "Which 'Banpo Hangang Park' do
+ * you mean?", and under a route "Refresh for leaving now" as a guide to paying
+ * by card.
+ */
+const ASK_AGAIN =
+  /^\s*(?:🔄\s*)?(?:refresh(?:\s+for\s+leaving\s+now)?|try\s+again|retry|update|다시\s*(?:확인|시도)|지금\s*출발\s*새로고침|새로고침)\s*[.!]?\s*$/i;
+
+export function askAgain<T extends { role: string; content: string }>(messages: T[]): T[] {
+  const users = messages.map((m, i) => ({ m, i })).filter((x) => x.m.role === "user");
+  const last = users[users.length - 1];
+  if (!last || !ASK_AGAIN.test(last.m.content)) return messages;
+  const before = users
+    .slice(0, -1)
+    .reverse()
+    .find((x) => !ASK_AGAIN.test(x.m.content));
+  if (!before) return messages;
+  return messages.map((m, i) => (i === last.i ? { ...m, content: before.m.content } : m));
+}
+
 /** A greeting on its own, or a question about what this service is and does. */
 export function asksAboutUs(text: string): boolean {
   const t = (text ?? "").trim();
@@ -630,7 +652,7 @@ export async function handleChat(
   onDraft?: (d: ChatDraft) => void,
 ): Promise<ChatResponse> {
   const start = Date.now();
-  const history = (req.messages ?? []).filter((m) => typeof m?.content === "string");
+  const history = askAgain((req.messages ?? []).filter((m) => typeof m?.content === "string"));
   const lastUser = [...history].reverse().find((m) => m.role === "user");
   const uiLang: Lang | undefined =
     req.uiLang && ["en", "ja", "zh", "ko"].includes(req.uiLang) ? req.uiLang : undefined;
@@ -916,7 +938,9 @@ ${partial.reply ?? ""}`.trim(),
       // about how long they are here — the model read it as three days and
       // handed back a 12-stop itinerary. Multi-day plans need someone to have
       // actually mentioned more than one day.
-      const MULTI_DAY = /\b(?:\d+|two|three|four|five|a few|several)\s*(?:days?|nights?)\b|\bweek(?:end)?\b|박\s*\d|\d\s*박|\d+\s*일|이틀|사흘|며칠|일주일|泊|\d+\s*日|几天|一周|\d+\s*天/i;
+      // "2-day", hyphenated, is how most people write it — and without the hyphen
+      // here, "Plan a 2-day trip" was cut down to a one-day course.
+      const MULTI_DAY = /\b(?:\d+|two|three|four|five|a few|several)[\s-]*(?:days?|nights?)\b|\bweek(?:end)?\b|박\s*\d|\d\s*박|\d+\s*일|이틀|사흘|며칠|일주일|泊|\d+\s*日|几天|一周|\d+\s*天/i;
       const saidDays = history.some((h) => h.role === "user" && MULTI_DAY.test(h.content ?? ""));
       if (!saidDays && typeof filled.duration === "string" && /^[234]-day$/.test(filled.duration)) {
         filled.duration = "1-day";

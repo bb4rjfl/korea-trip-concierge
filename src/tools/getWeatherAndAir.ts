@@ -160,6 +160,8 @@ export const getWeatherAndAir: ToolDef = {
     if (weather?.precip) w.push(`☔ ${weather.precip}`);
     if (weather?.rainProb != null) w.push(`rain ${weather.rainProb}%`);
     lines.push(w.length ? w.join(" · ") : "🌡️ _Forecast unavailable right now (try again shortly)._");
+    const wear = whatToWear(weather?.tempC, weather?.rainProb);
+    if (wear) lines.push(wear);
 
     // Tomorrow decides what someone packs and books tonight, so it belongs on the
     // same card rather than behind another question.
@@ -194,3 +196,31 @@ export const getWeatherAndAir: ToolDef = {
     return ok(lines.join("\n"), CHOICES);
   },
 };
+
+/**
+ * What to put on, from the temperature and the chance of rain. Our own button
+ * under every forecast asks "What should I wear today?", and nothing on the card
+ * answered it — the same card came back, or an essay on the season.
+ */
+export function whatToWear(tempC?: number | null, rainProb?: number | null): string | undefined {
+  if (tempC == null) return undefined;
+  const t = Number(tempC);
+  const clothes =
+    t >= 28
+      ? "light, breathable clothes, sunscreen and water — it's hot"
+      : t >= 23
+        ? "T-shirt weather, with a thin layer for air-conditioned trains and cafés"
+        : t >= 20
+          ? "long sleeves or a light shirt"
+          : t >= 17
+            ? "a light jacket or cardigan"
+            : t >= 12
+              ? "a jacket, and a layer for the evening"
+              : t >= 9
+                ? "a warm jacket or trench coat"
+                : t >= 5
+                  ? "a coat with a warm layer underneath"
+                  : "a winter coat, hat and gloves — it's cold";
+  const umbrella = (rainProb ?? 0) >= 50 ? " Bring an umbrella." : "";
+  return `🧥 **What to wear:** ${clothes}.${umbrella}`;
+}
