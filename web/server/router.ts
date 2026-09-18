@@ -478,6 +478,12 @@ const BODY_OR_SYMPTOM =
 
 export function criticalRoute(text: string): RouteHit | null {
   const t = text ?? "";
+  // "How much is a taxi from ICN to Hongdae?" is a fare question — decided before
+  // the model, which otherwise answers it with a subway route. The payment card
+  // has the metered-fare guidance and the airport ballpark.
+  if ((/\b(?:taxi|cab)\b/i.test(t) && /how much|cost|fare|price|expensive/i.test(t)) || /택시비|택시\s*요금|タクシー(?:代|料金)|出租车费|打车.*多少/.test(t)) {
+    return { tool: "explainPayment", args: { situation: `taxi fare: ${t.slice(0, 160)}` } };
+  }
   // "How do I get around Busan?" is a transport question about a city; the place
   // rules read the city name and answered with a neighbourhood guide instead.
   if (asksHowToGetAround(t)) {

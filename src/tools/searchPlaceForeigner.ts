@@ -599,7 +599,7 @@ const CITY_MUSTSEE: Record<string, string[]> = {
   ],
 };
 const SEOUL_GENERIC_RE =
-  /things?\s*to\s*(see|do)|worth\s*(see|visit)|sightsee|what\s*to\s*(see|do)|must.?see|attraction|landmark|명소|관광|볼거리|가\s*볼|観光|觀光|观光|名所|景点|景區|景区|景點/i;
+  /things?\s*to\s*(see|do)|worth\s*(see|visit)|sightsee|what\s*to\s*(see|do)|must.?see|attraction|landmark|\bfun\b|good\s*to\s*(see|do|visit)|명소|관광|볼거리|가\s*볼|볼\s*만한|재밌|재미|추천|観光|觀光|观光|名所|景点|景區|景区|景點|好玩|楽し|おすすめ|お勧め|推[荐薦]/i;
 
 /** Detect the headline city named in a generic query, for must-see seeding. */
 function detectMustSeeCity(query: string, area: string): keyof typeof CITY_MUSTSEE | null {

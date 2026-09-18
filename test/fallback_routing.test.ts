@@ -126,6 +126,27 @@ describe("questions that looked like something else", () => {
   });
 });
 
+describe("a taxi fare is not a taxi route", () => {
+  // The model answered "how much is a taxi" with a subway route, so this is
+  // decided before the model, in criticalRoute.
+  it("answers 'how much is a taxi' with fare/payment guidance", () => {
+    expect(criticalRoute("How much is a taxi from Incheon Airport to Hongdae?")?.tool).toBe("explainPayment");
+    expect(criticalRoute("인천공항에서 홍대 택시비 얼마야?")?.tool).toBe("explainPayment");
+  });
+  it("leaves a plain 'how do I get' to the route planner", () => {
+    expect(criticalRoute("How do I get from Incheon Airport to Hongdae?")).toBeNull();
+  });
+});
+
+describe("iconic must-see in every language", () => {
+  it("leads with the curated list for fun/recommend phrasings, not only English 'must-see'", async () => {
+    const { cityMustSeeLead } = await import("../src/tools/searchPlaceForeigner.js");
+    expect(cityMustSeeLead("首尔有什么好玩的", ""), "zh fun").toMatch(/must-see/);
+    expect(cityMustSeeLead("ソウルのおすすめ観光", ""), "ja recommend").toMatch(/must-see/);
+    expect(cityMustSeeLead("서울 볼만한 곳", ""), "ko").toMatch(/must-see/);
+  });
+});
+
 describe("the menu card's button", () => {
   it("names the dish it just explained", async () => {
     const { translateMenuContext } = await import("../src/tools/translateMenuContext.js");
