@@ -19,6 +19,7 @@ import { findPlaceInText } from "../../src/lib/places.js";
 import type { DeviceTask } from "../../src/lib/deviceTask.js";
 import { nearbyTaskFor, routeTaskFor } from "./deviceTask.js";
 import { essentialFor } from "../../src/tools/findForeignerFriendlyStore.js";
+import { asksEnglishHospital, hospitalCard } from "../../src/lib/hospitals.js";
 import {
   search as retrieve,
   confident as confidentHit,
@@ -715,6 +716,17 @@ ${partial.reply ?? ""}`.trim(),
   // hours and "뭐 할 수 있어?" as an English guide to Korean apps.
   if (asksAboutUs(text)) {
     return done({ reply: WELCOME[lang], chips: DEFAULT_CHIPS_BY_LANG[lang], meta: { engine: "rules" } });
+  }
+
+  // A calm request for an English-speaking / international hospital wants named
+  // hospitals to go to, not just the emergency hotline. A life-threatening case
+  // is caught by `urgent` above and gets the ambulance banner instead.
+  if (!urgent && asksEnglishHospital(text)) {
+    return done({
+      toolMarkdown: await localizeToolBody(hospitalCard(text), lang, hant),
+      chips: DEFAULT_CHIPS_BY_LANG[lang],
+      meta: { engine: "rules" },
+    });
   }
 
   // "Which exit?" is a one-line question with a one-line answer, and routing it
